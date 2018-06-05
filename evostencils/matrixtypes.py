@@ -2,21 +2,8 @@ from sympy import MatrixSymbol
 from functools import reduce
 import operator
 
-#class SparseMatrixSymbol(MatrixSymbol):
-#    def __new__(cls, name, m, n):
-#        obj = super().__new__(cls, name, m, n)
-#        obj._matrix_type = None
-#        return obj
-#
-#    def set_matrix_type(self, matrix_type):
-#        self._matrix_type = matrix_type
-#
-#    @property
-#    def get_matrix_type(self):
-#        return self._matrix_type
 
-
-class SplittedMatrixSymbol(MatrixSymbol):
+class SparseMatrixSymbol(MatrixSymbol):
     def __new__(cls, name, m, n):
         obj = super().__new__(cls, name, m, n)
         obj._source_matrix = None
@@ -30,20 +17,32 @@ class SplittedMatrixSymbol(MatrixSymbol):
         return self._source_matrix
 
 
-def get_diagonal(A) -> SplittedMatrixSymbol:
-    D = SplittedMatrixSymbol(f"{A.name}.diagonal", *A.shape)
+class DiagonalMatrixSymbol(SparseMatrixSymbol):
+    pass
+
+
+class LowerTriangularMatrixSymbol(SparseMatrixSymbol):
+    pass
+
+
+class UpperTriangularMatrixSymbol(SparseMatrixSymbol):
+    pass
+
+
+def get_diagonal(A) -> SparseMatrixSymbol:
+    D = DiagonalMatrixSymbol(f"{A.name}.diagonal", *A.shape)
     D.set_source_matrix(A)
     return D
 
 
-def get_lower_triangle(A) -> SplittedMatrixSymbol:
-    L = SplittedMatrixSymbol(f"{A.name}.lower_triangle", *A.shape)
+def get_lower_triangle(A) -> SparseMatrixSymbol:
+    L = LowerTriangularMatrixSymbol(f"{A.name}.lower_triangle", *A.shape)
     L.set_source_matrix(A)
     return L
 
 
-def get_upper_triangle(A) -> SplittedMatrixSymbol:
-    U = SplittedMatrixSymbol(f"{A.name}.upper_triangle", *A.shape)
+def get_upper_triangle(A) -> SparseMatrixSymbol:
+    U = UpperTriangularMatrixSymbol(f"{A.name}.upper_triangle", *A.shape)
     U.set_source_matrix(A)
     return U
 
@@ -79,3 +78,23 @@ def generate_matrix_type(shape_, diag=True, lower_triangle=True, upper_triangle=
         "lower_triangle": lower_triangle,
         "upper_triangle": upper_triangle
     })
+
+
+def generate_diagonal_matrix_type(shape):
+    return generate_matrix_type(shape, diag=True, lower_triangle=False, upper_triangle=False)
+
+
+def generate_strictly_lower_triangular_matrix_type(shape):
+    return generate_matrix_type(shape, diag=False, lower_triangle=True, upper_triangle=False)
+
+
+def generate_strictly_upper_triangular_matrix_type(shape):
+    return generate_matrix_type(shape, diag=False, lower_triangle=False, upper_triangle=True)
+
+
+def generate_lower_triangular_matrix_type(shape):
+    return generate_matrix_type(shape, diag=True, lower_triangle=True, upper_triangle=False)
+
+
+def generate_upper_triangular_matrix_type(shape):
+    return generate_matrix_type(shape, diag=True, lower_triangle=False, upper_triangle=True)

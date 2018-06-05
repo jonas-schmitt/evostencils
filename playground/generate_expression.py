@@ -1,6 +1,6 @@
 from deap import base, creator, gp, tools
 from sympy import *
-from evostencils.matrix import *
+from evostencils.matrixtypes import *
 
 grid = (2,)
 
@@ -49,23 +49,25 @@ toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=2, max_=6)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
+expr = toolbox.individual()
+#print(simplify(gp.compile(expr, pset)))
 
-if __name__ == '__main__':
-    pop = toolbox.population(n=1000)
-    expr = toolbox.individual()
-    print(simplify(gp.compile(expr, pset)))
-    nodes, edges, labels = gp.graph(expr)
-
-    ## Graphviz Section ###
-    import pygraphviz as pgv
-
-    g = pgv.AGraph()
-    g.add_nodes_from(nodes)
-    g.add_edges_from(edges)
-    g.layout(prog="dot")
-
-    for i in nodes:
-        n = g.get_node(i)
-        n.attr["label"] = labels[i]
-
-    g.draw("tree.png", "png")
+# if __name__ == '__main__':
+#     pop = toolbox.population(n=1000)
+#     expr = toolbox.individual()
+#     print(simplify(gp.compile(expr, pset)))
+#     nodes, edges, labels = gp.graph(expr)
+#
+#     ## Graphviz Section ###
+#     import pygraphviz as pgv
+#
+#     g = pgv.AGraph()
+#     g.add_nodes_from(nodes)
+#     g.add_edges_from(edges)
+#     g.layout(prog="dot")
+#
+#     for i in nodes:
+#         n = g.get_node(i)
+#         n.attr["label"] = labels[i]
+#
+#     g.draw("tree.png", "png")
