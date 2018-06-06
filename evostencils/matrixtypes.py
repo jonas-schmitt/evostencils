@@ -76,21 +76,21 @@ class MatrixTypeMetaClass(type):
         is_subclass = True
         if self.shape != other.shape:
             return False
-        elif not other.diagonal:
-            is_subclass = is_subclass and not self.diagonal
-        elif not other.lower_triangle:
-            is_subclass = is_subclass and not self.lower_triangle
-        elif not other.upper_triangle:
-            is_subclass = is_subclass and not self.upper_triangle
+        elif not self.diagonal:
+            is_subclass = is_subclass and not other.diagonal
+        elif not self.lower_triangle:
+            is_subclass = is_subclass and not other.lower_triangle
+        elif not self.upper_triangle:
+            is_subclass = is_subclass and not other.upper_triangle
         return is_subclass
 
     def __hash__(self):
         return hash((*self.shape, self.diagonal, self.lower_triangle, self.upper_triangle))
 
 
-def generate_matrix_type(shape_, diag=True, lower_triangle=True, upper_triangle=True):
+def generate_matrix_type(shape, diag=True, lower_triangle=True, upper_triangle=True):
     return MatrixTypeMetaClass("MatrixType", (), {
-        "shape": shape_,
+        "shape": shape,
         "diagonal": diag,
         "lower_triangle": lower_triangle,
         "upper_triangle": upper_triangle

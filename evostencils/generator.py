@@ -34,30 +34,76 @@ class ExpressionGenerator:
     def _init_operators(self):
         A = self.get_coefficient_matrix
         GeneralMatrixType = mt.generate_matrix_type(A.shape)
-        DiagonalMatrixType = mt.generate_diagonal_matrix_type(mt.get_diagonal(self.get_coefficient_matrix))
-        StrictlyLowerTriangularMatrixType = \
-            mt.generate_strictly_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix))
-        StrictlyUpperTriangularMatrixType = \
-            mt.generate_strictly_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix))
+        DiagonalMatrixType = mt.generate_diagonal_matrix_type(mt.get_diagonal(self.get_coefficient_matrix).shape)
 
+        StrictlyLowerTriangularMatrixType = \
+            mt.generate_strictly_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix).shape)
+        StrictlyUpperTriangularMatrixType = \
+            mt.generate_strictly_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix).shape)
         LowerTriangularMatrixType = \
-            mt.generate_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix))
+            mt.generate_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix).shape)
         UpperTriangularMatrixType = \
-            mt.generate_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix))
+            mt.generate_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix).shape)
 
         matrix_addition = operator.add
         operator_name = 'add'
         for argument_types in itertools.product(self.get_matrix_types, repeat=2):
             if argument_types[0] == argument_types[1]:
                 self.add_operator(matrix_addition, argument_types, argument_types[0], operator_name)
-            elif (argument_types[0] == DiagonalMatrixType and (argument_types[1] == StrictlyLowerTriangularMatrixType or argument_types[1] == LowerTriangularMatrixType)) \
-                    or (argument_types[1] == DiagonalMatrixType and (argument_types[0] == StrictlyLowerTriangularMatrixType or argument_types[0] == LowerTriangularMatrixType)):
+            elif (argument_types[0] == DiagonalMatrixType and issubclass(argument_types[1], LowerTriangularMatrixType)) \
+                    or (argument_types[1] == DiagonalMatrixType and issubclass(argument_types[0], LowerTriangularMatrixType)):
                 self.add_operator(matrix_addition, argument_types, LowerTriangularMatrixType, operator_name)
-            elif (argument_types[0] == DiagonalMatrixType and (argument_types[1] == StrictlyUpperTriangularMatrixType or argument_types[1] == UpperTriangularMatrixType)) \
-                    or (argument_types[1] == DiagonalMatrixType and (argument_types[0] == StrictlyUpperTriangularMatrixType or argument_types[0] == UpperTriangularMatrixType)):
+            elif (argument_types[0] == DiagonalMatrixType and issubclass(argument_types[1], UpperTriangularMatrixType)) \
+                    or (argument_types[1] == DiagonalMatrixType and issubclass(argument_types[0], UpperTriangularMatrixType)):
                 self.add_operator(matrix_addition, argument_types, UpperTriangularMatrixType, operator_name)
             else:
                 self.add_operator(matrix_addition, argument_types, GeneralMatrixType, operator_name)
+
+        matrix_subtraction = operator.sub
+        operator_name = 'sub'
+        for argument_types in itertools.product(self.get_matrix_types, repeat=2):
+            if (argument_types[0] == DiagonalMatrixType and issubclass(argument_types[1], LowerTriangularMatrixType)) \
+                    or (argument_types[1] == DiagonalMatrixType and issubclass(argument_types[0], LowerTriangularMatrixType)):
+                self.add_operator(matrix_subtraction, argument_types, LowerTriangularMatrixType, operator_name)
+            elif (argument_types[0] == DiagonalMatrixType and issubclass(argument_types[1], UpperTriangularMatrixType)) \
+                    or (argument_types[1] == DiagonalMatrixType and issubclass(argument_types[0], UpperTriangularMatrixType)):
+                self.add_operator(matrix_subtraction, argument_types, UpperTriangularMatrixType, operator_name)
+            else:
+                self.add_operator(matrix_subtraction, argument_types, GeneralMatrixType, operator_name)
+
+        matrix_multiplication = operator.mul
+        operator_name = 'mul'
+        for argument_types in itertools.product(self.get_matrix_types, repeat=2):
+            if argument_types[0] == DiagonalMatrixType:
+                self.add_operator(matrix_multiplication, argument_types, argument_types[1], operator_name)
+            elif argument_types[0] == argument_types[1]:
+                self.add_operator(matrix_multiplication, argument_types, argument_types[1], operator_name)
+            else:
+                self.add_operator(matrix_multiplication, argument_types, GeneralMatrixType, operator_name)
+
+        matrix_transpose = sp.MatrixExpr.transpose
+        operator_name = 'transpose'
+
+        for argument_type in self.get_matrix_types:
+            if issubclass(argument_type, LowerTriangularMatrixType):
+                self.add_operator(matrix_transpose, [argument_type], UpperTriangularMatrixType, operator_name)
+            elif issubclass(argument_type, UpperTriangularMatrixType):
+                self.add_operator(matrix_transpose, [argument_type], LowerTriangularMatrixType, operator_name)
+            else:
+                self.add_operator(matrix_transpose, [argument_type], argument_type, operator_name)
+
+        matrix_inverse = sp.MatrixExpr.inverse
+        operator_name = 'inverse'
+
+        for argument_type in self.get_matrix_types:
+            if argument_type == DiagonalMatrixType:
+                self.add_operator(matrix_inverse, [argument_type], argument_type, operator_name)
+            elif issubclass(argument_type, LowerTriangularMatrixType):
+                self.add_operator(matrix_inverse, [argument_type], GeneralMatrixType, operator_name)
+            elif issubclass(argument_type, UpperTriangularMatrixType):
+                self.add_operator(matrix_inverse, [argument_type], GeneralMatrixType, operator_name)
+
+
 
     @staticmethod
     def _init_creator():
@@ -65,7 +111,7 @@ class ExpressionGenerator:
 
     def _init_toolbox(self):
         self._toolbox = base.Toolbox()
-        self._toolbox.register("expr", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=3)
+        self._toolbox.register("expr", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=4)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expr)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
 
