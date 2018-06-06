@@ -73,7 +73,16 @@ class MatrixTypeMetaClass(type):
                and self.upper_triangle == other.upper_triangle
 
     def __subclasscheck__(self, other):
-        return self == other
+        is_subclass = True
+        if self.shape != other.shape:
+            return False
+        elif not other.diagonal:
+            is_subclass = is_subclass and not self.diagonal
+        elif not other.lower_triangle:
+            is_subclass = is_subclass and not self.lower_triangle
+        elif not other.upper_triangle:
+            is_subclass = is_subclass and not self.upper_triangle
+        return is_subclass
 
     def __hash__(self):
         return hash((*self.shape, self.diagonal, self.lower_triangle, self.upper_triangle))
