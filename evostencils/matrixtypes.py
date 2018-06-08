@@ -1,4 +1,5 @@
 from sympy import MatrixSymbol
+from sympy import BlockMatrix
 import sympy as sp
 from functools import reduce
 import operator
@@ -115,3 +116,26 @@ def generate_lower_triangular_matrix_type(shape):
 
 def generate_upper_triangular_matrix_type(shape):
     return generate_matrix_type(shape, diag=True, lower_triangle=False, upper_triangle=True)
+
+
+def map_block_matrix(fun, B: BlockMatrix) -> BlockMatrix:
+    result_blocks = []
+    for i in range(0, B.blocks.rows):
+        result_blocks.append([])
+        for j in range(0, B.blocks.cols):
+            result_blocks[-1].append(fun(B.blocks[i * B.blocks.rows + j], (i, j)))
+    return BlockMatrix(result_blocks)
+
+
+def get_diagonal_from_block_matrix(B: BlockMatrix) -> BlockMatrix:
+    def filter(matrix, index):
+        if index[0] == index[1]:
+            return get_diagonal(matrix)
+        else:
+            return matrix
+    return map_block_matrix(filter, B)
+
+
+
+
+
