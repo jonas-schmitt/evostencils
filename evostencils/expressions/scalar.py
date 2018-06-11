@@ -1,51 +1,47 @@
 from sympy import MatrixSymbol
+from sympy.matrices.expressions.factorizations import Factorization, svd
 import sympy as sp
 from functools import reduce
 import operator
 
 
-class SparseMatrixSymbol(MatrixSymbol):
-    def __new__(cls, name, m, n):
-        m, n = sp.sympify(m), sp.sympify(n)
-        obj = super().__new__(cls, name, m, n)
-        obj._source_matrix = None
-        return obj
+class Diagonal(Factorization):
+    predicates = sp.Q.diagonal
 
-    def set_source_matrix(self, source_matrix):
-        self._source_matrix = source_matrix
-
-    @property
-    def get_source_matrix(self):
-        return self._source_matrix
+    def __str__(self):
+        return f"{self.arg}_d"
 
 
-class DiagonalMatrixSymbol(SparseMatrixSymbol):
-    pass
+class Lower(Factorization):
+    predicates = sp.Q.lower_triangular
+
+    def __str__(self):
+        return f"{self.arg}_l"
 
 
-class LowerTriangularMatrixSymbol(SparseMatrixSymbol):
-    pass
+class Upper(Factorization):
+    predicates = sp.Q.upper_triangular
+
+    def __str__(self):
+        return f"{self.arg}_u"
 
 
-class UpperTriangularMatrixSymbol(SparseMatrixSymbol):
-    pass
+def split_matrix(expr):
+    return Diagonal(expr), Lower(expr), Upper(expr)
 
 
-def get_diagonal(A) -> SparseMatrixSymbol:
-    D = DiagonalMatrixSymbol(f"{A.name}_d", *A.shape)
-    D.set_source_matrix(A)
+def get_diagonal(expr) -> Diagonal:
+    D, _, _ = split_matrix(expr)
     return D
 
 
-def get_lower_triangle(A) -> SparseMatrixSymbol:
-    L = LowerTriangularMatrixSymbol(f"{A.name}_l", *A.shape)
-    L.set_source_matrix(A)
+def get_lower_triangle(expr) -> Lower:
+    _, L, _ = split_matrix(expr)
     return L
 
 
-def get_upper_triangle(A) -> SparseMatrixSymbol:
-    U = UpperTriangularMatrixSymbol(f"{A.name}_u", *A.shape)
-    U.set_source_matrix(A)
+def get_upper_triangle(expr) -> Upper:
+    _, _, U = split_matrix(expr)
     return U
 
 

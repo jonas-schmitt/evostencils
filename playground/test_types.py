@@ -15,6 +15,6 @@ print(isinstance(MatrixType1, MatrixType2))
 print(issubclass(MatrixType1, MatrixType2))
 
 B = BlockMatrix([[A, A], [A, A]])
-B_d = block.get_lower_triangle(B)
+B_d = block.get_block_diagonal(B)
 print(B_d)
 #print(B.blockshape)
