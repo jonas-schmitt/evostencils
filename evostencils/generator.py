@@ -9,23 +9,23 @@ import itertools
 
 class ExpressionGenerator:
 
-    def __init__(self, coefficients: MatrixSymbol, unknowns: MatrixSymbol, rhs: MatrixSymbol):
-        self._coefficients = coefficients
-        self._unknowns = unknowns
-        self._rhs = rhs
+    def __init__(self, A: MatrixSymbol, x: MatrixSymbol, b: MatrixSymbol):
+        self._A = A
+        self._x = x
+        self._b = b
         self._symbols = []
         self._types = []
-        self._symbol_types = {self._coefficients: types.generate_matrix_type(self._coefficients.shape)}
-        self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._coefficients.shape))
+        self._symbol_types = {self._A: types.generate_matrix_type(self._A.shape)}
+        self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._A.shape))
         self._init_terminals()
         self._init_operators()
         self._init_creator()
         self._init_toolbox()
 
     def _init_terminals(self):
-        A = self.get_coefficient_matrix
+        A = self.A
         self.add_terminal(A, self.get_symbol_type(A))
-        identity_matrix = sp.Identity(self.get_vector_of_unknowns.shape[0])
+        identity_matrix = sp.Identity(self.x.shape[0])
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape))
         symbols = [scalar.get_diagonal(A),
                    scalar.get_lower_triangle(A),
@@ -33,18 +33,18 @@ class ExpressionGenerator:
         self.add_terminal_list(symbols)
 
     def _init_operators(self):
-        A = self.get_coefficient_matrix
+        A = self.A
         GeneralMatrixType = types.generate_matrix_type(A.shape)
-        DiagonalMatrixType = types.generate_diagonal_matrix_type(scalar.get_diagonal(self.get_coefficient_matrix).shape)
+        DiagonalMatrixType = types.generate_diagonal_matrix_type(scalar.get_diagonal(self.A).shape)
 
         StrictlyLowerTriangularMatrixType = \
-            types.generate_strictly_lower_triangular_matrix_type(scalar.get_lower_triangle(self.get_coefficient_matrix).shape)
+            types.generate_strictly_lower_triangular_matrix_type(scalar.get_lower_triangle(self.A).shape)
         StrictlyUpperTriangularMatrixType = \
-            types.generate_strictly_upper_triangular_matrix_type(scalar.get_upper_triangle(self.get_coefficient_matrix).shape)
+            types.generate_strictly_upper_triangular_matrix_type(scalar.get_upper_triangle(self.A).shape)
         LowerTriangularMatrixType = \
-            types.generate_lower_triangular_matrix_type(scalar.get_lower_triangle(self.get_coefficient_matrix).shape)
+            types.generate_lower_triangular_matrix_type(scalar.get_lower_triangle(self.A).shape)
         UpperTriangularMatrixType = \
-            types.generate_upper_triangular_matrix_type(scalar.get_upper_triangle(self.get_coefficient_matrix).shape)
+            types.generate_upper_triangular_matrix_type(scalar.get_upper_triangle(self.A).shape)
 
         matrix_addition = operator.add
         operator_name = 'add'
@@ -123,16 +123,16 @@ class ExpressionGenerator:
         return self._symbol_types[symbol]
 
     @property
-    def get_coefficient_matrix(self) -> MatrixSymbol:
-        return self._coefficients
+    def A(self) -> MatrixSymbol:
+        return self._A
 
     @property
-    def get_vector_of_unknowns(self) -> MatrixSymbol:
-        return self._unknowns
+    def x(self) -> MatrixSymbol:
+        return self._x
 
     @property
-    def get_right_hand_side_vector(self) -> MatrixSymbol:
-        return self._rhs
+    def b(self) -> MatrixSymbol:
+        return self._b
 
     @property
     def get_symbols(self) -> list:
