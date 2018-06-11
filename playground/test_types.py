@@ -1,8 +1,12 @@
-from evostencils.matrixtypes import *
-from sympy import MatrixSymbol, BlockMatrix
+from evostencils.types import *
+from evostencils.expressions import scalar
+from evostencils.expressions import block
+
+from sympy import BlockMatrix
+
 grid = (2,)
 
-A = generate_matrix_on_grid('A', grid)
+A = scalar.generate_matrix_on_grid('A', grid)
 
 MatrixType1 = generate_matrix_type(A.shape)
 MatrixType2 = generate_matrix_type(A.shape)
@@ -11,4 +15,6 @@ print(isinstance(MatrixType1, MatrixType2))
 print(issubclass(MatrixType1, MatrixType2))
 
 B = BlockMatrix([[A, A], [A, A]])
-print(map_block_matrix(lambda x: get_diagonal(x), B))
+B_d = block.get_lower_triangle(B)
+print(B_d)
+#print(B.blockshape)

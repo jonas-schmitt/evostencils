@@ -1,7 +1,8 @@
 import sympy as sp
 from sympy import MatrixSymbol
 from deap import gp, creator, base, tools
-from evostencils import matrixtypes as mt
+from evostencils import types
+from evostencils.expressions import scalar, block
 import operator
 import itertools
 
@@ -14,8 +15,8 @@ class ExpressionGenerator:
         self._rhs = rhs
         self._symbols = []
         self._types = []
-        self._symbol_types = {self._coefficients: mt.generate_matrix_type(self._coefficients.shape)}
-        self._primitive_set = gp.PrimitiveSetTyped("main", [], mt.generate_matrix_type(self._coefficients.shape))
+        self._symbol_types = {self._coefficients: types.generate_matrix_type(self._coefficients.shape)}
+        self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._coefficients.shape))
         self._init_terminals()
         self._init_operators()
         self._init_creator()
@@ -25,25 +26,25 @@ class ExpressionGenerator:
         A = self.get_coefficient_matrix
         self.add_terminal(A, self.get_symbol_type(A))
         identity_matrix = sp.Identity(self.get_vector_of_unknowns.shape[0])
-        self.add_terminal(identity_matrix, mt.generate_diagonal_matrix_type(A.shape))
-        symbols = [mt.get_diagonal(A),
-                   mt.get_lower_triangle(A),
-                   mt.get_upper_triangle(A)]
+        self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape))
+        symbols = [scalar.get_diagonal(A),
+                   scalar.get_lower_triangle(A),
+                   scalar.get_upper_triangle(A)]
         self.add_terminal_list(symbols)
 
     def _init_operators(self):
         A = self.get_coefficient_matrix
-        GeneralMatrixType = mt.generate_matrix_type(A.shape)
-        DiagonalMatrixType = mt.generate_diagonal_matrix_type(mt.get_diagonal(self.get_coefficient_matrix).shape)
+        GeneralMatrixType = types.generate_matrix_type(A.shape)
+        DiagonalMatrixType = types.generate_diagonal_matrix_type(scalar.get_diagonal(self.get_coefficient_matrix).shape)
 
         StrictlyLowerTriangularMatrixType = \
-            mt.generate_strictly_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix).shape)
+            types.generate_strictly_lower_triangular_matrix_type(scalar.get_lower_triangle(self.get_coefficient_matrix).shape)
         StrictlyUpperTriangularMatrixType = \
-            mt.generate_strictly_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix).shape)
+            types.generate_strictly_upper_triangular_matrix_type(scalar.get_upper_triangle(self.get_coefficient_matrix).shape)
         LowerTriangularMatrixType = \
-            mt.generate_lower_triangular_matrix_type(mt.get_lower_triangle(self.get_coefficient_matrix).shape)
+            types.generate_lower_triangular_matrix_type(scalar.get_lower_triangle(self.get_coefficient_matrix).shape)
         UpperTriangularMatrixType = \
-            mt.generate_upper_triangular_matrix_type(mt.get_upper_triangle(self.get_coefficient_matrix).shape)
+            types.generate_upper_triangular_matrix_type(scalar.get_upper_triangle(self.get_coefficient_matrix).shape)
 
         matrix_addition = operator.add
         operator_name = 'add'
@@ -152,14 +153,14 @@ class ExpressionGenerator:
             "Either no or the appropriate number of types must be provided"
         if not matrix_types:
             for symbol in symbols:
-                if isinstance(symbol, mt.DiagonalMatrixSymbol):
-                    self.add_terminal(symbol, mt.generate_diagonal_matrix_type(symbol.shape))
-                elif isinstance(symbol, mt.LowerTriangularMatrixSymbol):
-                    self.add_terminal(symbol, mt.generate_strictly_lower_triangular_matrix_type(symbol.shape))
-                elif isinstance(symbol, mt.UpperTriangularMatrixSymbol):
-                    self.add_terminal(symbol, mt.generate_strictly_upper_triangular_matrix_type(symbol.shape))
+                if isinstance(symbol, types.DiagonalMatrixSymbol):
+                    self.add_terminal(symbol, types.generate_diagonal_matrix_type(symbol.shape))
+                elif isinstance(symbol, types.LowerTriangularMatrixSymbol):
+                    self.add_terminal(symbol, types.generate_strictly_lower_triangular_matrix_type(symbol.shape))
+                elif isinstance(symbol, types.UpperTriangularMatrixSymbol):
+                    self.add_terminal(symbol, types.generate_strictly_upper_triangular_matrix_type(symbol.shape))
                 else:
-                    self.add_terminal(symbol, mt.generate_matrix_type(symbol.shape))
+                    self.add_terminal(symbol, types.generate_matrix_type(symbol.shape))
         else:
             for (symbol, matrix_type) in zip(symbols, matrix_types):
                 self.add_terminal(symbol, matrix_type)

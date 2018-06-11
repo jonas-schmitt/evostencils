@@ -1,12 +1,11 @@
 from evostencils.generator import ExpressionGenerator
-import evostencils.matrixtypes as mt
-import sympy as sp
+from evostencils.expressions import scalar
 
 grid = (100,)
 
-x = mt.generate_vector_on_grid('x', grid)
-b = mt.generate_vector_on_grid('b', grid)
-A = mt.generate_matrix_on_grid('A', grid)
+x = scalar.generate_vector_on_grid('x', grid)
+b = scalar.generate_vector_on_grid('b', grid)
+A = scalar.generate_matrix_on_grid('A', grid)
 
 generator = ExpressionGenerator(A, x, b)
 

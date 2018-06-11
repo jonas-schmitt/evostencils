@@ -128,13 +128,30 @@ def map_block_matrix(fun, B: BlockMatrix) -> BlockMatrix:
 
 
 def get_diagonal_from_block_matrix(B: BlockMatrix) -> BlockMatrix:
-    def filter(matrix, index):
+    def filter_matrix(matrix, index):
         if index[0] == index[1]:
             return get_diagonal(matrix)
         else:
             return matrix
-    return map_block_matrix(filter, B)
+    return map_block_matrix(filter_matrix, B)
 
+
+def get_lower_triangle_from_block_matrix(B: BlockMatrix) -> BlockMatrix:
+    def filter_matrix(matrix, index):
+        if index[0] >= index[1]:
+            return get_diagonal(matrix)
+        else:
+            return matrix
+    return map_block_matrix(filter_matrix, B)
+
+
+def get_upper_triangle_from_block_matrix(B: BlockMatrix) -> BlockMatrix:
+    def filter_matrix(matrix, index):
+        if index[0] <= index[1]:
+            return get_diagonal(matrix)
+        else:
+            return matrix
+    return map_block_matrix(filter_matrix, B)
 
 
 
