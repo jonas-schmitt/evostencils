@@ -85,9 +85,11 @@ def get_block_upper_triangle(B: BlockMatrix) -> BlockMatrix:
 
 def generate_vector_on_grid(name: str, grid_size: tuple) -> MatrixSymbol:
     n = reduce(operator.mul, grid_size, 1)
-    return BlockMatrix([[MatrixSymbol(name, n, 1)]])
+    x = BlockMatrix([[MatrixSymbol(name, n, 1)]])
+    return BlockMatrix([[x]])
 
 
 def generate_matrix_on_grid(name: str, grid_size: tuple) -> MatrixSymbol:
     n = reduce(operator.mul, grid_size, 1)
-    return BlockMatrix([[MatrixSymbol(name, n, n)]])
+    A = MatrixSymbol(name, n, n)
+    return BlockMatrix([[A]])

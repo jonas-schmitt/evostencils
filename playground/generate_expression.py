@@ -9,5 +9,7 @@ A = block.generate_matrix_on_grid('A', grid)
 
 generator = ExpressionGenerator(A, x, b)
 
-expr = generator.generate_individual()
-print(generator.compile_expression(expr))
+individual = generator.generate_individual()
+#print(generator.compile_expression(individual))
+print(generator.compile_expression(individual.tree1))
+print(generator.compile_expression(individual.tree2))

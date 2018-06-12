@@ -7,6 +7,16 @@ import operator
 import itertools
 
 
+class Individual:
+    def __init__(self, tree1, tree2):
+        self.tree1 = gp.PrimitiveTree(tree1)
+        self.tree2 = gp.PrimitiveTree(tree2)
+
+
+def initIterate(container, generator):
+    return container(generator(), generator())
+
+
 class ExpressionGenerator:
 
     def __init__(self, A: BlockMatrix, x: BlockMatrix, b: BlockMatrix):
@@ -107,12 +117,14 @@ class ExpressionGenerator:
 
     @staticmethod
     def _init_creator():
-        creator.create("Individual", gp.PrimitiveTree)
+        creator.create("Individual", Individual)
+        #creator.create("Individual", gp.PrimitiveTree)
 
     def _init_toolbox(self):
         self._toolbox = base.Toolbox()
         self._toolbox.register("expr", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=4)
-        self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expr)
+        self._toolbox.register("individual", initIterate, Individual, self._toolbox.expr)
+        #self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expr)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
 
     def set_matrix_type(self, symbol, matrix_type):
