@@ -1,6 +1,7 @@
-from sympy import BlockMatrix
-from sympy import ZeroMatrix
+from sympy import MatrixSymbol, BlockMatrix, ZeroMatrix
 from evostencils.expressions import scalar
+from functools import reduce
+import operator
 
 
 def map_block_matrix(fun, B: BlockMatrix) -> BlockMatrix:
@@ -80,3 +81,13 @@ def get_block_upper_triangle(B: BlockMatrix) -> BlockMatrix:
         else:
             return ZeroMatrix(*matrix.shape)
     return map_block_matrix(filter_matrix, B)
+
+
+def generate_vector_on_grid(name: str, grid_size: tuple) -> MatrixSymbol:
+    n = reduce(operator.mul, grid_size, 1)
+    return BlockMatrix([[MatrixSymbol(name, n, 1)]])
+
+
+def generate_matrix_on_grid(name: str, grid_size: tuple) -> MatrixSymbol:
+    n = reduce(operator.mul, grid_size, 1)
+    return BlockMatrix([[MatrixSymbol(name, n, n)]])

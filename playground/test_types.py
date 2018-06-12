@@ -2,7 +2,7 @@ from evostencils.types import *
 from evostencils.expressions import scalar
 from evostencils.expressions import block
 
-from sympy import BlockMatrix
+from sympy import BlockMatrix, Identity
 
 grid = (2,)
 
@@ -15,6 +15,8 @@ print(isinstance(MatrixType1, MatrixType2))
 print(issubclass(MatrixType1, MatrixType2))
 
 B = BlockMatrix([[A, A], [A, A]])
+I = Identity(B.shape[0])
+print(B * I)
 B_d = block.get_block_diagonal(B)
 print(B_d)
 #print(B.blockshape)

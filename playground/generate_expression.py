@@ -1,11 +1,11 @@
 from evostencils.generator import ExpressionGenerator
-from evostencils.expressions import scalar
+from evostencils.expressions import scalar, block
 
 grid = (100,)
 
-x = scalar.generate_vector_on_grid('x', grid)
-b = scalar.generate_vector_on_grid('b', grid)
-A = scalar.generate_matrix_on_grid('A', grid)
+x = block.generate_vector_on_grid('x', grid)
+b = block.generate_vector_on_grid('b', grid)
+A = block.generate_matrix_on_grid('A', grid)
 
 generator = ExpressionGenerator(A, x, b)
 

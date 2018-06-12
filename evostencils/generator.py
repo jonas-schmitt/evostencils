@@ -1,5 +1,5 @@
 import sympy as sp
-from sympy import MatrixSymbol
+from sympy import MatrixSymbol, BlockMatrix
 from deap import gp, creator, base, tools
 from evostencils import types
 from evostencils.expressions import scalar, block
@@ -9,13 +9,14 @@ import itertools
 
 class ExpressionGenerator:
 
-    def __init__(self, A: MatrixSymbol, x: MatrixSymbol, b: MatrixSymbol):
+    def __init__(self, A: BlockMatrix, x: BlockMatrix, b: BlockMatrix):
         self._A = A
         self._x = x
         self._b = b
         self._symbols = []
         self._types = []
         self._symbol_types = {self._A: types.generate_matrix_type(self._A.shape)}
+        self._symbol_names = {self._A: 'A'}
         self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._A.shape))
         self._init_terminals()
         self._init_operators()
@@ -24,13 +25,12 @@ class ExpressionGenerator:
 
     def _init_terminals(self):
         A = self.A
-        self.add_terminal(A, self.get_symbol_type(A))
+        self.add_terminal(A, self.get_symbol_type(A), 'A')
         identity_matrix = sp.Identity(self.x.shape[0])
-        self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape))
-        symbols = [scalar.get_diagonal(A),
-                   scalar.get_lower_triangle(A),
-                   scalar.get_upper_triangle(A)]
-        self.add_terminal_list(symbols)
+        self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
+        self.add_terminal(block.get_diagonal(A), types.generate_diagonal_matrix_type(A.shape), 'A_d')
+        self.add_terminal(block.get_lower_triangle(A), types.generate_strictly_lower_triangular_matrix_type(A.shape), 'A_l')
+        self.add_terminal(block.get_upper_triangle(A), types.generate_strictly_upper_triangular_matrix_type(A.shape), 'A_u')
 
     def _init_operators(self):
         A = self.A
@@ -105,7 +105,6 @@ class ExpressionGenerator:
                 self.add_operator(matrix_inverse, [argument_type], GeneralMatrixType, operator_name)
 
 
-
     @staticmethod
     def _init_creator():
         creator.create("Individual", gp.PrimitiveTree)
@@ -123,15 +122,15 @@ class ExpressionGenerator:
         return self._symbol_types[symbol]
 
     @property
-    def A(self) -> MatrixSymbol:
+    def A(self) -> BlockMatrix:
         return self._A
 
     @property
-    def x(self) -> MatrixSymbol:
+    def x(self) -> BlockMatrix:
         return self._x
 
     @property
-    def b(self) -> MatrixSymbol:
+    def b(self) -> BlockMatrix:
         return self._b
 
     @property
@@ -142,13 +141,18 @@ class ExpressionGenerator:
     def get_matrix_types(self) -> list:
         return self._types
 
-    def add_terminal(self, symbol, matrix_type):
+    def add_terminal(self, symbol, matrix_type, name=None):
         self._symbols.append(symbol)
         self._types.append(matrix_type)
         self._symbol_types[symbol] = matrix_type
-        self._primitive_set.addTerminal(symbol, matrix_type, name=str(symbol))
+        if name:
+            self._symbol_names[symbol] = name
+            self._primitive_set.addTerminal(symbol, matrix_type, name=name)
+        else:
+            self._symbol_names[symbol] = str(symbol)
+            self._primitive_set.addTerminal(symbol, matrix_type, name=str(symbol))
 
-    def add_terminal_list(self, symbols: list, matrix_types:list=None):
+    def add_terminal_list(self, symbols: list, matrix_types: list):
         assert not matrix_types or len(symbols) == len(matrix_types), \
             "Either no or the appropriate number of types must be provided"
         if not matrix_types:
@@ -172,4 +176,4 @@ class ExpressionGenerator:
         return self._toolbox.individual()
 
     def compile_expression(self, expression):
-        return gp.compile(expression, self._primitive_set)
+        return sp.block_collapse(gp.compile(expression, self._primitive_set))
