@@ -25,8 +25,8 @@ class SmootherGenerator:
         self._x = x
         self._b = b
         self._D = block.get_diagonal(A)
-        self._symbols = []
-        self._types = []
+        self._symbols = set()
+        self._types = set()
         self._symbol_types = {}
         self._symbol_names = {}
         self._invertible_primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_diagonal_matrix_type(self._A.shape))
@@ -127,19 +127,22 @@ class SmootherGenerator:
     def get_matrix_types(self) -> list:
         return self._types
 
-    def add_terminal(self, set, symbol, matrix_type, name=None):
-        self._symbols.append(symbol)
-        self._types.append(matrix_type)
+    def add_terminal(self, pset, symbol, matrix_type, name=None):
+        self._symbols.add(symbol)
+        self._types.add(matrix_type)
         self._symbol_types[symbol] = matrix_type
         if name:
             self._symbol_names[symbol] = name
-            set.addTerminal(symbol, matrix_type, name=name)
+            pset.addTerminal(symbol, matrix_type, name=name)
         else:
             self._symbol_names[symbol] = str(symbol)
-            set.addTerminal(symbol, matrix_type, name=str(symbol))
+            pset.addTerminal(symbol, matrix_type, name=str(symbol))
 
-    def add_operator(self, set, primitive, argument_types, result_type, name: str):
-        set.addPrimitive(primitive, argument_types, result_type, name)
+    def add_operator(self, pset, primitive, argument_types, result_type, name: str):
+        for argument_type in argument_types:
+            self._types.add(argument_type)
+        self._types.add(result_type)
+        pset.addPrimitive(primitive, argument_types, result_type, name)
 
     def generate_individual(self):
         return self._toolbox.individual()
