@@ -77,7 +77,7 @@ class SmootherGenerator:
         self.add_operator(self._primitive_set, operator.mul, [DiagonalMatrixType, DiagonalMatrixType], DiagonalMatrixType, 'mul')
         self.add_operator(self._primitive_set, operator.mul, [GeneralMatrixType, GeneralMatrixType], GeneralMatrixType, 'mul')
 
-        self.add_operator(self._primitive_set, sp.MatrixExpr.transpose, [GeneralMatrixType], GeneralMatrixType, 'transpose')
+        #self.add_operator(self._primitive_set, sp.MatrixExpr.transpose, [GeneralMatrixType], GeneralMatrixType, 'transpose')
 
         self.add_operator(self._primitive_set, sp.MatrixExpr.inverse, [DiagonalMatrixType], DiagonalMatrixType, 'inverse')
 
@@ -97,7 +97,7 @@ class SmootherGenerator:
     def _init_toolbox(self):
         self._toolbox = base.Toolbox()
         self._toolbox.register("invertible_expression", gp.genHalfAndHalf, pset=self._invertible_primitive_set, min_=1, max_=4)
-        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=2, max_=4)
+        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=4)
         self._toolbox.register("individual", initIterate, Individual, self._toolbox.invertible_expression, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
 
