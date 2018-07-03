@@ -10,6 +10,4 @@ A = block.generate_matrix_on_grid('A', grid)
 generator = SmootherGenerator(A, x, b)
 
 individual = generator.generate_individual()
-#print(generator.compile_expression(individual))
-print(generator.compile_expression(individual.tree1))
-print(generator.compile_expression(individual.tree2))
+print(generator.compile_scalar_individual(individual))

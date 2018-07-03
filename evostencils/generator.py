@@ -148,4 +148,12 @@ class SmootherGenerator:
         return self._toolbox.individual()
 
     def compile_expression(self, expression):
-        return sp.block_collapse(gp.compile(expression, self._primitive_set))
+        return gp.compile(expression, self._primitive_set)
+
+    def compile_scalar_individual(self, individual: Individual) -> sp.MatrixExpr:
+        M = sp.block_collapse(self.compile_expression(individual.tree1))
+        N = sp.block_collapse(self.compile_expression(individual.tree2))
+        M_inv = sp.MatrixExpr.inverse(M)
+        x = sp.block_collapse(self._x)
+        b = sp.block_collapse(self._b)
+        return M_inv * N * x + M_inv * b
