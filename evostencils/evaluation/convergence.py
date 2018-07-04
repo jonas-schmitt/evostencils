@@ -40,3 +40,13 @@ class ConvergenceEvaluator:
         else:
             result = np.float64(expression.evalf())
         return result
+
+    def compute_spectral_radius(self, expression: sp.MatrixExpr):
+        try:
+            smoother = self.transform(expression)
+            symbol = smoother.symbol()
+            return symbol.spectral_radius()
+        except RuntimeError as re:
+            return 0.0
+
+

@@ -9,7 +9,11 @@ class MatrixTypeMetaClass(type):
         return super(MatrixTypeMetaClass, mcs).__new__(mcs, class_name, bases, dct)
 
     def __eq__(self, other):
-        return self.shape == other.shape \
+        tmp = type(other)
+        if tmp is type:
+            return True
+        else:
+            return self.shape == other.shape \
                and self.diagonal == other.diagonal \
                and self.lower_triangle == other.lower_triangle \
                and self.upper_triangle == other.upper_triangle
