@@ -169,13 +169,13 @@ class SmootherOptimizer:
 
     def optimize(self):
         random.seed(10)
-        pop = self._toolbox.population(n=100)
+        pop = self._toolbox.population(n=20)
         hof = tools.HallOfFame(1)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
         stats.register("max", np.max)
-        algorithms.eaSimple(pop, self._toolbox, 0.5, 0.2, 40, stats, halloffame=hof)
+        algorithms.eaSimple(pop, self._toolbox, 0.5, 0.2, 10, halloffame=hof)
         return pop, stats, hof
 

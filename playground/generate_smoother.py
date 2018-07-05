@@ -18,13 +18,13 @@ print(expression)
 iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
 from evostencils.evaluation.convergence import *
 # Create a 2D grid with step-size (1/32, 1/32).
-fine = lfa.Grid(2, [1.0/1000, 1.0/1000])
+fine = lfa.Grid(2, [1.0, 1.0])
 
 # Create a poisson operator.
 operator = lfa.gallery.poisson_2d(fine)
 
 evaluator = ConvergenceEvaluator(operator)
-#iteration_matrix = sp.block_collapse(sp.Identity(A.shape[0]) - generator._diagonal.I * generator.operator * sp.Identity(A.shape[0]))
+iteration_matrix = sp.block_collapse(sp.Identity(A.shape[0]) - generator._diagonal.I * generator.operator * sp.Identity(A.shape[0]))
 print(iteration_matrix)
 smoother = evaluator.transform(iteration_matrix)
 print(smoother)

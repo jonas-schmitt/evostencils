@@ -9,14 +9,13 @@ class MatrixTypeMetaClass(type):
         return super(MatrixTypeMetaClass, mcs).__new__(mcs, class_name, bases, dct)
 
     def __eq__(self, other):
-        tmp = type(other)
-        if tmp is type:
-            return True
-        else:
+        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') and hasattr(other, 'upper_triangle'):
             return self.shape == other.shape \
                and self.diagonal == other.diagonal \
                and self.lower_triangle == other.lower_triangle \
                and self.upper_triangle == other.upper_triangle
+        else:
+            return False
 
     def __subclasscheck__(self, other):
         is_subclass = True
