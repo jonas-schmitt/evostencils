@@ -5,14 +5,13 @@ import sympy as sp
 import math
 import lfa_lab as lfa
 
-grid = (1000, 10000)
+grid = (1000, 1000)
 
 x = block.generate_vector_on_grid('x', grid)
 b = block.generate_vector_on_grid('b', grid)
 A = block.generate_matrix_on_grid('A', grid)
 
 
-# Create a 2D grid with step-size (1/32, 1/32).
 fine = lfa.Grid(2, [1.0, 1.0])
 # Create a poisson operator.
 operator = lfa.gallery.poisson_2d(fine)
@@ -29,6 +28,16 @@ def evaluate(individual, generator):
         return spectral_radius,
 
 
-smoother_generator = SmootherOptimizer(A, x, b, evaluate)
-result = smoother_generator.optimize()
+
+
+def main():
+    smoother_generator = SmootherOptimizer(A, x, b, evaluate)
+    pop, log, hof = smoother_generator.optimize(20, 20)
+    print(log.stream)
+    print(smoother_generator.compile_scalar_expression(hof[0]))
+    return pop, log, hof
+
+
+if __name__ == "__main__":
+    main()
 

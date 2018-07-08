@@ -44,8 +44,8 @@ class SmootherOptimizer:
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, types.generate_diagonal_matrix_type(A.shape), 'A_d')
         self.add_terminal(D.I, types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
-        self.add_terminal(block.get_lower_triangle(A), types.generate_matrix_type(A.shape), 'A_l')
-        self.add_terminal(block.get_upper_triangle(A), types.generate_matrix_type(A.shape), 'A_u')
+        self.add_terminal(block.get_lower_triangle(A), types.generate_strictly_lower_triangular_matrix_type(A.shape), 'A_l')
+        self.add_terminal(block.get_upper_triangle(A), types.generate_strictly_upper_triangular_matrix_type(A.shape), 'A_u')
 
 
 
@@ -167,15 +167,15 @@ class SmootherOptimizer:
         tmp = propagate_zero(expression.subs(rhs, sp.ZeroMatrix(*rhs.shape)))
         return tmp.subs(grid, sp.Identity(grid.shape[0]))
 
-    def optimize(self):
+    def optimize(self, population, generations):
         random.seed(10)
-        pop = self._toolbox.population(n=20)
+        pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
         stats.register("max", np.max)
-        algorithms.eaSimple(pop, self._toolbox, 0.5, 0.2, 10, halloffame=hof)
-        return pop, stats, hof
+        pop, log = algorithms.eaSimple(pop, self._toolbox, 0.5, 0.2, generations, stats=stats, halloffame=hof, verbose=True)
+        return pop, log, hof
 
