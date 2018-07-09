@@ -1,6 +1,14 @@
 import sympy as sp
 
 
+class Interpolation(sp.MatrixSymbol):
+    pass
+
+
+class Restriction(sp.MatrixSymbol):
+    pass
+
+
 def smooth(grid, smoother, operator, rhs):
     A = operator
     u = grid
@@ -13,21 +21,24 @@ def residual(grid, operator, rhs):
     return rhs - operator * grid
 
 
-def correct(grid, interpolation, correction):
-    return grid + interpolation * correction
+def correct(grid, correction):
+    return grid + correction
 
 
-def get_interpolation(fine_grid, coarse_grid):
-    return sp.MatrixSymbol(f'I_{coarse_grid.shape[0]}', coarse_grid.shape[0], fine_grid.shape[1])
+def get_interpolation(coarse_grid, fine_grid):
+    return Interpolation(f'I_{coarse_grid.shape[0]}', fine_grid.shape[0], coarse_grid.shape[0])
 
 
 def get_restriction(fine_grid, coarse_grid):
-    return sp.MatrixSymbol(f'R_{fine_grid.shape[0]}', fine_grid.shape[0], coarse_grid.shape[1])
+    return Restriction(f'R_{fine_grid.shape[0]}', coarse_grid.shape[0], fine_grid.shape[0])
 
 
 def get_coarse_grid(fine_grid, factor):
-    return sp.MatrixSymbol(f'{fine_grid.name}_{fine_grid.shape[0]}', fine_grid.shape[0] / factor, fine_grid.shape[1])
+    return sp.MatrixSymbol(f'{str(fine_grid)}_{fine_grid.shape[0]}', fine_grid.shape[0] / factor, fine_grid.shape[1])
 
 
 def get_coarse_operator(fine_operator, factor):
-    return sp.MatrixSymbol(f'{fine_operator.name}_{fine_operator.shape[0]}', fine_operator.shape[0] / factor, fine_operator.shape[1] / factor)
+    return sp.MatrixSymbol(f'{str(fine_operator)}_{fine_operator.shape[0] / factor}', fine_operator.shape[0] / factor, fine_operator.shape[1] / factor)
+
+
+

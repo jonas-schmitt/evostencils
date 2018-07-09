@@ -4,7 +4,7 @@ from sympy import BlockMatrix
 from deap import gp, creator, base, tools, algorithms
 import random
 from evostencils import types
-from evostencils.expressions import block
+from evostencils.expressions import scalar, block
 from evostencils.expressions import multigrid
 import operator
 import functools
@@ -12,7 +12,7 @@ import functools
 def dummy_eval(individual, generator):
     return 0.0
 
-class SmootherOptimizer:
+class Optimizer:
 
     def __init__(self, operator: BlockMatrix, grid: BlockMatrix, rhs: BlockMatrix, evaluate=dummy_eval):
         self._operator = operator
@@ -39,55 +39,80 @@ class SmootherOptimizer:
         # Add primitives to set
         self.add_terminal(A, types.generate_matrix_type(A.shape), 'A')
         self.add_terminal(u, types.generate_matrix_type(u.shape), 'u')
-        #self.add_terminal(f, types.generate_matrix_type(f.shape), 'b')
 
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, types.generate_diagonal_matrix_type(A.shape), 'A_d')
-        self.add_terminal(D.I, types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
-        self.add_terminal(block.get_lower_triangle(A), types.generate_strictly_lower_triangular_matrix_type(A.shape), 'A_l')
-        self.add_terminal(block.get_upper_triangle(A), types.generate_strictly_upper_triangular_matrix_type(A.shape), 'A_u')
+        self.add_terminal(block.get_lower_triangle(A), types.generate_matrix_type(A.shape), 'A_l')
+        self.add_terminal(block.get_upper_triangle(A), types.generate_matrix_type(A.shape), 'A_u')
+
+        # Multigrid recipes
+        coarsening_factor = 4
+        coarse_grid = multigrid.get_coarse_grid(u, coarsening_factor)
+        coarse_operator = multigrid.get_coarse_operator(A, coarsening_factor)
+        interpolation = multigrid.get_interpolation(coarse_grid, u)
+        restriction = multigrid.get_restriction(u, coarse_grid)
+
+        self.add_terminal(sp.ZeroMatrix(*coarse_grid.shape), types.generate_matrix_type(coarse_grid.shape), 'Zero')
+        self.add_terminal(coarse_operator, types.generate_matrix_type(coarse_operator.shape), 'A_coarse')
+        self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
+        self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
+
+        self._coarsening_factor = coarsening_factor
+        self._coarse_grid = coarse_grid
+        self._coarse_operator = coarse_operator
+        self._interpolation = interpolation
+        self._restriction = restriction
+
+        self.add_terminal(sp.ZeroMatrix(*interpolation.shape), types.generate_zero_matrix_type(interpolation.shape), 'Zero_P')
+        self.add_terminal(sp.ZeroMatrix(*restriction.shape), types.generate_zero_matrix_type(restriction.shape), 'Zero_R')
 
 
 
     def _init_operators(self):
         A = self._operator
         u = self._grid
-        GeneralMatrixType = types.generate_matrix_type(A.shape)
-        VectorType = types.generate_matrix_type(u.shape)
-        DiagonalMatrixType = types.generate_diagonal_matrix_type(block.get_diagonal(A).shape)
-
-        StrictlyLowerTriangularMatrixType = \
-            types.generate_strictly_lower_triangular_matrix_type(block.get_lower_triangle(A).shape)
-        StrictlyUpperTriangularMatrixType = \
-            types.generate_strictly_upper_triangular_matrix_type(block.get_upper_triangle(A).shape)
-        LowerTriangularMatrixType = \
-            types.generate_lower_triangular_matrix_type(block.get_lower_triangle(A).shape)
-        UpperTriangularMatrixType = \
-            types.generate_upper_triangular_matrix_type(block.get_upper_triangle(A).shape)
+        FineOperatorType = types.generate_matrix_type(A.shape)
+        FineGridType = types.generate_matrix_type(u.shape)
+        FineDiagonalOperatorType = types.generate_diagonal_matrix_type(block.get_diagonal(A).shape)
 
         # Add primitives to full set
-        self.add_operator(operator.add, [DiagonalMatrixType, DiagonalMatrixType], DiagonalMatrixType, 'add')
-        self.add_operator(operator.add, [GeneralMatrixType, GeneralMatrixType], GeneralMatrixType, 'add')
+        self.add_operator(operator.add, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'add')
+        self.add_operator(operator.add, [FineOperatorType, FineOperatorType], FineOperatorType, 'add')
 
-        self.add_operator(operator.sub, [DiagonalMatrixType, DiagonalMatrixType], DiagonalMatrixType, 'sub')
-        self.add_operator(operator.sub, [GeneralMatrixType, GeneralMatrixType], GeneralMatrixType, 'sub')
+        self.add_operator(operator.sub, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'sub')
+        self.add_operator(operator.sub, [FineOperatorType, FineOperatorType], FineOperatorType, 'sub')
 
-        self.add_operator(operator.mul, [DiagonalMatrixType, DiagonalMatrixType], DiagonalMatrixType, 'mul')
-        self.add_operator(operator.mul, [GeneralMatrixType, GeneralMatrixType], GeneralMatrixType, 'mul')
+        self.add_operator(operator.mul, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'mul')
+        self.add_operator(operator.mul, [FineOperatorType, FineOperatorType], FineOperatorType, 'mul')
 
-        self.add_operator(sp.MatrixExpr.inverse, [DiagonalMatrixType], DiagonalMatrixType, 'inverse')
-
-        # self.add_operator(operator.add, [VectorType, VectorType], VectorType, 'add')
-        #
-        # self.add_operator(operator.sub, [VectorType, VectorType], GeneralMatrixType, 'sub')
-        #
-        # self.add_operator(operator.mul, [GeneralMatrixType, VectorType], VectorType, 'mul')
+        self.add_operator(sp.MatrixExpr.inverse, [FineDiagonalOperatorType], FineDiagonalOperatorType, 'inverse')
 
         smooth = functools.partial(multigrid.smooth, operator=self._operator, rhs=self._rhs)
-        residual = functools.partial(multigrid.residual, operator=self._operator, rhs=self._rhs)
 
-        self.add_operator(smooth, [VectorType, GeneralMatrixType], VectorType, 'smooth')
-        #self.add_operator(residual, [VectorType], VectorType, 'residual')
+        self.add_operator(smooth, [FineGridType, FineOperatorType], FineGridType, 'smooth')
+
+        # Multigrid recipes
+
+        residual = functools.partial(multigrid.residual, operator=self._operator, rhs=self._rhs)
+        self.add_operator(residual, [FineGridType], FineGridType, 'residual')
+
+        InterpolationType = types.generate_matrix_type(self._interpolation.shape)
+        RestrictionType = types.generate_matrix_type(self._restriction.shape)
+        CoarseOperatorType = types.generate_matrix_type(self._coarse_operator.shape)
+        CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
+
+        self.add_operator(operator.mul, [RestrictionType, FineGridType], CoarseGridType, 'restrict')
+        self.add_operator(operator.mul, [InterpolationType, CoarseGridType], FineGridType, 'interpolate')
+
+        self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
+        self.add_operator(sp.MatrixExpr.inverse, [CoarseOperatorType], CoarseOperatorType, 'inverse')
+
+
+        self.add_operator(operator.add, [RestrictionType, types.generate_zero_matrix_type(self._restriction.shape)], RestrictionType, 'add')
+        self.add_operator(operator.add, [InterpolationType, types.generate_zero_matrix_type(self._interpolation.shape)], InterpolationType, 'add')
+        self.add_operator(operator.add, [types.generate_zero_matrix_type(self._restriction.shape), types.generate_zero_matrix_type(self._restriction.shape)], types.generate_zero_matrix_type(self._restriction.shape), 'add')
+        self.add_operator(operator.add, [types.generate_zero_matrix_type(self._interpolation.shape), types.generate_zero_matrix_type(self._interpolation.shape)], types.generate_zero_matrix_type(self._interpolation.shape), 'add')
+
 
 
     @staticmethod
@@ -97,7 +122,7 @@ class SmootherOptimizer:
 
     def _init_toolbox(self, evaluate):
         self._toolbox = base.Toolbox()
-        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=2)
+        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
@@ -168,7 +193,7 @@ class SmootherOptimizer:
         return tmp.subs(grid, sp.Identity(grid.shape[0]))
 
     def optimize(self, population, generations):
-        random.seed(10)
+        random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
         stats = tools.Statistics(lambda ind: ind.fitness.values)

@@ -60,3 +60,7 @@ def generate_lower_triangular_matrix_type(shape):
 
 def generate_upper_triangular_matrix_type(shape):
     return generate_matrix_type(shape, diag=True, lower_triangle=False, upper_triangle=True)
+
+
+def generate_zero_matrix_type(shape):
+    return generate_matrix_type(shape, diag=False, lower_triangle=False, upper_triangle=False)
