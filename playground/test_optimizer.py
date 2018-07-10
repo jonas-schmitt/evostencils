@@ -32,7 +32,6 @@ def evaluate(individual, generator):
 def main():
     smoother_generator = Optimizer(A, x, b, evaluate)
     pop, log, hof = smoother_generator.ea_simple(50, 20, 0.5, 0.3)
-    print(log.stream)
     print(smoother_generator.compile_scalar_expression(hof[0]))
     return pop, log, hof
 

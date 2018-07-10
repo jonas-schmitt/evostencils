@@ -102,7 +102,7 @@ class ConvergenceEvaluator:
         try:
             smoother = self.transform(expression)
             symbol = smoother.symbol()
-        return symbol.spectral_radius()
+            return symbol.spectral_radius()
         except RuntimeError as re:
             return 0.0
 
