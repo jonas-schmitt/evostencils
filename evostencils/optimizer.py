@@ -192,7 +192,7 @@ class Optimizer:
         tmp = propagate_zero(expression.subs(rhs, sp.ZeroMatrix(*rhs.shape)))
         return tmp.subs(grid, sp.Identity(grid.shape[0]))
 
-    def optimize(self, population, generations):
+    def ea_simple(self, population, generations, crossover_probability, mutation_probability):
         random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
@@ -201,6 +201,32 @@ class Optimizer:
         stats.register("std", np.std)
         stats.register("min", np.min)
         stats.register("max", np.max)
-        pop, log = algorithms.eaSimple(pop, self._toolbox, 0.5, 0.2, generations, stats=stats, halloffame=hof, verbose=True)
+        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
         return pop, log, hof
+
+    def ea_mu_plus_lambda(self, population, generations, mu_, lambda_, crossover_probability, mutation_probability):
+        random.seed()
+        pop = self._toolbox.population(n=population)
+        hof = tools.HallOfFame(1)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("avg", np.mean)
+        stats.register("std", np.std)
+        stats.register("min", np.min)
+        stats.register("max", np.max)
+        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
+        return pop, log, hof
+
+    def ea_mu_comma_lambda(self, population, generations, mu_, lambda_, crossover_probability, mutation_probability):
+        random.seed()
+        pop = self._toolbox.population(n=population)
+        hof = tools.HallOfFame(1)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("avg", np.mean)
+        stats.register("std", np.std)
+        stats.register("min", np.min)
+        stats.register("max", np.max)
+        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
+        return pop, log, hof
+
+
 

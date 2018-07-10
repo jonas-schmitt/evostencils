@@ -24,7 +24,7 @@ def evaluate(individual, generator):
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = evaluator.compute_spectral_radius(iteration_matrix)
     if spectral_radius == 0.0:
-        return 1e20,
+        return math.inf,
     else:
         return spectral_radius,
 
@@ -33,7 +33,7 @@ def evaluate(individual, generator):
 
 def main():
     smoother_generator = Optimizer(A, x, b, evaluate)
-    pop, log, hof = smoother_generator.optimize(100, 20)
+    pop, log, hof = smoother_generator.ea_simple(1000, 20, 0.5, 0.3)
     print(log.stream)
     print(smoother_generator.compile_scalar_expression(hof[0]))
     return pop, log, hof
