@@ -5,7 +5,7 @@ import sympy as sp
 import math
 import lfa_lab as lfa
 
-fine_grid_size = (1024, 1024)
+fine_grid_size = (8, 8)
 
 x = block.generate_vector_on_grid('x', fine_grid_size)
 b = block.generate_vector_on_grid('b', fine_grid_size)
@@ -29,11 +29,9 @@ def evaluate(individual, generator):
         return spectral_radius,
 
 
-
-
 def main():
     smoother_generator = Optimizer(A, x, b, evaluate)
-    pop, log, hof = smoother_generator.ea_simple(1000, 20, 0.5, 0.3)
+    pop, log, hof = smoother_generator.ea_simple(50, 20, 0.5, 0.3)
     print(log.stream)
     print(smoother_generator.compile_scalar_expression(hof[0]))
     return pop, log, hof

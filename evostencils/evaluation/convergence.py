@@ -76,16 +76,23 @@ class ConvergenceEvaluator:
             result = self.fine_operator.matching_identity()
         elif isinstance(expression, sp.ZeroMatrix):
             result = self.fine_operator.matching_zero()
-        elif isinstance(expression, multigrid.Restriction):
+        elif type(expression) == multigrid.Restriction:
             result = self._restriction
-        elif isinstance(expression, multigrid.Interpolation):
+        elif type(expression) == multigrid.Interpolation:
             result = self._interpolation
         elif isinstance(expression, sp.MatrixSymbol):
-            n = reduce(operator.mul, self.fine_grid_size, 1)
-            if expression.shape == (n, n):
-                result = self.fine_operator
+            #TODO dirty fix here to return the right symbol
+            #TODO We need a better solution here!
+            if expression.shape[0] > expression.shape[1]:
+                result = self._interpolation
+            elif expression.shape[0] < expression.shape[1]:
+                result = self._restriction
             else:
-                result = self.coarse_operator
+                n = reduce(operator.mul, self.fine_grid_size, 1)
+                if expression.shape == (n, n):
+                    result = self.fine_operator
+                else:
+                    result = self.coarse_operator
         else:
             tmp = expression.evalf()
             result = complex(tmp)
@@ -95,7 +102,7 @@ class ConvergenceEvaluator:
         try:
             smoother = self.transform(expression)
             symbol = smoother.symbol()
-            return symbol.spectral_radius()
+        return symbol.spectral_radius()
         except RuntimeError as re:
             return 0.0
 

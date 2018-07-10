@@ -113,6 +113,10 @@ class Optimizer:
         self.add_operator(operator.add, [types.generate_zero_matrix_type(self._restriction.shape), types.generate_zero_matrix_type(self._restriction.shape)], types.generate_zero_matrix_type(self._restriction.shape), 'add')
         self.add_operator(operator.add, [types.generate_zero_matrix_type(self._interpolation.shape), types.generate_zero_matrix_type(self._interpolation.shape)], types.generate_zero_matrix_type(self._interpolation.shape), 'add')
 
+        # Coarse grid correction
+
+        #coarse_grid_correction = functools.partial(multigrid.coarse_grid_correction, self.operator, self.rhs, self._coarse_operator, self._restriction, self._interpolation)
+        #self.add_operator(coarse_grid_correction, [FineGridType], FineGridType, 'cgc')
 
 
     @staticmethod

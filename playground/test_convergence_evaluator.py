@@ -23,13 +23,13 @@ R = multigrid.get_restriction(u, u_coarse)
 coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2, 2)))
 evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
 smoother = sp.Identity(A.shape[0]) - block.get_diagonal(A).I * A * sp.Identity(A.shape[0])
-two_grid = smoother * (sp.Identity(A.shape[0]) - P * A_coarse.I * R * A) * smoother
+two_grid = (sp.Identity(A.shape[0]) - P * A_coarse.I * R * A)
 iteration_matrix = sp.block_collapse(two_grid)
 print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 jacobi = lfa_lab.jacobi(fine_operator, 1.0)
 reference = lfa_lab.coarse_grid_correction(fine_operator, coarse_operator, evaluator.interpolation, evaluator.restriction, coarse_error=None)
-print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
+print(reference.symbol().spectral_radius())
 
 
