@@ -1,5 +1,5 @@
 from evostencils.optimizer import Optimizer
-from evostencils.expressions import scalar, block, transformations
+from evostencils.expressions import scalar, block, transformations, multigrid
 from evostencils.evaluation.convergence import *
 import sympy as sp
 import math
@@ -24,18 +24,19 @@ def evaluate(individual, generator):
     expression = transformations.fold_intergrid_operations(generator.compile_scalar_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = evaluator.compute_spectral_radius(iteration_matrix)
-    expr_length = len(expression.atoms(sp.MatrixExpr))
+    atoms = expression.atoms(sp.MatMul, sp.MatAdd)
+    expr_length = len(atoms)
     if spectral_radius == 0.0:
         spectral_radius = infinity
-    if expr_length == 0.0:
+    if expr_length <= 1:
         expr_length = infinity
     return spectral_radius, expr_length
 
 
 def main():
     smoother_generator = Optimizer(A, x, b, evaluate)
-    pop, log, hof = smoother_generator.ea_simple(1000, 20, 0.5, 0.3)
-    #pop, log, hof = smoother_generator.ea_mu_plus_lambda(200, 20, 200, 200, 0.5, 0.3)
+    #pop, log, hof = smoother_generator.ea_simple(1000, 20, 0.5, 0.3)
+    pop, log, hof = smoother_generator.ea_mu_plus_lambda(200, 20, 0.5, 0.3, 100, 100)
     print(smoother_generator.compile_scalar_expression(hof[0]))
     return pop, log, hof
 
