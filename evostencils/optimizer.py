@@ -53,7 +53,7 @@ class Optimizer:
         restriction = multigrid.get_restriction(u, coarse_grid)
 
         self.add_terminal(sp.ZeroMatrix(*coarse_grid.shape), types.generate_matrix_type(coarse_grid.shape), 'Zero')
-        self.add_terminal(coarse_operator.I, types.generate_matrix_type(coarse_operator.shape), 'A_coarse_inv')
+        self.add_terminal(coarse_operator, types.generate_matrix_type(coarse_operator.shape), 'A_coarse')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
 
