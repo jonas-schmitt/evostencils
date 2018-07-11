@@ -12,8 +12,8 @@ import functools
 def dummy_eval(individual, generator):
     return 0.0
 
-class Optimizer:
 
+class Optimizer:
     def __init__(self, operator: BlockMatrix, grid: BlockMatrix, rhs: BlockMatrix, evaluate=dummy_eval):
         self._operator = operator
         self._grid = grid
@@ -49,7 +49,7 @@ class Optimizer:
         coarsening_factor = 4
         coarse_grid = multigrid.get_coarse_grid(u, coarsening_factor)
         coarse_operator = multigrid.get_coarse_operator(A, coarsening_factor)
-        interpolation = multigrid.get_interpolation(coarse_grid, u)
+        interpolation = multigrid.get_interpolation(u, coarse_grid)
         restriction = multigrid.get_restriction(u, coarse_grid)
 
         self.add_terminal(sp.ZeroMatrix(*coarse_grid.shape), types.generate_matrix_type(coarse_grid.shape), 'Zero')
@@ -121,7 +121,7 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0, -1.0))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     def _init_toolbox(self, evaluate):
@@ -135,8 +135,8 @@ class Optimizer:
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=2)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
-        #self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
-        #self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
+        #self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
+        #self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
 
     def set_matrix_type(self, symbol, matrix_type):
         self._symbol_types[symbol] = matrix_type
@@ -200,7 +200,7 @@ class Optimizer:
         random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
@@ -208,11 +208,11 @@ class Optimizer:
         pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def ea_mu_plus_lambda(self, population, generations, mu_, lambda_, crossover_probability, mutation_probability):
+    def ea_mu_plus_lambda(self, population, generations, crossover_probability, mutation_probability, mu_, lambda_):
         random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
@@ -220,11 +220,11 @@ class Optimizer:
         pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def ea_mu_comma_lambda(self, population, generations, mu_, lambda_, crossover_probability, mutation_probability):
+    def ea_mu_comma_lambda(self, population, generations, crossover_probability, mutation_probability, mu_, lambda_):
         random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)

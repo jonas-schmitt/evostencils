@@ -1,11 +1,22 @@
 import sympy as sp
 from evostencils.expressions import block
 
-class Interpolation(sp.MatrixSymbol):
-    pass
+class Restriction(sp.MatrixExpr):
+    def __new__(cls, m, n):
+        return super(Restriction, cls).__new__(cls, m, n)
 
-class Restriction(sp.MatrixSymbol):
-    pass
+    @property
+    def shape(self):
+        return self.args[0], self.args[1]
+
+
+class Interpolation(sp.MatrixExpr):
+    def __new__(cls, m, n):
+        return super(Interpolation, cls).__new__(cls, m, n)
+
+    @property
+    def shape(self):
+        return self.args[0], self.args[1]
 
 
 def smooth(grid, smoother, operator, rhs):
@@ -24,20 +35,20 @@ def correct(grid, correction):
     return grid + correction
 
 
-def get_interpolation(coarse_grid, fine_grid):
-    return Interpolation(f'I_{coarse_grid.shape[0]}', fine_grid.shape[0], coarse_grid.shape[0])
+def get_interpolation(fine_grid, coarse_grid):
+    return Interpolation(fine_grid.shape[0], coarse_grid.shape[0])
 
 
 def get_restriction(fine_grid, coarse_grid):
-    return Restriction(f'R_{fine_grid.shape[0]}', coarse_grid.shape[0], fine_grid.shape[0])
+    return Restriction(coarse_grid.shape[0], fine_grid.shape[0])
 
 
 def get_coarse_grid(fine_grid, factor):
-    return sp.MatrixSymbol(f'{str(fine_grid)}_{fine_grid.shape[0]}', fine_grid.shape[0] / factor, fine_grid.shape[1])
+    return sp.MatrixSymbol(f'{str(fine_grid)}_coarse', fine_grid.shape[0] / factor, fine_grid.shape[1])
 
 
 def get_coarse_operator(fine_operator, factor):
-    return sp.MatrixSymbol(f'{str(fine_operator)}_{fine_operator.shape[0] / factor}', fine_operator.shape[0] / factor, fine_operator.shape[1] / factor)
+    return sp.MatrixSymbol(f'{str(fine_operator)}_coarse', fine_operator.shape[0] / factor, fine_operator.shape[1] / factor)
 
 
 def coarse_grid_correction(operator, rhs, coarse_operator, restriction, interpolation, grid, coarse_error=None):

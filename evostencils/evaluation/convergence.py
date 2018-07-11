@@ -81,18 +81,11 @@ class ConvergenceEvaluator:
         elif type(expression) == multigrid.Interpolation:
             result = self._interpolation
         elif isinstance(expression, sp.MatrixSymbol):
-            #TODO dirty fix here to return the right symbol
-            #TODO We need a better solution here!
-            if expression.shape[0] > expression.shape[1]:
-                result = self._interpolation
-            elif expression.shape[0] < expression.shape[1]:
-                result = self._restriction
+            n = reduce(operator.mul, self.fine_grid_size, 1)
+            if expression.shape == (n, n):
+                result = self.fine_operator
             else:
-                n = reduce(operator.mul, self.fine_grid_size, 1)
-                if expression.shape == (n, n):
-                    result = self.fine_operator
-                else:
-                    result = self.coarse_operator
+                result = self.coarse_operator
         else:
             tmp = expression.evalf()
             result = complex(tmp)
