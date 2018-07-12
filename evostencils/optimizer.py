@@ -53,7 +53,7 @@ class Optimizer:
         restriction = multigrid.get_restriction(u, coarse_grid)
 
         self.add_terminal(sp.ZeroMatrix(*coarse_grid.shape), types.generate_matrix_type(coarse_grid.shape), 'Zero')
-        self.add_terminal(coarse_operator, types.generate_matrix_type(coarse_operator.shape), 'A_coarse')
+        self.add_terminal(coarse_operator.I, types.generate_matrix_type(coarse_operator.shape), 'A_coarse_inv')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
 
@@ -62,9 +62,6 @@ class Optimizer:
         self._coarse_operator = coarse_operator
         self._interpolation = interpolation
         self._restriction = restriction
-
-        self.add_terminal(sp.ZeroMatrix(*interpolation.shape), types.generate_zero_matrix_type(interpolation.shape), 'Zero_P')
-        self.add_terminal(sp.ZeroMatrix(*restriction.shape), types.generate_zero_matrix_type(restriction.shape), 'Zero_R')
 
 
 
@@ -93,27 +90,36 @@ class Optimizer:
 
         # Multigrid recipes
 
-        residual = functools.partial(multigrid.residual, operator=self._operator, rhs=self._rhs)
-        self.add_operator(residual, [FineGridType], FineGridType, 'residual')
-
         InterpolationType = types.generate_matrix_type(self._interpolation.shape)
         RestrictionType = types.generate_matrix_type(self._restriction.shape)
         CoarseOperatorType = types.generate_matrix_type(self._coarse_operator.shape)
         CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
 
+        # Residual
+        residual = functools.partial(multigrid.residual, operator=self._operator, rhs=self._rhs)
+        self.add_operator(residual, [FineGridType], FineGridType, 'residual')
+
+        # Restriction
         self.add_operator(operator.mul, [RestrictionType, FineGridType], CoarseGridType, 'restrict')
+        # Interpolation
         self.add_operator(operator.mul, [InterpolationType, CoarseGridType], FineGridType, 'interpolate')
 
+        # Solving on the coarse grid
         self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
-        self.add_operator(sp.MatrixExpr.inverse, [CoarseOperatorType], CoarseOperatorType, 'inverse')
 
+        # Correction
+        self.add_operator(multigrid.correct, [FineGridType, FineGridType], FineGridType, 'correct')
 
-        self.add_operator(operator.add, [RestrictionType, types.generate_zero_matrix_type(self._restriction.shape)], RestrictionType, 'add')
-        self.add_operator(operator.add, [InterpolationType, types.generate_zero_matrix_type(self._interpolation.shape)], InterpolationType, 'add')
-        self.add_operator(operator.add, [types.generate_zero_matrix_type(self._restriction.shape), types.generate_zero_matrix_type(self._restriction.shape)], types.generate_zero_matrix_type(self._restriction.shape), 'add')
-        self.add_operator(operator.add, [types.generate_zero_matrix_type(self._interpolation.shape), types.generate_zero_matrix_type(self._interpolation.shape)], types.generate_zero_matrix_type(self._interpolation.shape), 'add')
+        # Dummy operations
+        def noop(A):
+            return A
 
-        # Coarse grid correction
+        self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
+        self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
+        self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
+        #self.add_operator(noop, [CoarseGridType], CoarseGridType, 'noop')
+
+        # Full coarse grid correction
 
         #coarse_grid_correction = functools.partial(multigrid.coarse_grid_correction, self.operator, self.rhs, self._coarse_operator, self._restriction, self._interpolation)
         #self.add_operator(coarse_grid_correction, [FineGridType], FineGridType, 'cgc')
@@ -121,12 +127,12 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0, -1.0))
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0, -1e-10))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     def _init_toolbox(self, evaluate):
         self._toolbox = base.Toolbox()
-        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
+        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=2, max_=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
@@ -135,8 +141,8 @@ class Optimizer:
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=2)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
-        #self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
-        #self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
+        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
+        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
 
     def set_matrix_type(self, symbol, matrix_type):
         self._symbol_types[symbol] = matrix_type
