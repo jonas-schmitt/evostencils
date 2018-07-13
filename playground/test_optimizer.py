@@ -24,20 +24,23 @@ def evaluate(individual, generator):
     expression = transformations.fold_intergrid_operations(generator.compile_scalar_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = evaluator.compute_spectral_radius(iteration_matrix)
-    atoms = expression.atoms(sp.MatMul, sp.MatAdd)
-    expr_length = len(atoms)
     if spectral_radius == 0.0:
         spectral_radius = infinity
-    if expr_length <= 1:
-        expr_length = infinity
-    return spectral_radius, expr_length
+    return spectral_radius,
 
 
 def main():
-    smoother_generator = Optimizer(A, x, b, evaluate)
-    pop, log, hof = smoother_generator.ea_simple(200, 20, 0.5, 0.3)
-    #pop, log, hof = smoother_generator.ea_mu_plus_lambda(1000, 20, 0.5, 0.3, 500, 500)
-    print(smoother_generator.compile_scalar_expression(hof[0]))
+    optimizer = Optimizer(A, x, b, evaluate)
+    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
+    i = 1
+    print('\n')
+    for ind in hof:
+        print(f'Individual {i} with fitness {ind.fitness}')
+        expression = transformations.fold_intergrid_operations(optimizer.compile_scalar_expression(ind))
+        print(f'Update expression: {expression}')
+        iteration_matrix = optimizer.get_iteration_matrix(expression, sp.block_collapse(optimizer.grid), sp.block_collapse(optimizer.rhs))
+        print(f'Iteration Matrix: {iteration_matrix}\n')
+        i = i + 1
     return pop, log, hof
 
 

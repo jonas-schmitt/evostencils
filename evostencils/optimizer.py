@@ -127,7 +127,7 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0, -1e-10))
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     def _init_toolbox(self, evaluate):
@@ -141,8 +141,8 @@ class Optimizer:
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=2)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
-        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
-        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=10))
+        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=15))
+        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=15))
 
     def set_matrix_type(self, symbol, matrix_type):
         self._symbol_types[symbol] = matrix_type
@@ -202,11 +202,11 @@ class Optimizer:
         tmp = propagate_zero(expression.subs(rhs, sp.ZeroMatrix(*rhs.shape)))
         return tmp.subs(grid, sp.Identity(grid.shape[0]))
 
-    def ea_simple(self, population, generations, crossover_probability, mutation_probability):
+    def simple_gp(self, population, generations, crossover_probability, mutation_probability):
         random.seed()
         pop = self._toolbox.population(n=population)
-        hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+        hof = tools.HallOfFame(10)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
@@ -214,29 +214,26 @@ class Optimizer:
         pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def ea_mu_plus_lambda(self, population, generations, crossover_probability, mutation_probability, mu_, lambda_):
+    def harm_gp(self, population, generations, crossover_probability, mutation_probability):
         random.seed()
         pop = self._toolbox.population(n=population)
-        hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats.register("avg", np.mean)
-        stats.register("std", np.std)
-        stats.register("min", np.min)
-        stats.register("max", np.max)
-        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
+        hof = tools.HallOfFame(10)
+
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+
+        pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats,
+                           halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def ea_mu_comma_lambda(self, population, generations, crossover_probability, mutation_probability, mu_, lambda_):
-        random.seed()
-        pop = self._toolbox.population(n=population)
-        hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats.register("avg", np.mean)
-        stats.register("std", np.std)
-        stats.register("min", np.min)
-        stats.register("max", np.max)
-        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
-        return pop, log, hof
+    def default_optimization(self, population, generations, crossover_probability, mutation_probability):
+        return self.harm_gp(population, generations, crossover_probability, mutation_probability)
+
 
 
 
