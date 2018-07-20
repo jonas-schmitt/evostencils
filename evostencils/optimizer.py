@@ -93,21 +93,11 @@ class Optimizer:
         InterpolationType = types.generate_matrix_type(self._interpolation.shape)
         RestrictionType = types.generate_matrix_type(self._restriction.shape)
         CoarseOperatorType = types.generate_matrix_type(self._coarse_operator.I.shape)
-        CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
-
-        # Restriction
-        self.add_operator(operator.mul, [RestrictionType, GridType], CoarseGridType, 'restrict')
-        # Interpolation
-        self.add_operator(operator.mul, [InterpolationType, CoarseGridType], GridType, 'interpolate')
-
-        # Solving on the coarse grid
-        self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
 
         # Create intergrid operators
         self.add_operator(operator.mul, [CoarseOperatorType, RestrictionType], RestrictionType, 'mul')
         self.add_operator(operator.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
         self.add_operator(operator.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
-
 
         # Dummy operations
         def noop(A):
@@ -116,6 +106,16 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
+
+        # Unclear if needed
+        # CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
+        # # Restriction
+        # self.add_operator(operator.mul, [RestrictionType, GridType], CoarseGridType, 'restrict')
+        # # Interpolation
+        # self.add_operator(operator.mul, [InterpolationType, CoarseGridType], GridType, 'interpolate')
+        # # Solving on the coarse grid
+        # self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
+
 
 
     @staticmethod
@@ -129,13 +129,13 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
-        self._toolbox.register("select", tools.selTournament, tournsize=2)
+        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=3, parsimony_size=1.5, fitness_first=False)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
-        self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=20))
-        self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=20))
+        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
+        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
 
     def set_matrix_type(self, symbol, matrix_type):
         self._symbol_types[symbol] = matrix_type
@@ -226,6 +226,20 @@ class Optimizer:
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
         return self.harm_gp(population, generations, crossover_probability, mutation_probability)
+
+    @staticmethod
+    def visualize_tree(individual, filename):
+        import pygraphviz as pgv
+        nodes, edges, labels = gp.graph(individual)
+        g = pgv.AGraph()
+        g.add_nodes_from(nodes)
+        g.add_edges_from(edges)
+        g.layout(prog="dot")
+        for i in nodes:
+            n = g.get_node(i)
+            n.attr["label"] = labels[i]
+        g.draw(f"{filename}.png", "png")
+
 
 
 
