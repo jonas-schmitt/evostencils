@@ -42,6 +42,7 @@ class Optimizer:
 
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, types.generate_diagonal_matrix_type(A.shape), 'A_d')
+        self.add_terminal(D.I, types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
         self.add_terminal(block.get_lower_triangle(A), types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(block.get_upper_triangle(A), types.generate_matrix_type(A.shape), 'A_u')
 
@@ -68,47 +69,45 @@ class Optimizer:
     def _init_operators(self):
         A = self._operator
         u = self._grid
-        FineOperatorType = types.generate_matrix_type(A.shape)
-        FineGridType = types.generate_matrix_type(u.shape)
-        FineDiagonalOperatorType = types.generate_diagonal_matrix_type(block.get_diagonal(A).shape)
+        OperatorType = types.generate_matrix_type(A.shape)
+        GridType = types.generate_matrix_type(u.shape)
+        DiagonalOperatorType = types.generate_diagonal_matrix_type(block.get_diagonal(A).shape)
 
         # Add primitives to full set
-        self.add_operator(operator.add, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'add')
-        self.add_operator(operator.add, [FineOperatorType, FineOperatorType], FineOperatorType, 'add')
+        self.add_operator(operator.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'add')
+        self.add_operator(operator.add, [OperatorType, OperatorType], OperatorType, 'add')
 
-        self.add_operator(operator.sub, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'sub')
-        self.add_operator(operator.sub, [FineOperatorType, FineOperatorType], FineOperatorType, 'sub')
+        self.add_operator(operator.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'sub')
+        self.add_operator(operator.sub, [OperatorType, OperatorType], OperatorType, 'sub')
 
-        self.add_operator(operator.mul, [FineDiagonalOperatorType, FineDiagonalOperatorType], FineDiagonalOperatorType, 'mul')
-        self.add_operator(operator.mul, [FineOperatorType, FineOperatorType], FineOperatorType, 'mul')
+        self.add_operator(operator.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'mul')
+        self.add_operator(operator.mul, [OperatorType, OperatorType], OperatorType, 'mul')
 
-        self.add_operator(sp.MatrixExpr.inverse, [FineDiagonalOperatorType], FineDiagonalOperatorType, 'inverse')
+        self.add_operator(sp.MatrixExpr.inverse, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
 
-        smooth = functools.partial(multigrid.smooth, operator=self._operator, rhs=self._rhs)
-
-        self.add_operator(smooth, [FineGridType, FineOperatorType], FineGridType, 'smooth')
+        # Correction
+        correct = functools.partial(multigrid.correct, operator=self._operator, rhs=self._rhs)
+        self.add_operator(correct, [OperatorType, GridType], GridType, 'correct')
 
         # Multigrid recipes
-
         InterpolationType = types.generate_matrix_type(self._interpolation.shape)
         RestrictionType = types.generate_matrix_type(self._restriction.shape)
-        CoarseOperatorType = types.generate_matrix_type(self._coarse_operator.shape)
+        CoarseOperatorType = types.generate_matrix_type(self._coarse_operator.I.shape)
         CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
 
-        # Residual
-        residual = functools.partial(multigrid.residual, operator=self._operator, rhs=self._rhs)
-        self.add_operator(residual, [FineGridType], FineGridType, 'residual')
-
         # Restriction
-        self.add_operator(operator.mul, [RestrictionType, FineGridType], CoarseGridType, 'restrict')
+        self.add_operator(operator.mul, [RestrictionType, GridType], CoarseGridType, 'restrict')
         # Interpolation
-        self.add_operator(operator.mul, [InterpolationType, CoarseGridType], FineGridType, 'interpolate')
+        self.add_operator(operator.mul, [InterpolationType, CoarseGridType], GridType, 'interpolate')
 
         # Solving on the coarse grid
         self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
 
-        # Correction
-        self.add_operator(multigrid.correct, [FineGridType, FineGridType], FineGridType, 'correct')
+        # Create intergrid operators
+        self.add_operator(operator.mul, [CoarseOperatorType, RestrictionType], RestrictionType, 'mul')
+        self.add_operator(operator.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
+        self.add_operator(operator.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
+
 
         # Dummy operations
         def noop(A):
@@ -117,12 +116,6 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
-        #self.add_operator(noop, [CoarseGridType], CoarseGridType, 'noop')
-
-        # Full coarse grid correction
-
-        #coarse_grid_correction = functools.partial(multigrid.coarse_grid_correction, self.operator, self.rhs, self._coarse_operator, self._restriction, self._interpolation)
-        #self.add_operator(coarse_grid_correction, [FineGridType], FineGridType, 'cgc')
 
 
     @staticmethod
@@ -132,17 +125,17 @@ class Optimizer:
 
     def _init_toolbox(self, evaluate):
         self._toolbox = base.Toolbox()
-        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=2, max_=5)
+        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
-        self._toolbox.register("select", tools.selTournament, tournsize=3)
+        self._toolbox.register("select", tools.selTournament, tournsize=2)
         self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=2)
+        self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
-        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=15))
-        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=15))
+        self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=20))
+        self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=20))
 
     def set_matrix_type(self, symbol, matrix_type):
         self._symbol_types[symbol] = matrix_type

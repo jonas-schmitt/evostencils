@@ -1,6 +1,7 @@
 import sympy as sp
 from evostencils.expressions import block
 
+
 class Restriction(sp.MatrixExpr):
     def __new__(cls, m, n):
         return super(Restriction, cls).__new__(cls, m, n)
@@ -19,20 +20,16 @@ class Interpolation(sp.MatrixExpr):
         return self.args[0], self.args[1]
 
 
-def smooth(grid, smoother, operator, rhs):
+def correct(iteration_matrix, grid, operator, rhs):
     A = operator
     u = grid
     f = rhs
-    B = smoother
-    return u + B * (f - A * u)
+    B = iteration_matrix
+    return u + B * residual(u, A, f)
 
 
 def residual(grid, operator, rhs):
     return rhs - operator * grid
-
-
-def correct(grid, correction):
-    return grid + correction
 
 
 def get_interpolation(fine_grid, coarse_grid):
@@ -51,7 +48,7 @@ def get_coarse_operator(fine_operator, factor):
     return sp.MatrixSymbol(f'{str(fine_operator)}_coarse', fine_operator.shape[0] / factor, fine_operator.shape[1] / factor)
 
 
-def coarse_grid_correction(operator, rhs, coarse_operator, restriction, interpolation, grid, coarse_error=None):
+def coarse_grid_correction(grid, operator, rhs, coarse_operator, restriction, interpolation, coarse_error=None):
     u = grid
     f = rhs
     I = sp.Identity(operator.shape[1])

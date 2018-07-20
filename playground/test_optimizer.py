@@ -31,7 +31,7 @@ def evaluate(individual, generator):
 
 def main():
     optimizer = Optimizer(A, x, b, evaluate)
-    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(200, 10, 0.5, 0.3)
     i = 1
     print('\n')
     for ind in hof:
