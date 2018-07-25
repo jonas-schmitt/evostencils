@@ -1,7 +1,7 @@
 import lfa_lab
 import sympy as sp
 import numpy as np
-from evostencils.expressions import scalar, multigrid
+from evostencils.expressions import base, multigrid
 from functools import reduce
 import operator
 

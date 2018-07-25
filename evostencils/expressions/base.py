@@ -1,14 +1,39 @@
-from abc import ABC
+import abc
 
 
-class Expression(ABC):
-    pass
+class Expression(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def shape(self):
+        pass
+
+
+class UnaryExpression(Expression):
+    @property
+    @abc.abstractmethod
+    def shape(self):
+        pass
+
+
+class BinaryExpression(Expression):
+    @property
+    @abc.abstractmethod
+    def shape(self):
+        pass
 
 
 class Operator(Expression):
     def __init__(self, name, shape):
-        self.name = name
-        self.shape = shape
+        self._name = name
+        self._shape = shape
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def shape(self):
+        return self._shape
 
 
 class Diagonal(Operator):
@@ -27,53 +52,131 @@ class UpperTriangle(Operator):
 
 
 class Identity(Operator):
-    def __init__(self, grid):
-        super(Identity, self).__init__('I', (grid.size, grid.size))
+    def __init__(self, shape):
+        super(Identity, self).__init__('I', shape)
 
 
 class Zero(Operator):
-    def __init__(self, operator):
-        super(Zero, self).__init__('0', operator.shape)
+    def __init__(self, shape):
+        super(Zero, self).__init__('0', shape)
 
 
 class Grid(Expression):
     def __init__(self, name, size):
-        self.name = name
-        self.shape = (size, 1)
+        self._name = name
+        self._shape = (size, 1)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Addition(Expression):
+class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
-        self.operand1 = operand1
-        self.operand2 = operand2
+        self._operand1 = operand1
+        self._operand2 = operand2
+        self._shape = operand1.shape
+
+    @property
+    def operand1(self):
+        return self._operand1
+
+    @property
+    def operand2(self):
+        return self._operand2
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Subtraction(Expression):
+class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
-        self.operand1 = operand1
-        self.operand2 = operand2
+        self._operand1 = operand1
+        self._operand2 = operand2
+        self._shape = operand1.shape
+
+    @property
+    def operand1(self):
+        return self._operand1
+
+    @property
+    def operand2(self):
+        return self._operand2
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Multiplication(Expression):
+class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
-        self.operand1 = operand1
-        self.operand2 = operand2
+        self._operand1 = operand1
+        self._operand2 = operand2
+        self._shape = (operand1.shape[0], operand2.shape[1])
+
+    @property
+    def operand1(self):
+        return self._operand1
+
+    @property
+    def operand2(self):
+        return self._operand2
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Scaling(Expression):
+class Scaling(UnaryExpression):
     def __init__(self, factor, operand):
-        self.factor = factor
-        self.operand = operand
+        self._factor = factor
+        self._operand = operand
+        self._shape = operand.shape
+
+    @property
+    def factor(self):
+        return self._factor
+
+    @property
+    def operand(self):
+        return self._operand
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Inverse(Expression):
-    def __init__(self, operator):
-        self.operator = operator
+class Inverse(UnaryExpression):
+    def __init__(self, operand):
+        self._operand = operand
+        self._shape = operand.shape
+
+    @property
+    def operand(self):
+        return self._operand
+
+    @property
+    def shape(self):
+        return self._shape
 
 
-class Transposition(Expression):
-    def __init__(self, operator):
-        self.operator = operator
+class Transpose(UnaryExpression):
+    def __init__(self, operand):
+        self._operand = operand
+        self._shape = (operand.shape[1], operand.shape[0])
+
+    @property
+    def operand(self):
+        return self._operand
+
+    @property
+    def shape(self):
+        return self._shape
 
 
 def inv(operand):
