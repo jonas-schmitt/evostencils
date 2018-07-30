@@ -56,6 +56,8 @@ class ConvergenceEvaluator:
             return expression.factor * self.transform(expression.operand)
         elif isinstance(expression, base.Inverse):
             return self.transform(expression.operand).inverse()
+        elif isinstance(expression, base.Transpose):
+            return self.transform(expression.operand).transpose()
         elif isinstance(expression, base.Diagonal):
             return self.transform(expression.operand).diag()
         elif isinstance(expression, base.LowerTriangle):
