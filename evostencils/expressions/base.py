@@ -9,17 +9,31 @@ class Expression(abc.ABC):
 
 
 class UnaryExpression(Expression):
+    def __init__(self, operand):
+        self._operand = operand
+        self._shape = operand.shape
+
     @property
-    @abc.abstractmethod
+    def operand(self):
+        return self._operand
+
+    @property
     def shape(self):
-        pass
+        return self._shape
 
 
 class BinaryExpression(Expression):
     @property
-    @abc.abstractmethod
+    def operand1(self):
+        return self._operand1
+
+    @property
+    def operand2(self):
+        return self._operand2
+
+    @property
     def shape(self):
-        pass
+        return self._shape
 
 
 class Operator(Expression):
@@ -36,19 +50,16 @@ class Operator(Expression):
         return self._shape
 
 
-class Diagonal(Operator):
-    def __init__(self, operator):
-        super(Diagonal, self).__init__(operator.name, operator.shape)
+class Diagonal(UnaryExpression):
+    pass
 
 
 class LowerTriangle(Operator):
-    def __init__(self, operator):
-        super(LowerTriangle, self).__init__(operator.name, operator.shape)
+    pass
 
 
 class UpperTriangle(Operator):
-    def __init__(self, operator):
-        super(UpperTriangle, self).__init__(operator.name, operator.shape)
+    pass
 
 
 class Identity(Operator):
@@ -77,62 +88,29 @@ class Grid(Expression):
 
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
-
-    @property
-    def operand1(self):
-        return self._operand1
-
-    @property
-    def operand2(self):
-        return self._operand2
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
 
-    @property
-    def operand1(self):
-        return self._operand1
-
-    @property
-    def operand2(self):
-        return self._operand2
-
-    @property
-    def shape(self):
-        return self._shape
-
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
+        assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
 
-    @property
-    def operand1(self):
-        return self._operand1
 
-    @property
-    def operand2(self):
-        return self._operand2
-
-    @property
-    def shape(self):
-        return self._shape
-
-
-class Scaling(UnaryExpression):
+class Scaling(Expression):
     def __init__(self, factor, operand):
         self._factor = factor
         self._operand = operand
@@ -152,31 +130,13 @@ class Scaling(UnaryExpression):
 
 
 class Inverse(UnaryExpression):
-    def __init__(self, operand):
-        self._operand = operand
-        self._shape = operand.shape
-
-    @property
-    def operand(self):
-        return self._operand
-
-    @property
-    def shape(self):
-        return self._shape
+    pass
 
 
 class Transpose(UnaryExpression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = (operand.shape[1], operand.shape[0])
-
-    @property
-    def operand(self):
-        return self._operand
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 def inv(operand):

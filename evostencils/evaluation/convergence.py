@@ -1,6 +1,4 @@
 import lfa_lab
-import sympy as sp
-import numpy as np
 from evostencils.expressions import base, multigrid
 from functools import reduce
 import operator
@@ -28,7 +26,6 @@ class ConvergenceEvaluator:
     def coarse_operator(self):
         return self._coarse_operator
 
-
     @property
     def fine_grid_size(self):
         return self._fine_grid_size
@@ -45,36 +42,33 @@ class ConvergenceEvaluator:
     def interpolation(self):
         return self._interpolation
 
-    def transform(self, expression: sp.MatrixExpr):
-        if isinstance(expression, sp.MatMul):
-            acc = self.transform(expression.args[0])
-            for i in range(1, len(expression.args)):
-                child = self.transform(expression.args[i])
-                if isinstance(child, complex):
-                    acc = child * acc
-                else:
-                    acc = acc * child
-            result = acc
-        elif isinstance(expression, sp.MatAdd):
-            acc = self.transform(expression.args[0])
-            for i in range(1, len(expression.args)):
-                child = self.transform(expression.args[i])
-                acc = acc + child
-            result = acc
-        elif isinstance(expression, sp.Inverse):
-            if isinstance(expression.arg, sp.ZeroMatrix):
-                result = self.transform(expression.arg)
-            else:
-                result = self.transform(expression.arg).inverse()
-        elif isinstance(expression, scalar.Diagonal):
-            result = self.transform(expression.arg).diag()
-        elif isinstance(expression, scalar.Lower):
-            result = self.transform(expression.arg).lower()
-        elif isinstance(expression, scalar.Upper):
-            result = self.transform(expression.arg).upper()
-        elif isinstance(expression, sp.Identity):
+    def transform(self, expression: base.Expression):
+        if isinstance(expression, base.Multiplication):
+                child1 = self.transform(expression.operand1)
+                child2 = self.transform(expression.operand2)
+                return child1 * child2
+        elif isinstance(expression, base.Addition):
+            child1 = self.transform(expression.operand1)
+            child2 = self.transform(expression.operand2)
+            return child1 + child2
+        elif isinstance(expression, base.Subtraction):
+            child1 = self.transform(expression.operand1)
+            child2 = self.transform(expression.operand2)
+            return child1 - child2
+        elif isinstance(expression, base.Scaling):
+            child = self.transform(expression.operand)
+            return expression.factor * child
+        elif isinstance(expression, base.Inverse):
+            return self.transform(expression.operand).inverse()
+        elif isinstance(expression, base.Diagonal):
+            result = self.transform(expression.operand).diag()
+        elif isinstance(expression, base.LowerTriangle):
+            result = self.transform(expression.operand).lower()
+        elif isinstance(expression, base.UpperTriangle):
+            result = self.transform(expression.operand).upper()
+        elif isinstance(expression, base.Identity):
             result = self.fine_operator.matching_identity()
-        elif isinstance(expression, sp.ZeroMatrix):
+        elif isinstance(expression, base.Zero):
             result = self.fine_operator.matching_zero()
         elif type(expression) == multigrid.Restriction:
             result = self._restriction
