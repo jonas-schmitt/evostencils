@@ -1,11 +1,24 @@
 import abc
+from operator import mul as builtin_mul
+from functools import reduce
 
 
+# Base classes
 class Expression(abc.ABC):
     @property
     @abc.abstractmethod
     def shape(self):
         pass
+
+
+class Entity(Expression):
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def shape(self):
+        return self._shape
 
 
 class UnaryExpression(Expression):
@@ -36,30 +49,11 @@ class BinaryExpression(Expression):
         return self._shape
 
 
-class Operator(Expression):
+# Entities
+class Operator(Entity):
     def __init__(self, name, shape):
         self._name = name
         self._shape = shape
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def shape(self):
-        return self._shape
-
-
-class Diagonal(UnaryExpression):
-    pass
-
-
-class LowerTriangle(Operator):
-    pass
-
-
-class UpperTriangle(Operator):
-    pass
 
 
 class Identity(Operator):
@@ -72,20 +66,40 @@ class Zero(Operator):
         super(Zero, self).__init__('0', shape)
 
 
-class Grid(Expression):
+class Grid(Entity):
     def __init__(self, name, size):
         self._name = name
         self._shape = (size, 1)
 
     @property
-    def name(self):
-        return self._name
-
-    @property
-    def shape(self):
-        return self._shape
+    def size(self):
+        return self._shape[0]
 
 
+# Unary Expressions
+class Diagonal(UnaryExpression):
+    pass
+
+
+class LowerTriangle(UnaryExpression):
+    pass
+
+
+class UpperTriangle(UnaryExpression):
+    pass
+
+
+class Inverse(UnaryExpression):
+    pass
+
+
+class Transpose(UnaryExpression):
+    def __init__(self, operand):
+        self._operand = operand
+        self._shape = (operand.shape[1], operand.shape[0])
+
+
+# Binary Expressions
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
         assert operand1.shape == operand2.shape, "Operand shapes are not equal"
@@ -110,6 +124,7 @@ class Multiplication(BinaryExpression):
         self._shape = (operand1.shape[0], operand2.shape[1])
 
 
+# Scaling
 class Scaling(Expression):
     def __init__(self, factor, operand):
         self._factor = factor
@@ -129,16 +144,7 @@ class Scaling(Expression):
         return self._shape
 
 
-class Inverse(UnaryExpression):
-    pass
-
-
-class Transpose(UnaryExpression):
-    def __init__(self, operand):
-        self._operand = operand
-        self._shape = (operand.shape[1], operand.shape[0])
-
-
+# Wrapper functions
 def inv(operand):
     return Inverse(operand)
 
@@ -158,3 +164,12 @@ def mul(operand1, operand2):
 def scale(factor, operand):
     return Scaling(factor, operand)
 
+
+def generate_grid(name: str, grid_size: tuple) -> Grid:
+    n = reduce(builtin_mul, grid_size, 1)
+    return Grid(name, n)
+
+
+def generate_operator(name: str, grid_size: tuple) -> Operator:
+    n = reduce(builtin_mul, grid_size, 1)
+    return Operator(name, (n, n))

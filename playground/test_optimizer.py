@@ -1,16 +1,15 @@
 from evostencils.optimizer import Optimizer
-from evostencils.expressions import scalar, block, transformations, multigrid
+from evostencils.expressions import transformations, multigrid
 from evostencils.evaluation.convergence import *
 import sympy as sp
 import lfa_lab as lfa
-from evostencils.profiling import *
 
 infinity = 1e10
 fine_grid_size = (8, 8)
 
-x = block.generate_vector_on_grid('x', fine_grid_size)
-b = block.generate_vector_on_grid('b', fine_grid_size)
-A = block.generate_matrix_on_grid('A', fine_grid_size)
+x = base.generate_grid('x', fine_grid_size)
+b = base.generate_grid('b', fine_grid_size)
+A = base.generate_operator('A', fine_grid_size)
 
 
 fine = lfa.Grid(2, [1.0, 1.0])
@@ -21,7 +20,7 @@ evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid
 
 
 def evaluate(individual, generator):
-    expression = transformations.fold_intergrid_operations(generator.compile_scalar_expression(individual))
+    expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = evaluator.compute_spectral_radius(iteration_matrix)
     if spectral_radius == 0.0:
@@ -31,13 +30,13 @@ def evaluate(individual, generator):
 
 def main():
     optimizer = Optimizer(A, x, b, evaluate)
-    pop, log, hof = optimizer.default_optimization(50, 5, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(500, 10, 0.5, 0.3)
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')
     for ind in hof:
         print(f'Individual {i} with fitness {ind.fitness}')
-        expression = transformations.fold_intergrid_operations(optimizer.compile_scalar_expression(ind))
+        expression = transformations.fold_intergrid_operations(optimizer.compile_expression(ind))
         print(f'Update expression: {expression}')
         iteration_matrix = optimizer.get_iteration_matrix(expression, sp.block_collapse(optimizer.grid), sp.block_collapse(optimizer.rhs))
         print(f'Iteration Matrix: {iteration_matrix}\n')

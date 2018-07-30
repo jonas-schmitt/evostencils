@@ -43,49 +43,43 @@ class ConvergenceEvaluator:
         return self._interpolation
 
     def transform(self, expression: base.Expression):
-        if isinstance(expression, base.Multiplication):
-                child1 = self.transform(expression.operand1)
-                child2 = self.transform(expression.operand2)
+        if isinstance(expression, base.BinaryExpression):
+            child1 = self.transform(expression.operand1)
+            child2 = self.transform(expression.operand2)
+            if isinstance(expression, base.Multiplication):
                 return child1 * child2
-        elif isinstance(expression, base.Addition):
-            child1 = self.transform(expression.operand1)
-            child2 = self.transform(expression.operand2)
-            return child1 + child2
-        elif isinstance(expression, base.Subtraction):
-            child1 = self.transform(expression.operand1)
-            child2 = self.transform(expression.operand2)
-            return child1 - child2
+            elif isinstance(expression, base.Addition):
+                return child1 + child2
+            elif isinstance(expression, base.Subtraction):
+                return child1 - child2
         elif isinstance(expression, base.Scaling):
-            child = self.transform(expression.operand)
-            return expression.factor * child
+            return expression.factor * self.transform(expression.operand)
         elif isinstance(expression, base.Inverse):
             return self.transform(expression.operand).inverse()
         elif isinstance(expression, base.Diagonal):
-            result = self.transform(expression.operand).diag()
+            return self.transform(expression.operand).diag()
         elif isinstance(expression, base.LowerTriangle):
-            result = self.transform(expression.operand).lower()
+            return self.transform(expression.operand).lower()
         elif isinstance(expression, base.UpperTriangle):
-            result = self.transform(expression.operand).upper()
+            return self.transform(expression.operand).upper()
         elif isinstance(expression, base.Identity):
-            result = self.fine_operator.matching_identity()
+            return self.fine_operator.matching_identity()
         elif isinstance(expression, base.Zero):
-            result = self.fine_operator.matching_zero()
+            return self.fine_operator.matching_zero()
         elif type(expression) == multigrid.Restriction:
-            result = self._restriction
+            return self._restriction
         elif type(expression) == multigrid.Interpolation:
-            result = self._interpolation
-        elif isinstance(expression, sp.MatrixSymbol):
+            return self._interpolation
+        elif isinstance(expression, base.Operator):
             n = reduce(operator.mul, self.fine_grid_size, 1)
             if expression.shape == (n, n):
-                result = self.fine_operator
+                return self.fine_operator
             else:
-                result = self.coarse_operator
+                return self.coarse_operator
         else:
-            tmp = expression.evalf()
-            result = complex(tmp)
-        return result
+            raise NotImplementedError("Not implemented")
 
-    def compute_spectral_radius(self, expression: sp.MatrixExpr):
+    def compute_spectral_radius(self, expression: base.Expression):
         try:
             smoother = self.transform(expression)
             symbol = smoother.symbol()
