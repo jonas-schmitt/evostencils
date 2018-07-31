@@ -39,9 +39,9 @@ def combine(stencil1, stencil2, f):
     new_entries = list(stencil1.entries)
     for entry2 in stencil2.entries:
         added = False
-        for new_entry in new_entries:
+        for i, new_entry in enumerate(new_entries):
             if new_entry[0] == entry2[0]:
-                new_entry[1] = f(new_entry[1], entry2[1])
+                new_entries[i] = (entry2[0], f(new_entry[1], entry2[1]))
                 added = True
                 break
         if not added:
@@ -61,7 +61,6 @@ def diagonal(stencil):
 def lower(stencil):
     import numpy as np
     zero = np.zeros(stencil.dimension)
-
     return filter_stencil(stencil, lambda o, v: lexicographical_less(o, zero))
 
 
@@ -89,16 +88,16 @@ def scale(factor, stencil):
 
 
 def mul(stencil1, stencil2):
-    import operator.add
+    from operator import add as builtin_add
     new_entries = []
     for offset2, value2 in stencil2.entries:
         for offset1, value1 in stencil1.entries:
             added = False
-            offset = tuple(map(operator.add, offset1, offset2))
+            offset = tuple(map(builtin_add, offset1, offset2))
             value = value1 * value2
-            for new_entry in new_entries:
+            for i, new_entry in enumerate(new_entries):
                 if offset == new_entry[0]:
-                    new_entry[1] += value
+                    new_entries[i] = (offset, new_entry[1] + value)
                     added = True
                     break
             if not added:
