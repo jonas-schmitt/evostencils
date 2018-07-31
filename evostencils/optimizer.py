@@ -8,7 +8,6 @@ import evostencils.expressions.multigrid as multigrid
 import evostencils.expressions.transformations as transformations
 import operator
 import functools
-from scoop import futures
 
 
 def dummy_eval(individual, generator):
