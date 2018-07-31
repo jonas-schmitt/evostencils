@@ -1,15 +1,15 @@
-from evostencils.expressions import block, multigrid
+from evostencils.expressions import base, multigrid
 from evostencils.expressions import transformations
+from evostencils.optimizer import Optimizer
 import sympy as sp
 import lfa_lab as lfa
 
 fine_grid_size = (64, 64)
 
-u = block.generate_vector_on_grid('x', fine_grid_size)
-b = block.generate_vector_on_grid('b', fine_grid_size)
-A = block.generate_matrix_on_grid('A', fine_grid_size)
+u = base.generate_grid('x', fine_grid_size)
+b = base.generate_grid('b', fine_grid_size)
+A = base.generate_operator('A', fine_grid_size)
 
-transformations.fold_intergrid_operations(sp.block_collapse((-1) * A * u))
 from evostencils.evaluation.convergence import *
 # Create a 2D grid with step-size (1/32, 1/32).
 fine = lfa.Grid(2, [1.0, 1.0])
@@ -25,14 +25,17 @@ R = multigrid.get_restriction(u, u_coarse)
 
 coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2, 2)))
 evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
-smoother = sp.Identity(A.shape[0]) - block.get_diagonal(A).I * A * sp.Identity(A.shape[0])
-two_grid = transformations.fold_intergrid_operations(P * A_coarse * R)
-iteration_matrix = sp.block_collapse(two_grid)
+smoother = base.Inverse(base.Diagonal(A))
+tmp = multigrid.correct(smoother, u, A, b)
+coarse_grid_correction = base.Multiplication(P, base.Multiplication(base.Inverse(A_coarse), R))
+tmp = multigrid.correct(coarse_grid_correction, tmp, A, b)
+two_grid = multigrid.correct(smoother, tmp, A, b)
+iteration_matrix = Optimizer.get_iteration_matrix(two_grid, u, b)
 print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 jacobi = lfa_lab.jacobi(fine_operator, 1.0)
-reference = lfa_lab.coarse_grid_correction(fine_operator, coarse_operator, evaluator.interpolation, evaluator.restriction, coarse_error=None)
+reference = jacobi * lfa_lab.coarse_grid_correction(fine_operator, coarse_operator, evaluator.interpolation, evaluator.restriction, coarse_error=None) * jacobi
 print(reference.symbol().spectral_radius())
 
 
