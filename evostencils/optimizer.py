@@ -15,7 +15,7 @@ def dummy_eval(individual, generator):
 
 
 class Optimizer:
-    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, evaluate=dummy_eval):
+    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor, evaluate=dummy_eval):
         self._operator = op
         self._grid = grid
         self._rhs = rhs
@@ -25,18 +25,18 @@ class Optimizer:
         self._symbol_types = {}
         self._symbol_names = {}
         self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._grid.shape))
-        self._init_terminals()
+        self._init_terminals(dimension, coarsening_factor)
         self._init_operators()
         self._init_creator()
         self._init_toolbox(evaluate)
 
-    def _init_terminals(self):
+    def _init_terminals(self, dimension, coarsening_factor):
         A = self._operator
         u = self._grid
         f = self._rhs
         D = self._diagonal
 
-        identity_matrix = base.Identity(A.shape)
+        identity_matrix = base.Identity(A.shape, dimension)
         # Add primitives to set
         self.add_terminal(A, types.generate_matrix_type(A.shape), 'A')
         self.add_terminal(u, types.generate_matrix_type(u.shape), 'u')
@@ -48,7 +48,6 @@ class Optimizer:
         self.add_terminal(base.UpperTriangle(A), types.generate_matrix_type(A.shape), 'A_u')
 
         # Multigrid recipes
-        coarsening_factor = 4
         coarse_grid = multigrid.get_coarse_grid(u, coarsening_factor)
         coarse_operator = multigrid.get_coarse_operator(A, coarsening_factor)
         interpolation = multigrid.get_interpolation(u, coarse_grid)

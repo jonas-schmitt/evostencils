@@ -56,7 +56,11 @@ def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
         child1 = fold_intergrid_operations(expression.operand1)
         child2 = fold_intergrid_operations(expression.operand2)
         if isinstance(child1, multigrid.Interpolation) and isinstance(child2, multigrid.Restriction):
-            return base.Identity(expression.shape)
+            stencil = expression.generate_stencil()
+            if stencil is None:
+                return base.Identity(expression.shape)
+            else:
+                return base.Identity(expression.shape, stencil.dimension)
         else:
             return base.Multiplication(child1, child2)
     elif isinstance(expression, base.Scaling):

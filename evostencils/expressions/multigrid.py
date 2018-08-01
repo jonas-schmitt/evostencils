@@ -2,13 +2,13 @@ from evostencils.expressions import base
 
 
 class Restriction(base.Operator):
-    def __init__(self, grid, coarse_grid):
-        super(Restriction, self).__init__(f'R_{grid.size}', (coarse_grid.size, grid.size))
+    def __init__(self, grid, coarse_grid, stencil=None):
+        super(Restriction, self).__init__(f'R_{grid.size}', (coarse_grid.size, grid.size), stencil)
 
 
 class Interpolation(base.Operator):
-    def __init__(self, grid, coarse_grid):
-        super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size))
+    def __init__(self, grid, coarse_grid, stencil=None):
+        super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size), stencil)
 
 
 def correct(iteration_matrix, grid, operator, rhs):

@@ -21,6 +21,8 @@ def lexicographical_less(a, b):
 
 
 def map_stencil(stencil, f):
+    if stencil is None:
+        return stencil
     result = []
     for offset, value in stencil.entries:
         result.append(f(offset, value))
@@ -28,6 +30,9 @@ def map_stencil(stencil, f):
 
 
 def filter_stencil(stencil, predicate):
+
+    if stencil is None:
+        return stencil
     result = []
     for offset, value in stencil.entries:
         if predicate(offset, value):
@@ -36,6 +41,8 @@ def filter_stencil(stencil, predicate):
 
 
 def combine(stencil1, stencil2, f):
+    if stencil1 is None or stencil2 is None:
+        return None
     new_entries = list(stencil1.entries)
     for entry2 in stencil2.entries:
         added = False
@@ -75,6 +82,11 @@ def transpose(self):
     return map_stencil(self, lambda o, v: (-np.array(o), v))
 
 
+# Note that this is not equivalent to matrix inversion
+def inverse(self):
+    return map_stencil(self, lambda o, v: (o, 1.0 / v))
+
+
 def add(stencil1, stencil2):
     return combine(stencil1, stencil2, lambda x, y: x + y)
 
@@ -88,6 +100,8 @@ def scale(factor, stencil):
 
 
 def mul(stencil1, stencil2):
+    if stencil1 is None or stencil2 is None:
+        return None
     from operator import add as builtin_add
     new_entries = []
     for offset2, value2 in stencil2.entries:
@@ -103,3 +117,15 @@ def mul(stencil1, stencil2):
             if not added:
                 new_entries.append((offset, value))
     return Stencil(new_entries)
+
+
+def get_unit_stencil(dimension=None) -> Stencil:
+    if dimension is None:
+        return None
+    else:
+        entries = ((1 for i in range(dimension)), 1)
+        return Stencil(entries)
+
+
+def get_null_stencil() -> Stencil:
+    return Stencil(entries=())

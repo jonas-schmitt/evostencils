@@ -29,8 +29,8 @@ def evaluate(individual, generator):
 
 
 def main():
-    optimizer = Optimizer(A, x, b, evaluate)
-    pop, log, hof = optimizer.default_optimization(1000, 30, 0.5, 0.3)
+    optimizer = Optimizer(A, x, b, 2, 4, evaluate)
+    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')

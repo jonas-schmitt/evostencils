@@ -1,6 +1,7 @@
 import abc
 from operator import mul as builtin_mul
 from functools import reduce
+from evostencils import stencils as stencils
 
 
 # Base classes
@@ -51,19 +52,23 @@ class BinaryExpression(Expression):
 
 # Entities
 class Operator(Entity):
-    def __init__(self, name, shape):
+    def __init__(self, name, shape, stencil=None):
         self._name = name
         self._shape = shape
+        self._stencil = stencil
+
+    def generate_stencil(self):
+        return self._stencil
 
 
 class Identity(Operator):
-    def __init__(self, shape):
-        super(Identity, self).__init__('I', shape)
+    def __init__(self, shape, dimension=None):
+        super(Identity, self).__init__('I', shape, stencils.get_unit_stencil(dimension))
 
 
 class Zero(Operator):
     def __init__(self, shape):
-        super(Zero, self).__init__('0', shape)
+        super(Zero, self).__init__('0', shape, stencils.get_null_stencil())
 
 
 class Grid(Entity):
@@ -75,28 +80,39 @@ class Grid(Entity):
     def size(self):
         return self._shape[0]
 
+    @staticmethod
+    def generate_stencil():
+        return None
+
 
 # Unary Expressions
 class Diagonal(UnaryExpression):
-    pass
+    def generate_stencil(self):
+        return stencils.diagonal(self.operand.generate_stencil())
 
 
 class LowerTriangle(UnaryExpression):
-    pass
+    def generate_stencil(self):
+        return stencils.lower(self.operand.generate_stencil())
 
 
 class UpperTriangle(UnaryExpression):
-    pass
+    def generate_stencil(self):
+        return stencils.upper(self.operand.generate_stencil())
 
 
 class Inverse(UnaryExpression):
-    pass
+    def generate_stencil(self):
+        return stencils.inverse(self.operand.generate_stencil())
 
 
 class Transpose(UnaryExpression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = (operand.shape[1], operand.shape[0])
+
+    def generate_stencil(self):
+        return stencils.transpose(self.operand.generate_stencil())
 
 
 # Binary Expressions
@@ -107,6 +123,9 @@ class Addition(BinaryExpression):
         self._operand2 = operand2
         self._shape = operand1.shape
 
+    def generate_stencil(self):
+        return stencils.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -115,6 +134,9 @@ class Subtraction(BinaryExpression):
         self._operand2 = operand2
         self._shape = operand1.shape
 
+    def generate_stencil(self):
+        return stencils.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -122,6 +144,9 @@ class Multiplication(BinaryExpression):
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
+
+    def generate_stencil(self):
+        return stencils.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
 
 # Scaling
@@ -142,6 +167,9 @@ class Scaling(Expression):
     @property
     def shape(self):
         return self._shape
+
+    def generate_stencil(self):
+        return stencils.scale(self.factor, self.operand.generate_stencil())
 
 
 # Wrapper functions
@@ -170,6 +198,6 @@ def generate_grid(name: str, grid_size: tuple) -> Grid:
     return Grid(name, n)
 
 
-def generate_operator(name: str, grid_size: tuple) -> Operator:
+def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:
     n = reduce(builtin_mul, grid_size, 1)
-    return Operator(name, (n, n))
+    return Operator(name, (n, n), stencil)
