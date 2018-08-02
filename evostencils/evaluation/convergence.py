@@ -74,12 +74,10 @@ class ConvergenceEvaluator:
             return self._restriction
         elif type(expression) == multigrid.Interpolation:
             return self._interpolation
+        elif type(expression) == multigrid.CoarseGridSolver:
+            return self._coarse_operator.inverse()
         elif isinstance(expression, base.Operator):
-            n = reduce(operator.mul, self.fine_grid_size, 1)
-            if expression.shape == (n, n):
-                return self.fine_operator
-            else:
-                return self.coarse_operator
+            return self.fine_operator
         else:
             raise NotImplementedError("Not implemented")
 

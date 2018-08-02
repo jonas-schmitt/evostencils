@@ -11,6 +11,11 @@ class Interpolation(base.Operator):
         super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size), stencil)
 
 
+class CoarseGridSolver(base.Operator):
+    def __init__(self, coarse_grid):
+        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.size}', (coarse_grid.size, coarse_grid.size), None)
+
+
 class Correction(base.Expression):
     def __init__(self, iteration_matrix, grid, operator, rhs):
         self._iteration_matrix = iteration_matrix
@@ -74,3 +79,22 @@ def get_coarse_operator(operator, coarsening_factor):
     return base.Operator(f'{operator.name}_coarse', (operator.shape[0] / coarsening_factor,
                                                      operator.shape[1] / coarsening_factor))
 
+
+def is_intergrid_operation(expression: base.Expression) -> bool:
+    return isinstance(expression, Restriction) or isinstance(expression, Interpolation) \
+           or isinstance(expression, CoarseGridSolver)
+
+
+def contains_intergrid_operation(expression: base.Expression) -> bool:
+    if isinstance(expression, Restriction) or isinstance(expression.Interpolation):
+        return True
+    elif isinstance(expression, base.Entity):
+        return False
+    elif isinstance(expression, base.UnaryExpression):
+        return contains_intergrid_operation(expression.operand)
+    elif isinstance(expression, base.BinaryExpression):
+        return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
+    elif isinstance(expression, base.Scaling):
+        return contains_intergrid_operation(expression.operand)
+    else:
+        raise NotImplementedError("Not implemented")

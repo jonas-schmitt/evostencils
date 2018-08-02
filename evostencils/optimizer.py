@@ -43,7 +43,7 @@ class Optimizer:
 
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, types.generate_diagonal_matrix_type(A.shape), 'A_d')
-        self.add_terminal(base.Inverse(D), types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
+        #self.add_terminal(base.Inverse(D), types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
         self.add_terminal(base.LowerTriangle(A), types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(base.UpperTriangle(A), types.generate_matrix_type(A.shape), 'A_u')
 
@@ -54,7 +54,7 @@ class Optimizer:
         restriction = multigrid.get_restriction(u, coarse_grid)
 
         self.add_terminal(base.Zero(A), types.generate_matrix_type(coarse_grid.shape), 'Zero')
-        self.add_terminal(base.Inverse(coarse_operator), types.generate_matrix_type(coarse_operator.shape), 'A_coarse_inv')
+        self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
 
@@ -130,7 +130,7 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
-        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=3, parsimony_size=1.6, fitness_first=False)
+        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=4, parsimony_size=1.5, fitness_first=False)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
