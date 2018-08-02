@@ -130,7 +130,7 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
-        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=3, parsimony_size=1.5, fitness_first=False)
+        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=3, parsimony_size=1.6, fitness_first=False)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)

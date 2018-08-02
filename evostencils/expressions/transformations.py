@@ -3,7 +3,13 @@ from evostencils.expressions import base
 
 
 def propagate_zero(expression: base.Expression) -> base.Expression:
-    if isinstance(expression, base.Addition):
+    if isinstance(expression, multigrid.Correction):
+        iteration_matrix = propagate_zero(expression.iteration_matrix)
+        grid = propagate_zero(expression.grid)
+        operator = propagate_zero(expression.operator)
+        rhs = propagate_zero(expression.rhs)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+    elif isinstance(expression, base.Addition):
         child1 = propagate_zero(expression.operand1)
         child2 = propagate_zero(expression.operand2)
         if isinstance(child1, base.Zero):
@@ -52,7 +58,13 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
 
 
 def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
-    if isinstance(expression, base.Multiplication):
+    if isinstance(expression, multigrid.Correction):
+        iteration_matrix = fold_intergrid_operations(expression.iteration_matrix)
+        grid = fold_intergrid_operations(expression.grid)
+        operator = fold_intergrid_operations(expression.operator)
+        rhs = fold_intergrid_operations(expression.rhs)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+    elif isinstance(expression, base.Multiplication):
         child1 = fold_intergrid_operations(expression.operand1)
         child2 = fold_intergrid_operations(expression.operand2)
         if isinstance(child1, multigrid.Interpolation) and isinstance(child2, multigrid.Restriction):
@@ -78,7 +90,13 @@ def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
 
 
 def substitute_entity(expression: base.Expression, source: base.Entity, destination: base.Entity) -> base.Expression:
-    if isinstance(expression, base.Entity):
+    if isinstance(expression, multigrid.Correction):
+        iteration_matrix = substitute_entity(expression.iteration_matrix, source, destination)
+        grid = substitute_entity(expression.grid, source, destination)
+        operator = substitute_entity(expression.operator, source, destination)
+        rhs = substitute_entity(expression.rhs, source, destination)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+    elif isinstance(expression, base.Entity):
         if expression.name == source.name:
             return destination
         else:

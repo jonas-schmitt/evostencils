@@ -43,7 +43,9 @@ class ConvergenceEvaluator:
         return self._interpolation
 
     def transform(self, expression: base.Expression):
-        if isinstance(expression, base.BinaryExpression):
+        if isinstance(expression, multigrid.Correction):
+            return self.transform(expression.generate_expression())
+        elif isinstance(expression, base.BinaryExpression):
             child1 = self.transform(expression.operand1)
             child2 = self.transform(expression.operand2)
             if isinstance(expression, base.Multiplication):

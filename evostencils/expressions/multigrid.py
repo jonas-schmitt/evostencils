@@ -11,12 +11,47 @@ class Interpolation(base.Operator):
         super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size), stencil)
 
 
+class Correction(base.Expression):
+    def __init__(self, iteration_matrix, grid, operator, rhs):
+        self._iteration_matrix = iteration_matrix
+        self._grid = grid
+        self._operator = operator
+        self._rhs = rhs
+
+    @property
+    def shape(self):
+        return self._grid.shape
+
+    @property
+    def stencil(self):
+        return None
+
+    @property
+    def iteration_matrix(self):
+        return self._iteration_matrix
+
+    @property
+    def grid(self):
+        return self._grid
+
+    @property
+    def operator(self):
+        return self._operator
+
+    @property
+    def rhs(self):
+        return self._rhs
+
+    def generate_expression(self):
+        A = self.operator
+        u = self.grid
+        f = self.rhs
+        B = self.iteration_matrix
+        return base.Addition(u, base.Multiplication(B, residual(u, A, f)))
+
+
 def correct(iteration_matrix, grid, operator, rhs):
-    A = operator
-    u = grid
-    f = rhs
-    B = iteration_matrix
-    return base.Addition(u, base.Multiplication(B, residual(u, A, f)))
+    return Correction(iteration_matrix, grid, operator, rhs)
 
 
 def residual(grid, operator, rhs):
