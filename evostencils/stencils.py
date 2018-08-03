@@ -127,7 +127,11 @@ def get_unit_stencil(dimension=None) -> Stencil:
     if dimension is None:
         return None
     else:
-        entries = ((1 for i in range(dimension)), 1)
+        offsets = []
+        for i in range(dimension):
+            offsets.append(0)
+        entries = ((tuple(offsets), 1.0),)
+        #entries = ((0 for i in range(dimension)), 1.0)
         return Stencil(entries)
 
 

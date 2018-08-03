@@ -47,14 +47,14 @@ R = multigrid.get_restriction(u, u_coarse, stencils.Stencil(interpolation_stenci
 metrics = []
 smoother = base.Inverse(base.Diagonal(A))
 tmp = multigrid.correct(smoother, u, A, b)
-evaluator = roofline.RooflineEvaluator(1, 1, 1)
-metrics.extend(evaluator.estimate_correction_performance_metrics(tmp))
+evaluator = roofline.RooflineEvaluator(8)
+metrics.extend(evaluator._estimate_correction_performance_metrics(tmp))
 
 coarse_grid_correction = base.Multiplication(P, base.Multiplication(S_coarse, R))
 tmp = multigrid.correct(coarse_grid_correction, tmp, A, b)
-metrics.extend(evaluator.estimate_correction_performance_metrics(tmp))
+metrics.extend(evaluator._estimate_correction_performance_metrics(tmp))
 two_grid = multigrid.correct(smoother, tmp, A, b)
-metrics.extend(evaluator.estimate_correction_performance_metrics(two_grid))
+metrics.extend(evaluator._estimate_correction_performance_metrics(two_grid))
 average = evaluator.compute_average_arithmetic_intensity(metrics)
 minimum = evaluator.compute_minimum_arithmetic_intensity(metrics)
 maximum = evaluator.compute_maximum_arithmetic_intensity(metrics)

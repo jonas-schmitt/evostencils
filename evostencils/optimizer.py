@@ -8,7 +8,7 @@ import evostencils.expressions.multigrid as multigrid
 import evostencils.expressions.transformations as transformations
 import operator
 import functools
-
+from evostencils.stencils import Stencil
 
 def dummy_eval(individual, generator):
     return 0.0
@@ -47,11 +47,34 @@ class Optimizer:
         self.add_terminal(base.LowerTriangle(A), types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(base.UpperTriangle(A), types.generate_matrix_type(A.shape), 'A_u')
 
-        # Multigrid recipes
+        #TODO quick hack for testing here
+        interpolation_stencil_entries = [
+            ((-1, -1), 1.0/4),
+            (( 0, -1), 1.0/2),
+            (( 1, -1), 1.0/4),
+            ((-1,  0), 1.0/2),
+            (( 0,  0), 1.0),
+            (( 1,  0), 1.0/2),
+            ((-1,  1), 1.0/4),
+            (( 0,  1), 1.0/2),
+            (( 1,  1), 1.0/4),
+        ]
+
+        restriction_stencil_entries = [
+            ((-1, -1), 1.0/16),
+            (( 0, -1), 1.0/8),
+            (( 1, -1), 1.0/16),
+            ((-1,  0), 1.0/8),
+            (( 0,  0), 1.0/4),
+            (( 1,  0), 1.0/8),
+            ((-1,  1), 1.0/16),
+            (( 0,  1), 1.0/8),
+            (( 1,  1), 1.0/16),
+        ]
         coarse_grid = multigrid.get_coarse_grid(u, coarsening_factor)
         coarse_operator = multigrid.get_coarse_operator(A, coarsening_factor)
-        interpolation = multigrid.get_interpolation(u, coarse_grid)
-        restriction = multigrid.get_restriction(u, coarse_grid)
+        interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
+        restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
         self.add_terminal(base.Zero(A), types.generate_matrix_type(coarse_grid.shape), 'Zero')
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
@@ -121,8 +144,8 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("FitnessMin", deap.base.Fitness, weights=(-1.0,))
-        creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
+        creator.create("Fitness", deap.base.Fitness, weights=(-1.0, 1.0))
+        creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
     def _init_toolbox(self, evaluate):
         self._toolbox = deap.base.Toolbox()

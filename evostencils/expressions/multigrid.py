@@ -17,7 +17,7 @@ class CoarseGridSolver(base.Operator):
 
 
 class Correction(base.Expression):
-    def __init__(self, iteration_matrix: base.Expression, grid: base.Grid, operator: base.Operator, rhs: base.Grid):
+    def __init__(self, iteration_matrix: base.Expression, grid, operator: base.Operator, rhs: base.Grid):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
