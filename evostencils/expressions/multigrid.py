@@ -17,7 +17,7 @@ class CoarseGridSolver(base.Operator):
 
 
 class Correction(base.Expression):
-    def __init__(self, iteration_matrix, grid, operator, rhs):
+    def __init__(self, iteration_matrix: base.Expression, grid: base.Grid, operator: base.Operator, rhs: base.Grid):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
@@ -63,21 +63,25 @@ def residual(grid, operator, rhs):
     return base.Subtraction(rhs, base.Multiplication(operator, grid))
 
 
-def get_interpolation(grid, coarse_grid):
-    return Interpolation(grid, coarse_grid)
+def get_interpolation(grid, coarse_grid, stencil=None):
+    return Interpolation(grid, coarse_grid, stencil)
 
 
-def get_restriction(grid, coarse_grid):
-    return Restriction(grid, coarse_grid)
+def get_restriction(grid, coarse_grid, stencil=None):
+    return Restriction(grid, coarse_grid, stencil)
 
 
 def get_coarse_grid(grid, coarsening_factor):
     return base.Grid(f'{grid.name}_coarse', grid.size / coarsening_factor)
 
 
-def get_coarse_operator(operator, coarsening_factor):
+def get_coarse_operator(operator, coarsening_factor, stencil=None):
     return base.Operator(f'{operator.name}_coarse', (operator.shape[0] / coarsening_factor,
-                                                     operator.shape[1] / coarsening_factor))
+                                                     operator.shape[1] / coarsening_factor), stencil)
+
+
+def get_coarse_grid_solver(coarse_grid):
+    return CoarseGridSolver(coarse_grid)
 
 
 def is_intergrid_operation(expression: base.Expression) -> bool:

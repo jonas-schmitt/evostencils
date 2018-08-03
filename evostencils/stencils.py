@@ -10,6 +10,10 @@ class Stencil:
     def dimension(self):
         return len(self.entries[0])
 
+    @property
+    def number_of_entries(self):
+        return len(self.entries)
+
 
 def lexicographical_less(a, b):
     for p, q in zip(a, b):
