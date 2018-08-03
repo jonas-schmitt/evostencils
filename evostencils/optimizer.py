@@ -144,7 +144,7 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("Fitness", deap.base.Fitness, weights=(-1.0, 1.0))
+        creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
     def _init_toolbox(self, evaluate):
@@ -153,7 +153,8 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", evaluate, generator=self)
-        self._toolbox.register("select", tools.selNSGA2)
+        #self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selDoubleTournament, fitness_size=4, parsimony_size=1.5, fitness_first=False)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
@@ -221,7 +222,7 @@ class Optimizer:
         random.seed()
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(10)
-        stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", np.mean)
         stats.register("std", np.std)
         stats.register("min", np.min)
@@ -234,7 +235,7 @@ class Optimizer:
         pop = self._toolbox.population(n=population)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)

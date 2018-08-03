@@ -31,18 +31,18 @@ def evaluate(individual, generator):
     expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = convergence_evaluator.compute_spectral_radius(iteration_matrix)
-    arithmetic_intensity = 0
+    arithmetic_intensity = 1.0/infinity
     if spectral_radius == 0.0:
         spectral_radius = infinity
     elif spectral_radius < 1.0:
         list_of_metrics = performance_evaluator.estimate_performance_metrics(expression)
         arithmetic_intensity = performance_evaluator.compute_average_arithmetic_intensity(list_of_metrics)
-    return spectral_radius, arithmetic_intensity
+    return spectral_radius / arithmetic_intensity,
 
 
 def main():
     optimizer = Optimizer(A, x, b, 2, 4, evaluate)
-    pop, log, hof = optimizer.default_optimization(2000, 10, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(5000, 15, 0.5, 0.3)
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')
