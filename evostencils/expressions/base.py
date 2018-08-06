@@ -21,6 +21,9 @@ class Entity(Expression):
     def shape(self):
         return self._shape
 
+    def __repr__(self):
+        return f'{self.__class__}({self.name}, {self.shape})'
+
 
 class UnaryExpression(Expression):
     def __init__(self, operand):
@@ -35,6 +38,9 @@ class UnaryExpression(Expression):
     def shape(self):
         return self._shape
 
+    def __repr__(self):
+        return f'{self.__class__}({self.operand})'
+
 
 class BinaryExpression(Expression):
     @property
@@ -48,6 +54,9 @@ class BinaryExpression(Expression):
     @property
     def shape(self):
         return self._shape
+
+    def __repr__(self):
+        return f'{self.__class__}({self.operand1}, {self.operand2})'
 
 
 # Entities
@@ -170,6 +179,9 @@ class Scaling(Expression):
 
     def generate_stencil(self):
         return stencils.scale(self.factor, self.operand.generate_stencil())
+
+    def __repr__(self):
+        return f'{self.__class__}({self.factor}, {self.operand})'
 
 
 # Wrapper functions

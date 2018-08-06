@@ -54,6 +54,9 @@ class Correction(base.Expression):
         B = self.iteration_matrix
         return base.Addition(u, base.Multiplication(B, residual(u, A, f)))
 
+    def __repr__(self):
+        return f'{self.__class__}({self.iteration_matrix}, {self.grid}, {self.operator}, {self.rhs})'
+
 
 def correct(iteration_matrix, grid, operator, rhs):
     return Correction(iteration_matrix, grid, operator, rhs)
