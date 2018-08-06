@@ -5,9 +5,11 @@ from evostencils.evaluation.convergence import *
 from evostencils.evaluation.roofline import *
 import sympy as sp
 import lfa_lab as lfa
+import math
 
 infinity = 1e10
-fine_grid_size = (8, 8)
+epsilon = 1e-6
+fine_grid_size = (100, 100)
 operator_stencil_entries = [
     (( 0, -1), -1.0),
     ((-1,  0), -1.0),
@@ -24,25 +26,26 @@ fine = lfa.Grid(2, [1.0, 1.0])
 fine_operator = lfa.gallery.poisson_2d(fine)
 coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2, 2)))
 convergence_evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
-performance_evaluator = RooflineEvaluator(8)
+bytes_per_word = 8
+peak_performance = 4 * 16 * 3.3 * 1e9
+peak_bandwidth = 34.1 * 1e9
+performance_evaluator = RooflineEvaluator(bytes_per_word)
 
 
 def evaluate(individual, generator):
     expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = convergence_evaluator.compute_spectral_radius(iteration_matrix)
-    arithmetic_intensity = 1.0/infinity
-    if spectral_radius == 0.0:
-        spectral_radius = infinity
+    if spectral_radius == 0.0 or spectral_radius > 1.0:
+        return infinity,
     elif spectral_radius < 1.0:
-        list_of_metrics = performance_evaluator.estimate_performance_metrics(expression)
-        arithmetic_intensity = performance_evaluator.compute_average_arithmetic_intensity(list_of_metrics)
-    return spectral_radius / arithmetic_intensity,
+        runtime = performance_evaluator.estimate_runtime(expression, peak_performance, peak_bandwidth)
+        return math.log(epsilon) / math.log(spectral_radius) * runtime,
 
 
 def main():
     optimizer = Optimizer(A, x, b, 2, 4, evaluate)
-    pop, log, hof = optimizer.default_optimization(5000, 15, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(500, 20, 0.5, 0.3)
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')
