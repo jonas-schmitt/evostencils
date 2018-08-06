@@ -66,7 +66,6 @@ class RooflineEvaluator:
         # u = u + tmp
         return list_of_metrics
 
-
     @staticmethod
     def estimate_operations_per_word_for_stencil(stencil: stencils.Stencil, problem_size) -> tuple:
         number_of_entries = stencil.number_of_entries

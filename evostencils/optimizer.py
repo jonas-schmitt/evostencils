@@ -131,17 +131,6 @@ class Optimizer:
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
 
-        # Unclear if needed
-        # CoarseGridType = types.generate_matrix_type(self._coarse_grid.shape)
-        # # Restriction
-        # self.add_operator(operator.mul, [RestrictionType, GridType], CoarseGridType, 'restrict')
-        # # Interpolation
-        # self.add_operator(operator.mul, [InterpolationType, CoarseGridType], GridType, 'interpolate')
-        # # Solving on the coarse grid
-        # self.add_operator(operator.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
-
-
-
     @staticmethod
     def _init_creator():
         creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))

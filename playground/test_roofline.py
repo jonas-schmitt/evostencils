@@ -1,8 +1,6 @@
-from evostencils.expressions import base, multigrid
-from evostencils.evaluation import roofline
-import evostencils.stencils as stencils
+from evostencils.evaluation.roofline import *
 
-fine_grid_size = (64, 64)
+fine_grid_size = (1000, 1000)
 operator_stencil_entries = [
     (( 0, -1), -1.0),
     ((-1,  0), -1.0),
@@ -37,6 +35,11 @@ restriction_stencil_entries = [
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
 A = base.generate_operator('A', fine_grid_size, stencils.Stencil(operator_stencil_entries))
+bytes_per_word = 8
+peak_performance = 4 * 16 * 3.3 * 1e9
+peak_bandwidth = 34.1 * 1e9
+evaluator = RooflineEvaluator(bytes_per_word)
+
 
 coarsening_factor = 4
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
@@ -44,19 +47,13 @@ A_coarse = multigrid.get_coarse_operator(A, coarsening_factor)
 S_coarse = multigrid.get_coarse_grid_solver(u_coarse)
 P = multigrid.get_interpolation(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))
 R = multigrid.get_restriction(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))
-metrics = []
 smoother = base.Inverse(base.Diagonal(A))
 tmp = multigrid.correct(smoother, u, A, b)
-evaluator = roofline.RooflineEvaluator(8)
-metrics.extend(evaluator._estimate_operations_per_word_for_correction(tmp))
+print(f'Runtime:{evaluator.estimate_runtime(tmp, peak_performance, peak_bandwidth)}')
 
 coarse_grid_correction = base.Multiplication(P, base.Multiplication(S_coarse, R))
 tmp = multigrid.correct(coarse_grid_correction, tmp, A, b)
-metrics.extend(evaluator._estimate_operations_per_word_for_correction(tmp))
+print(f'Runtime:{evaluator.estimate_runtime(tmp, peak_performance, peak_bandwidth)}')
 two_grid = multigrid.correct(smoother, tmp, A, b)
-metrics.extend(evaluator._estimate_operations_per_word_for_correction(two_grid))
-average = evaluator.compute_average_arithmetic_intensity(metrics)
-minimum = evaluator.compute_minimum_arithmetic_intensity(metrics)
-maximum = evaluator.compute_maximum_arithmetic_intensity(metrics)
-print(f'Minimum:{minimum}, Maximum:{maximum}, Average:{average}')
+print(f'Runtime:{evaluator.estimate_runtime(two_grid, peak_performance, peak_bandwidth)}')
 
