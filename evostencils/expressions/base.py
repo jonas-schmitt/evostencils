@@ -21,9 +21,6 @@ class Entity(Expression):
     def shape(self):
         return self._shape
 
-    def __repr__(self):
-        return f'{self.__class__}({self.name}, {self.shape})'
-
     def __str__(self):
         return f'{self.name}'
 
@@ -41,9 +38,6 @@ class UnaryExpression(Expression):
     def shape(self):
         return self._shape
 
-    def __repr__(self):
-        return f'{self.__class__}({self.operand})'
-
 
 class BinaryExpression(Expression):
     @property
@@ -58,9 +52,6 @@ class BinaryExpression(Expression):
     def shape(self):
         return self._shape
 
-    def __repr__(self):
-        return f'{self.__class__}({self.operand1}, {self.operand2})'
-
 
 # Entities
 class Operator(Entity):
@@ -72,15 +63,25 @@ class Operator(Entity):
     def generate_stencil(self):
         return self._stencil
 
+    def __repr__(self):
+        return f'Operator({repr(self.name)}, {repr(self.shape)}, {repr(self.generate_stencil())})'
+
 
 class Identity(Operator):
     def __init__(self, shape, dimension=None):
+        self._dimension = dimension
         super(Identity, self).__init__('I', shape, stencils.get_unit_stencil(dimension))
+
+    def __repr__(self):
+        return f'Identity({repr(self.shape)}, {repr(self._dimension)})'
 
 
 class Zero(Operator):
     def __init__(self, shape):
         super(Zero, self).__init__('0', shape, stencils.get_null_stencil())
+
+    def __repr__(self):
+        return f'Zero({repr(self.shape)})'
 
 
 class Grid(Entity):
@@ -96,6 +97,9 @@ class Grid(Entity):
     def generate_stencil():
         return None
 
+    def __repr__(self):
+        return f'Grid({repr(self.name)}, {repr(self.size)})'
+
 
 # Unary Expressions
 class Diagonal(UnaryExpression):
@@ -105,6 +109,9 @@ class Diagonal(UnaryExpression):
     def __str__(self):
         return f'{str(self.operand)}.diag'
 
+    def __repr__(self):
+        return f'Diagonal({repr(self.operand)})'
+
 
 class LowerTriangle(UnaryExpression):
     def generate_stencil(self):
@@ -112,6 +119,9 @@ class LowerTriangle(UnaryExpression):
 
     def __str__(self):
         return f'{str(self.operand)}.lower'
+
+    def __repr__(self):
+        return f'LowerTriangle({repr(self.operand)})'
 
 
 class UpperTriangle(UnaryExpression):
@@ -121,6 +131,9 @@ class UpperTriangle(UnaryExpression):
     def __str__(self):
         return f'{str(self.operand)}.upper'
 
+    def __repr__(self):
+        return f'UpperTriangle({repr(self.operand)})'
+
 
 class Inverse(UnaryExpression):
     def generate_stencil(self):
@@ -128,6 +141,9 @@ class Inverse(UnaryExpression):
 
     def __str__(self):
         return f'{str(self.operand)}.I'
+
+    def __repr__(self):
+        return f'Inverse({repr(self.operand)})'
 
 
 class Transpose(UnaryExpression):
@@ -140,6 +156,9 @@ class Transpose(UnaryExpression):
 
     def __str__(self):
         return f'{str(self.operand)}.T'
+
+    def __repr__(self):
+        return f'Transpose({repr(self.operand)})'
 
 
 # Binary Expressions
@@ -156,6 +175,9 @@ class Addition(BinaryExpression):
     def __str__(self):
         return f'({str(self.operand1)} + {str(self.operand2)})'
 
+    def __repr__(self):
+        return f'Addition({repr(self.operand1)}, {repr(self.operand2)})'
+
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -170,6 +192,9 @@ class Subtraction(BinaryExpression):
     def __str__(self):
         return f'({str(self.operand1)} - {str(self.operand2)})'
 
+    def __repr__(self):
+        return f'Subtraction({repr(self.operand1)}, {repr(self.operand2)})'
+
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -183,6 +208,9 @@ class Multiplication(BinaryExpression):
 
     def __str__(self):
         return f'({str(self.operand1)} * {str(self.operand2)})'
+
+    def __repr__(self):
+        return f'Multiplication({repr(self.operand1)}, {repr(self.operand2)})'
 
 
 # Scaling
@@ -207,11 +235,11 @@ class Scaling(Expression):
     def generate_stencil(self):
         return stencils.scale(self.factor, self.operand.generate_stencil())
 
-    def __repr__(self):
-        return f'{self.__class__}({self.factor}, {self.operand})'
-
     def __str__(self):
         return f'{str(self.factor)} * {str(self.operand)}'
+
+    def __repr__(self):
+        return f'Scaling({repr(self.factor)}, {repr(self.operand)})'
 
 
 # Wrapper functions

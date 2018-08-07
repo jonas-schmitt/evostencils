@@ -14,6 +14,9 @@ class Stencil:
     def number_of_entries(self):
         return len(self.entries)
 
+    def __repr__(self):
+        return f'Stencil({repr(self.entries)})'
+
 
 def lexicographical_less(a, b):
     for p, q in zip(a, b):

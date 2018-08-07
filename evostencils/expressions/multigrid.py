@@ -3,17 +3,31 @@ from evostencils.expressions import base
 
 class Restriction(base.Operator):
     def __init__(self, grid, coarse_grid, stencil=None):
+        self._grid = grid
+        self._coarse_grid = coarse_grid
         super(Restriction, self).__init__(f'R_{grid.size}', (coarse_grid.size, grid.size), stencil)
+
+    def __repr__(self):
+        return f'Restriction({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class Interpolation(base.Operator):
     def __init__(self, grid, coarse_grid, stencil=None):
+        self._grid = grid
+        self._coarse_grid = coarse_grid
         super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size), stencil)
+
+    def __repr__(self):
+        return f'Interpolation({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class CoarseGridSolver(base.Operator):
     def __init__(self, coarse_grid):
+        self._grid = coarse_grid
         super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.size}', (coarse_grid.size, coarse_grid.size), None)
+
+    def __repr__(self):
+        return f'CoarseGridSolver({repr(self._coarse_grid)})'
 
 
 class Correction(base.Expression):
@@ -60,7 +74,7 @@ class Correction(base.Expression):
         return base.Addition(u, base.Scaling(self.weight, base.Multiplication(B, residual(u, A, f))))
 
     def __repr__(self):
-        return f'{self.__class__}({self.iteration_matrix}, {self.grid}, {self.operator}, {self.rhs}, {self.weight})'
+        return f'Correction({repr(self.iteration_matrix)}, {repr(self.grid)}, {repr(self.operator)}, {repr(self.rhs)}, {repr(self.weight)})'
 
     def __str__(self):
         return str(self.generate_expression())

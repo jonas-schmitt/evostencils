@@ -83,11 +83,11 @@ class Optimizer:
         interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
         restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
-        self.add_terminal(base.Zero(A), types.generate_matrix_type(coarse_grid.shape), 'Zero')
+        self.add_terminal(base.Zero(A), types.generate_matrix_type(coarse_grid.shape))
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
-        self._primitive_set.addTerminal(1, float, '1')
+        self._primitive_set.addTerminal(1, float)
 
         self._coarsening_factor = accumulated_coarsening_factor
         self._coarse_grid = coarse_grid
@@ -207,7 +207,7 @@ class Optimizer:
     def get_matrix_types(self) -> list:
         return self._types
 
-    def add_terminal(self, symbol, matrix_type, name):
+    def add_terminal(self, symbol, matrix_type, name=None):
         self._symbols.add(symbol)
         self._types.add(matrix_type)
         self._symbol_types[symbol] = matrix_type
@@ -216,7 +216,7 @@ class Optimizer:
             self._primitive_set.addTerminal(symbol, matrix_type, name=name)
         else:
             self._symbol_names[symbol] = symbol.name
-            self._primitive_set.addTerminal(symbol, matrix_type, name=symbol.name)
+            self._primitive_set.addTerminal(symbol, matrix_type)
 
     def add_operator(self, primitive, argument_types, result_type, name: str):
         for argument_type in argument_types:
