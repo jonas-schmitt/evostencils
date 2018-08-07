@@ -18,16 +18,19 @@ class MatrixTypeMetaClass(type):
             return False
 
     def __subclasscheck__(self, other):
-        is_subclass = True
-        if self.shape != other.shape:
+        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') and hasattr(other, 'upper_triangle'):
+            is_subclass = True
+            if self.shape != other.shape:
+                return False
+            elif not self.diagonal:
+                is_subclass = is_subclass and not other.diagonal
+            elif not self.lower_triangle:
+                is_subclass = is_subclass and not other.lower_triangle
+            elif not self.upper_triangle:
+                is_subclass = is_subclass and not other.upper_triangle
+            return is_subclass
+        else:
             return False
-        elif not self.diagonal:
-            is_subclass = is_subclass and not other.diagonal
-        elif not self.lower_triangle:
-            is_subclass = is_subclass and not other.lower_triangle
-        elif not self.upper_triangle:
-            is_subclass = is_subclass and not other.upper_triangle
-        return is_subclass
 
     def __hash__(self):
         return hash((*self.shape, self.diagonal, self.lower_triangle, self.upper_triangle))

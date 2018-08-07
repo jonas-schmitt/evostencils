@@ -87,6 +87,7 @@ class Optimizer:
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
+        self._primitive_set.addTerminal(1, float, '1')
 
         self._coarsening_factor = accumulated_coarsening_factor
         self._coarse_grid = coarse_grid
@@ -115,8 +116,8 @@ class Optimizer:
 
         # Correction
 
-        correct = functools.partial(multigrid.correct, operator=self._operator, rhs=self._rhs)
-        self.add_operator(correct, [OperatorType, GridType], GridType, 'correct')
+        correct = functools.partial(multigrid.correct, self._operator, self._rhs)
+        self.add_operator(correct, [OperatorType, GridType, float], GridType, 'correct')
 
         # Multigrid recipes
         InterpolationType = types.generate_matrix_type(self._interpolation.shape)
@@ -135,6 +136,7 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
+        self.add_operator(noop, [float], float, 'noop')
 
     @staticmethod
     def _init_creator():
