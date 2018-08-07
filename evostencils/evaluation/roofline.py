@@ -3,9 +3,22 @@ import evostencils.stencils as stencils
 
 
 class RooflineEvaluator:
-    def __init__(self, bytes_per_word=8, solver_properties=(4, 5)):
+    """
+    Class for estimating the performance of matrix expressions by applying a simple roofline model
+    """
+    def __init__(self, peak_performance=4*16*3.6e9, peak_bandwidth=3.41e10, bytes_per_word=8, solver_properties=(4, 5)):
+        self._peak_performance = peak_performance
+        self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word
         self._solver_properties = solver_properties
+
+    @property
+    def peak_performance(self):
+        return self._peak_performance
+
+    @property
+    def peak_bandwidth(self):
+        return self._peak_bandwidth
 
     @property
     def bytes_per_word(self):
@@ -15,19 +28,18 @@ class RooflineEvaluator:
     def solver_properties(self):
         return self._solver_properties
 
-    @staticmethod
-    def compute_performance(peak_performance, intensity, bandwidth):
-        return min(peak_performance, intensity * bandwidth)
+    def compute_performance(self, intensity):
+        return min(self.peak_performance, intensity * self.peak_bandwidth)
 
     def compute_arithmetic_intensity(self, operations, words):
         return operations / (words * self.bytes_per_word)
 
-    def estimate_runtime(self, expression: base.Expression, peak_performance, peak_bandwidth):
+    def estimate_runtime(self, expression: base.Expression, ):
         from functools import reduce
         import operator
         list_of_metrics = self.estimate_operations_per_word(expression)
         tmp = ((N * operations, self.compute_arithmetic_intensity(operations, words)) for operations, words, N in list_of_metrics)
-        runtimes = ((total_number_of_operations / self.compute_performance(peak_performance, arithmetic_intensity, peak_bandwidth))
+        runtimes = ((total_number_of_operations / self.compute_performance(arithmetic_intensity))
                     for total_number_of_operations, arithmetic_intensity in tmp)
         return reduce(operator.add, runtimes)
 
@@ -87,13 +99,13 @@ class RooflineEvaluator:
                 metrics.extend(result1)
             else:
                 metrics.append(self.estimate_operations_per_word_for_stencil(expression.operand1.generate_stencil(),
-                                                                             expression.operand1.shape[1]))
+                                                                             expression.operand1.shape[0]))
 
             if evaluated2:
                 metrics.extend(result2)
             else:
                 metrics.append(self.estimate_operations_per_word_for_stencil(expression.operand2.generate_stencil(),
-                               expression.operand2.shape[1]))
+                               expression.operand2.shape[0]))
             # (A + B) * u = A * u + B * u => op(A*u) + op(B*u) + 1
             if isinstance(expression, base.Addition) or isinstance(expression, base.Subtraction):
                 metrics = [(operations + 1, words, problem_size) for operations, words, problem_size in metrics]
@@ -114,7 +126,7 @@ class RooflineEvaluator:
         elif isinstance(expression, multigrid.CoarseGridSolver):
             return True, [(*self.solver_properties, expression.shape[1])]
         elif isinstance(expression, base.Operator):
-            metrics = self.estimate_operations_per_word_for_stencil(expression.generate_stencil(), expression.shape[1])
+            metrics = self.estimate_operations_per_word_for_stencil(expression.generate_stencil(), expression.shape[0])
             return True, [metrics]
         else:
             raise NotImplementedError("Not implemented")

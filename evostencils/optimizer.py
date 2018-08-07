@@ -10,33 +10,38 @@ import operator
 import functools
 from evostencils.stencils import Stencil
 
-def dummy_eval(individual, generator):
-    return 0.0
-
 
 class Optimizer:
-    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor, evaluate=dummy_eval):
+    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
+                 convergence_evaluator=None, performance_evaluator=None, epsilon=1e-6, infinity=1e10):
+        assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
         self._rhs = rhs
+        self._dimension = dimension
+        self._coarsening_factor = coarsening_factor
+        self._convergence_evaluator = convergence_evaluator
+        self._performance_evaluator = performance_evaluator
+        self._epsilon = epsilon
+        self._infinity = infinity
         self._diagonal = base.Diagonal(self._operator)
         self._symbols = set()
         self._types = set()
         self._symbol_types = {}
         self._symbol_names = {}
         self._primitive_set = gp.PrimitiveSetTyped("main", [], types.generate_matrix_type(self._grid.shape))
-        self._init_terminals(dimension, coarsening_factor)
+        self._init_terminals()
         self._init_operators()
         self._init_creator()
-        self._init_toolbox(evaluate)
+        self._init_toolbox()
 
-    def _init_terminals(self, dimension, coarsening_factor):
+    def _init_terminals(self):
         A = self._operator
         u = self._grid
         f = self._rhs
         D = self._diagonal
 
-        identity_matrix = base.Identity(A.shape, dimension)
+        identity_matrix = base.Identity(A.shape, self.dimension)
         # Add primitives to set
         self.add_terminal(A, types.generate_matrix_type(A.shape), 'A')
         self.add_terminal(u, types.generate_matrix_type(u.shape), 'u')
@@ -70,8 +75,11 @@ class Optimizer:
             (( 0,  1), 1.0/8),
             (( 1,  1), 1.0/16),
         ]
-        coarse_grid = multigrid.get_coarse_grid(u, coarsening_factor)
-        coarse_operator = multigrid.get_coarse_operator(A, coarsening_factor)
+        from functools import reduce
+        import operator
+        accumulated_coarsening_factor = reduce(operator.mul, self.coarsening_factor)
+        coarse_grid = multigrid.get_coarse_grid(u, accumulated_coarsening_factor)
+        coarse_operator = multigrid.get_coarse_operator(A, accumulated_coarsening_factor)
         interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
         restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
@@ -80,13 +88,11 @@ class Optimizer:
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
 
-        self._coarsening_factor = coarsening_factor
+        self._coarsening_factor = accumulated_coarsening_factor
         self._coarse_grid = coarse_grid
         self._coarse_operator = coarse_operator
         self._interpolation = interpolation
         self._restriction = restriction
-
-
 
     def _init_operators(self):
         A = self._operator
@@ -135,12 +141,12 @@ class Optimizer:
         creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
-    def _init_toolbox(self, evaluate):
+    def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
         self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
-        self._toolbox.register("evaluate", evaluate, generator=self)
+        self._toolbox.register("evaluate", self.evaluate, generator=self)
         self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
@@ -168,6 +174,30 @@ class Optimizer:
         return self._rhs
 
     @property
+    def dimension(self):
+        return self._dimension
+
+    @property
+    def coarsening_factor(self):
+        return self._coarsening_factor
+
+    @property
+    def convergence_evaluator(self):
+        return self._convergence_evaluator
+
+    @property
+    def performance_evaluator(self):
+        return self._performance_evaluator
+
+    @property
+    def epsilon(self):
+        return self._epsilon
+
+    @property
+    def infinity(self):
+        return self._infinity
+
+    @property
     def get_symbols(self) -> list:
         return self._symbols
 
@@ -175,7 +205,7 @@ class Optimizer:
     def get_matrix_types(self) -> list:
         return self._types
 
-    def add_terminal(self, symbol, matrix_type, name=None):
+    def add_terminal(self, symbol, matrix_type, name):
         self._symbols.add(symbol)
         self._types.add(matrix_type)
         self._symbol_types[symbol] = matrix_type
@@ -183,8 +213,8 @@ class Optimizer:
             self._symbol_names[symbol] = name
             self._primitive_set.addTerminal(symbol, matrix_type, name=name)
         else:
-            self._symbol_names[symbol] = str(symbol)
-            self._primitive_set.addTerminal(symbol, matrix_type, name=str(symbol))
+            self._symbol_names[symbol] = symbol.name
+            self._primitive_set.addTerminal(symbol, matrix_type, name=symbol.name)
 
     def add_operator(self, primitive, argument_types, result_type, name: str):
         for argument_type in argument_types:
@@ -204,6 +234,22 @@ class Optimizer:
         tmp = substitute_entity(expression, rhs, base.Zero(rhs.shape))
         tmp = propagate_zero(tmp)
         return substitute_entity(tmp, grid, base.Identity(grid.shape))
+
+    def evaluate(self, individual, generator):
+        import math
+        expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
+        iteration_matrix = generator.get_iteration_matrix(expression, generator.grid, generator.rhs)
+        spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+        if spectral_radius == 0.0 or spectral_radius >= 1.0:
+            return self.infinity,
+        elif spectral_radius < 1.0:
+            if self._performance_evaluator is not None:
+                runtime = self.performance_evaluator.estimate_runtime(expression)
+                return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+            else:
+                return spectral_radius,
+        else:
+            raise RuntimeError("Spectral radius out of range")
 
     def simple_gp(self, population, generations, crossover_probability, mutation_probability):
         random.seed()
