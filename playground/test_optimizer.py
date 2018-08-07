@@ -36,7 +36,7 @@ def evaluate(individual, generator):
     expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
     iteration_matrix = generator.get_iteration_matrix(expression, sp.block_collapse(generator.grid), sp.block_collapse(generator.rhs))
     spectral_radius = convergence_evaluator.compute_spectral_radius(iteration_matrix)
-    if spectral_radius == 0.0 or spectral_radius > 1.0:
+    if spectral_radius == 0.0 or spectral_radius >= 1.0:
         return infinity,
     elif spectral_radius < 1.0:
         runtime = performance_evaluator.estimate_runtime(expression, peak_performance, peak_bandwidth)
@@ -47,7 +47,7 @@ def evaluate(individual, generator):
 
 def main():
     optimizer = Optimizer(A, x, b, 2, 4, evaluate)
-    pop, log, hof = optimizer.default_optimization(50, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(100, 20, 0.5, 0.3)
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')

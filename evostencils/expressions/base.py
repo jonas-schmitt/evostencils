@@ -24,6 +24,9 @@ class Entity(Expression):
     def __repr__(self):
         return f'{self.__class__}({self.name}, {self.shape})'
 
+    def __str__(self):
+        return f'{self.name}'
+
 
 class UnaryExpression(Expression):
     def __init__(self, operand):
@@ -99,20 +102,32 @@ class Diagonal(UnaryExpression):
     def generate_stencil(self):
         return stencils.diagonal(self.operand.generate_stencil())
 
+    def __str__(self):
+        return f'{str(self.operand)}.diag'
+
 
 class LowerTriangle(UnaryExpression):
     def generate_stencil(self):
         return stencils.lower(self.operand.generate_stencil())
+
+    def __str__(self):
+        return f'{str(self.operand)}.lower'
 
 
 class UpperTriangle(UnaryExpression):
     def generate_stencil(self):
         return stencils.upper(self.operand.generate_stencil())
 
+    def __str__(self):
+        return f'{str(self.operand)}.upper'
+
 
 class Inverse(UnaryExpression):
     def generate_stencil(self):
         return stencils.inverse(self.operand.generate_stencil())
+
+    def __str__(self):
+        return f'{str(self.operand)}.I'
 
 
 class Transpose(UnaryExpression):
@@ -122,6 +137,9 @@ class Transpose(UnaryExpression):
 
     def generate_stencil(self):
         return stencils.transpose(self.operand.generate_stencil())
+
+    def __str__(self):
+        return f'{str(self.operand)}.T'
 
 
 # Binary Expressions
@@ -135,6 +153,9 @@ class Addition(BinaryExpression):
     def generate_stencil(self):
         return stencils.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
+    def __str__(self):
+        return f'({str(self.operand1)} + {str(self.operand2)})'
+
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -146,6 +167,9 @@ class Subtraction(BinaryExpression):
     def generate_stencil(self):
         return stencils.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
+    def __str__(self):
+        return f'({str(self.operand1)} - {str(self.operand2)})'
+
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
@@ -156,6 +180,9 @@ class Multiplication(BinaryExpression):
 
     def generate_stencil(self):
         return stencils.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+
+    def __str__(self):
+        return f'({str(self.operand1)} * {str(self.operand2)})'
 
 
 # Scaling
@@ -182,6 +209,9 @@ class Scaling(Expression):
 
     def __repr__(self):
         return f'{self.__class__}({self.factor}, {self.operand})'
+
+    def __str__(self):
+        return f'{str(self.factor)} * {str(self.operand)}'
 
 
 # Wrapper functions

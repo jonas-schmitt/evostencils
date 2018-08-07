@@ -43,7 +43,6 @@ class Optimizer:
 
         self.add_terminal(identity_matrix, types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, types.generate_diagonal_matrix_type(A.shape), 'A_d')
-        #self.add_terminal(base.Inverse(D), types.generate_diagonal_matrix_type(A.shape), 'A_d_inv')
         self.add_terminal(base.LowerTriangle(A), types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(base.UpperTriangle(A), types.generate_matrix_type(A.shape), 'A_u')
 

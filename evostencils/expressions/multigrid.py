@@ -57,6 +57,9 @@ class Correction(base.Expression):
     def __repr__(self):
         return f'{self.__class__}({self.iteration_matrix}, {self.grid}, {self.operator}, {self.rhs})'
 
+    def __str__(self):
+        return str(self.generate_expression())
+
 
 def correct(iteration_matrix, grid, operator, rhs):
     return Correction(iteration_matrix, grid, operator, rhs)
