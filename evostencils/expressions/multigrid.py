@@ -17,11 +17,12 @@ class CoarseGridSolver(base.Operator):
 
 
 class Correction(base.Expression):
-    def __init__(self, iteration_matrix: base.Expression, grid, operator: base.Operator, rhs: base.Grid):
+    def __init__(self, iteration_matrix: base.Expression, grid, operator: base.Operator, rhs: base.Grid, weight=1.0):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
         self._rhs = rhs
+        self._weight = weight
 
     @property
     def shape(self):
@@ -47,12 +48,16 @@ class Correction(base.Expression):
     def rhs(self):
         return self._rhs
 
+    @property
+    def weight(self):
+        return self._weight
+
     def generate_expression(self):
         A = self.operator
         u = self.grid
         f = self.rhs
         B = self.iteration_matrix
-        return base.Addition(u, base.Multiplication(B, residual(u, A, f)))
+        return base.Addition(u, base.Scaling(self.weight, base.Multiplication(B, residual(u, A, f))))
 
     def __repr__(self):
         return f'{self.__class__}({self.iteration_matrix}, {self.grid}, {self.operator}, {self.rhs})'
