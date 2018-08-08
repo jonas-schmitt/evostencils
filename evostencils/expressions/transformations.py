@@ -8,7 +8,7 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
         grid = propagate_zero(expression.grid)
         operator = propagate_zero(expression.operator)
         rhs = propagate_zero(expression.rhs)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
     elif isinstance(expression, base.Addition):
         child1 = propagate_zero(expression.operand1)
         child2 = propagate_zero(expression.operand2)
@@ -63,7 +63,7 @@ def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
         grid = fold_intergrid_operations(expression.grid)
         operator = fold_intergrid_operations(expression.operator)
         rhs = fold_intergrid_operations(expression.rhs)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
     elif isinstance(expression, base.Multiplication):
         child1 = fold_intergrid_operations(expression.operand1)
         child2 = fold_intergrid_operations(expression.operand2)
@@ -95,7 +95,7 @@ def substitute_entity(expression: base.Expression, source: base.Entity, destinat
         grid = substitute_entity(expression.grid, source, destination)
         operator = substitute_entity(expression.operator, source, destination)
         rhs = substitute_entity(expression.rhs, source, destination)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs)
+        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
     elif isinstance(expression, base.Entity):
         if expression.name == source.name:
             return destination
@@ -113,4 +113,28 @@ def substitute_entity(expression: base.Expression, source: base.Entity, destinat
         raise NotImplementedError("Not implemented")
 
 
+def set_weights(expression: base.Expression, weights: list) -> base.Expression:
+    if isinstance(expression, multigrid.Correction):
+        if len(weights) == 0:
+            raise RuntimeError("Too few weights have been supplied")
+        head, *tail = weights
+        return multigrid.Correction(expression.iteration_matrix, set_weights(expression.grid, tail), expression.operator, expression.rhs, weight=head)
+    elif isinstance(expression, base.Grid):
+        if len(weights) > 0:
+            raise RuntimeError("Too many weights have been supplied")
+        return expression
+    else:
+        raise NotImplementedError("Not implemented")
+
+
+def obtain_weights(expression: base.Expression) -> list:
+    weights = []
+    if isinstance(expression, multigrid.Correction):
+        weights.append(expression.weight)
+        weights.extend(obtain_weights(expression.grid))
+        return weights
+    elif isinstance(expression, base.Grid):
+        return weights
+    else:
+        raise NotImplementedError("Not implemented")
 

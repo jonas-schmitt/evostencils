@@ -37,7 +37,8 @@ def main():
 
     optimizer = Optimizer(A, x, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator)
-    pop, log, hof = optimizer.default_optimization(200, 10, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(100, 20, 0.5, 0.3)
+
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')

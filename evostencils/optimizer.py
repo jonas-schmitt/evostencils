@@ -9,6 +9,20 @@ import evostencils.expressions.transformations as transformations
 import operator
 import functools
 from evostencils.stencils import Stencil
+from evostencils.weight_optimizer import WeightOptimizer
+
+
+class AST(gp.PrimitiveTree):
+    def __init__(self, content):
+        self._weights = []
+        super(AST, self).__init__(content)
+
+    @property
+    def weights(self):
+        return self._weights
+
+    def set_weights(self, weights):
+        self._weights = weights
 
 
 class Optimizer:
@@ -34,6 +48,7 @@ class Optimizer:
         self._init_operators()
         self._init_creator()
         self._init_toolbox()
+        self._weight_optimizer = WeightOptimizer(self)
 
     def _init_terminals(self):
         A = self._operator
@@ -87,7 +102,6 @@ class Optimizer:
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, types.generate_matrix_type(restriction.shape), 'R')
-        self._primitive_set.addTerminal(1, float)
 
         self._coarsening_factor = accumulated_coarsening_factor
         self._coarse_grid = coarse_grid
@@ -117,7 +131,7 @@ class Optimizer:
         # Correction
 
         correct = functools.partial(multigrid.correct, self._operator, self._rhs)
-        self.add_operator(correct, [OperatorType, GridType, float], GridType, 'correct')
+        self.add_operator(correct, [OperatorType, GridType], GridType, 'correct')
 
         # Multigrid recipes
         InterpolationType = types.generate_matrix_type(self._interpolation.shape)
@@ -136,19 +150,18 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
-        self.add_operator(noop, [float], float, 'noop')
 
     @staticmethod
     def _init_creator():
         creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))
-        creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
+        creator.create("Individual", AST, fitness=creator.Fitness)
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
         self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
-        self._toolbox.register("evaluate", self.evaluate, generator=self)
+        self._toolbox.register("evaluate", self.evaluate)
         self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
@@ -237,11 +250,13 @@ class Optimizer:
         tmp = propagate_zero(tmp)
         return substitute_entity(tmp, grid, base.Identity(grid.shape))
 
-    def evaluate(self, individual, generator):
+    def evaluate(self, individual):
         import math
-        expression = transformations.fold_intergrid_operations(generator.compile_expression(individual))
-        iteration_matrix = generator.get_iteration_matrix(expression, generator.grid, generator.rhs)
+        expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+        individual.set_weights(transformations.obtain_weights(expression))
+        iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+
         if spectral_radius == 0.0 or spectral_radius >= 1.0:
             return self.infinity,
         elif spectral_radius < 1.0:
@@ -280,10 +295,21 @@ class Optimizer:
 
         pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats,
                            halloffame=hof, verbose=True)
+        weights, spectral_radius = self.optimize_weights(hof[0])
+        print(spectral_radius)
+        hof[0].set_weights(weights)
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
         return self.harm_gp(population, generations, crossover_probability, mutation_probability)
+
+    def optimize_weights(self, individual):
+        expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+        weights = transformations.obtain_weights(expression)
+        best_individual = self._weight_optimizer.optimize(expression, len(weights), 50)
+        best_weights = list(best_individual)
+        spectral_radius = best_individual.fitness.values[0]
+        return best_weights, spectral_radius
 
     @staticmethod
     def visualize_tree(individual, filename):
