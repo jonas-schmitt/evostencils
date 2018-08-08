@@ -14,7 +14,7 @@ from evostencils.weight_optimizer import WeightOptimizer
 
 class AST(gp.PrimitiveTree):
     def __init__(self, content):
-        self._weights = []
+        self._weights = None
         super(AST, self).__init__(content)
 
     @property
@@ -253,7 +253,8 @@ class Optimizer:
     def evaluate(self, individual):
         import math
         expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
-        individual.set_weights(transformations.obtain_weights(expression))
+        if individual.weights is not None:
+            expression = transformations.set_weights(expression, individual.weights)
         iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
 
@@ -298,6 +299,7 @@ class Optimizer:
         weights, spectral_radius = self.optimize_weights(hof[0])
         print(spectral_radius)
         hof[0].set_weights(weights)
+        hof[0].fitness = creator.Fitness(values=self.evaluate(hof[0]))
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
