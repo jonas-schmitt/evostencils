@@ -37,7 +37,7 @@ def main():
 
     optimizer = Optimizer(A, x, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator)
-    pop, log, hof = optimizer.default_optimization(100, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(1000, 20, 0.5, 0.3)
 
     optimizer.visualize_tree(hof[0], "tree")
     i = 1
@@ -45,6 +45,7 @@ def main():
     for ind in hof:
         print(f'Individual {i} with fitness {ind.fitness}')
         expression = transformations.fold_intergrid_operations(optimizer.compile_expression(ind))
+        expression = transformations.set_weights(expression, ind.weights)
         print(f'Update expression: {expression}')
         iteration_matrix = optimizer.get_iteration_matrix(expression, optimizer.grid, optimizer.rhs)
         print(f'Iteration Matrix: {iteration_matrix}\n')

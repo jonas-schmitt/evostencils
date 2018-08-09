@@ -296,10 +296,10 @@ class Optimizer:
 
         pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats,
                            halloffame=hof, verbose=True)
-        weights, spectral_radius = self.optimize_weights(hof[0])
-        print(spectral_radius)
-        hof[0].set_weights(weights)
-        hof[0].fitness = creator.Fitness(values=self.evaluate(hof[0]))
+        for individual in hof:
+            weights, spectral_radius = self.optimize_weights(individual)
+            individual.set_weights(weights)
+            individual.fitness = creator.Fitness(values=self.evaluate(individual))
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
