@@ -27,7 +27,7 @@ class AST(gp.PrimitiveTree):
 
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
-                 convergence_evaluator=None, performance_evaluator=None, epsilon=1e-6, infinity=1e10):
+                 convergence_evaluator=None, performance_evaluator=None, epsilon=1e-9, infinity=1e10):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid

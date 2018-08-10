@@ -10,7 +10,7 @@ import math
 
 def main():
     infinity = 1e10
-    epsilon = 1e-6
+    epsilon = 1e-12
     dimension = 2
     fine_grid_size = (100, 100)
     operator_stencil_entries = [
@@ -36,7 +36,7 @@ def main():
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
 
     optimizer = Optimizer(A, x, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator)
+                          performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
     pop, log, hof = optimizer.default_optimization(1000, 20, 0.5, 0.3)
 
     optimizer.visualize_tree(hof[0], "tree")

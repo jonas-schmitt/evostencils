@@ -88,12 +88,8 @@ class RooflineEvaluator:
         iteration_matrix = correction.iteration_matrix
         evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
         operator_stencil = correction.operator.generate_stencil()
-        # u = (1 - omega) * u + omega * correction
-        #operations_update = self.operations_for_addition() + 2 * self.operations_for_scaling()
-        #words_update = self.words_transferred_for_load() + self.words_transferred_for_store()
-        # r = (b - A*x)
         if not evaluated:
-            # u = (1 - omega) * u + omega * B * u - B * A * u
+            # u = (1 - omega) * u + omega * B * u - omega * B * A * u
             iteration_matrix_stencil = iteration_matrix.generate_stencil()
             combined_stencil = stencils.mul(iteration_matrix_stencil, operator_stencil)
             operations = self.operations_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
@@ -104,6 +100,8 @@ class RooflineEvaluator:
                 + self.words_transferred_for_load() + self.words_transferred_for_store()
             list_of_metrics.append((operations, words, problem_size))
         else:
+            # u = (1 - omega) * u + omega * correction
+            # r = (b - A*x)
             operations_residual = self.operations_for_stencil_application(operator_stencil.number_of_entries) \
                 + self.operations_for_subtraction()
             words_residual = self.words_transferred_for_load() \
