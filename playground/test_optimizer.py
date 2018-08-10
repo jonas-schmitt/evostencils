@@ -46,9 +46,10 @@ def main():
         print(f'Individual {i} with fitness {ind.fitness}')
         expression = transformations.fold_intergrid_operations(optimizer.compile_expression(ind))
         expression = transformations.set_weights(expression, ind.weights)
-        print(f'Update expression: {expression}')
+        print(f'Update expression: {repr(expression)}')
         iteration_matrix = optimizer.get_iteration_matrix(expression, optimizer.grid, optimizer.rhs)
-        print(f'Iteration Matrix: {iteration_matrix}\n')
+        print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
+        optimizer.visualize_tree(ind, f'tree{i}')
         i = i + 1
     return pop, log, hof
 

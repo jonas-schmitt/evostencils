@@ -6,7 +6,7 @@ class RooflineEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance=4*16*3.6e9, peak_bandwidth=3.41e10, bytes_per_word=8, solver_properties=(4, 5)):
+    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, solver_properties=(4, 5)):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word
@@ -55,34 +55,71 @@ class RooflineEvaluator:
         else:
             raise NotImplementedError("Not implemented")
 
+    @staticmethod
+    def operations_for_addition():
+        return 1
+
+    @staticmethod
+    def operations_for_subtraction():
+        return 1
+
+    @staticmethod
+    def operations_for_stencil_application(number_of_entries):
+        return number_of_entries + (number_of_entries - 1)
+
+    @staticmethod
+    def operations_for_scaling():
+        return 1
+
+    @staticmethod
+    def words_transferred_for_stencil_application(number_of_entries):
+        return number_of_entries
+
+    @staticmethod
+    def words_transferred_for_load():
+        return 1
+
+    @staticmethod
+    def words_transferred_for_store():
+        return 1
+
     def _estimate_operations_per_word_for_correction(self, correction: multigrid.Correction) -> list:
         problem_size = correction.grid.shape[0]
         iteration_matrix = correction.iteration_matrix
         evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
         operator_stencil = correction.operator.generate_stencil()
-        number_of_entries = operator_stencil.number_of_entries
-        operations_update = 1
-        words_update = 1
-        operations_residual = number_of_entries + (number_of_entries - 1) + 1
-        words_residual = number_of_entries + 3
+        # u = (1 - omega) * u + omega * correction
+        #operations_update = self.operations_for_addition() + 2 * self.operations_for_scaling()
+        #words_update = self.words_transferred_for_load() + self.words_transferred_for_store()
+        # r = (b - A*x)
         if not evaluated:
-            stencil = iteration_matrix.generate_stencil()
-            list_of_metrics.append(self.estimate_operations_per_word_for_stencil(stencil, problem_size))
-            list_of_metrics[-1] = (operations_residual + list_of_metrics[-1][0] + operations_update,
-                                   operations_residual + list_of_metrics[-1][1] + words_update, list_of_metrics[-1][2])
+            # u = (1 - omega) * u + omega * B * u - B * A * u
+            iteration_matrix_stencil = iteration_matrix.generate_stencil()
+            combined_stencil = stencils.mul(iteration_matrix_stencil, operator_stencil)
+            operations = self.operations_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
+                + self.operations_for_stencil_application(combined_stencil.number_of_entries) \
+                + self.operations_for_subtraction() + self.operations_for_addition() + 3 * self.operations_for_scaling()
+            words = self.words_transferred_for_stencil_application(combined_stencil.number_of_entries) \
+                + self.words_transferred_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
+                + self.words_transferred_for_load() + self.words_transferred_for_store()
+            list_of_metrics.append((operations, words, problem_size))
         else:
-            list_of_metrics.append((operations_residual + operations_update, words_residual + words_update + 2,
-                                    problem_size))
-        # r = b - Au
-        # tmp = iteration_matrix * r
-        # u = u + tmp
+            operations_residual = self.operations_for_stencil_application(operator_stencil.number_of_entries) \
+                + self.operations_for_subtraction()
+            words_residual = self.words_transferred_for_load() \
+                + self.words_transferred_for_stencil_application(operator_stencil.number_of_entries) \
+                + self.words_transferred_for_store()
+            list_of_metrics.append((operations_residual, words_residual, problem_size))
+            list_of_metrics[-1] = (list_of_metrics[-1][0] + self.operations_for_addition() + 2 * self.operations_for_scaling(),
+                                   list_of_metrics[-1][1] + self.words_transferred_for_load(), problem_size)
         return list_of_metrics
 
     @staticmethod
     def estimate_operations_per_word_for_stencil(stencil: stencils.Stencil, problem_size) -> tuple:
         number_of_entries = stencil.number_of_entries
-        operations = number_of_entries + (number_of_entries - 1)
-        words = number_of_entries + 2
+        operations = RooflineEvaluator.operations_for_stencil_application(number_of_entries)
+        words = RooflineEvaluator.operations_for_stencil_application(number_of_entries) \
+            + RooflineEvaluator.words_transferred_for_store()
         # if any(all(i == 0 for i in entry[0]) for entry in stencil.entries):
         #    words -= 1
         return operations, words, problem_size
@@ -107,8 +144,10 @@ class RooflineEvaluator:
                 metrics.append(self.estimate_operations_per_word_for_stencil(expression.operand2.generate_stencil(),
                                expression.operand2.shape[0]))
             # (A + B) * u = A * u + B * u => op(A*u) + op(B*u) + 1
-            if isinstance(expression, base.Addition) or isinstance(expression, base.Subtraction):
-                metrics = [(operations + 1, words, problem_size) for operations, words, problem_size in metrics]
+            if isinstance(expression, base.Addition):
+                metrics = [(operations + self.operations_for_addition(), words, problem_size) for operations, words, problem_size in metrics]
+            elif isinstance(expression, base.Subtraction):
+                metrics = [(operations + self.operations_for_subtraction(), words, problem_size) for operations, words, problem_size in metrics]
             # A * B * u => op(A*u) + op(B*u)
             return True, metrics
         elif isinstance(expression, base.UnaryExpression):
@@ -119,7 +158,9 @@ class RooflineEvaluator:
                 # Here we have to apply the scaling separately to the grid
                 # Operations: One multiplication per grid point
                 # Words: We have to load (into the cache) and store each grid point once
-                metrics = [(operations + 1, words + 2, problem_size) for operations, words, problem_size in result]
+                metrics = [(operations + self.operations_for_scaling(), words + self.words_transferred_for_load() +
+                            self.words_transferred_for_store(), problem_size)
+                           for operations, words, problem_size in result]
                 return True, metrics
             else:
                 return False, []

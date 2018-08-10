@@ -1,9 +1,9 @@
 import evostencils.stencils as stencils
 import copy
 
-stencil1 = stencils.Stencil(((( 0,), -2),
-            ((-1,),  1),
-            (( 1,),  1)))
+stencil1 = stencils.Stencil((((0,), -2),
+                             ((-1,),  1),
+                             (( 1,),  1)))
 stencil2 = stencils.Stencil(copy.deepcopy(stencil1.entries))
 
 a = stencils.scale(2, stencil1)
