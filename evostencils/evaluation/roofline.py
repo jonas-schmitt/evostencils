@@ -165,7 +165,7 @@ class RooflineEvaluator:
             else:
                 return False, []
         elif isinstance(expression, multigrid.CoarseGridSolver):
-            return True, [(*self.solver_properties, expression.shape[1])]
+            return True, [(*self.solver_properties, expression.shape[0])]
         elif isinstance(expression, base.Operator):
             metrics = self.estimate_operations_per_word_for_stencil(expression.generate_stencil(), expression.shape[0])
             return True, [metrics]
