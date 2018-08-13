@@ -1,6 +1,6 @@
 from evostencils.evaluation.roofline import *
 
-fine_grid_size = (1000, 1000)
+fine_grid_size = (100, 100)
 operator_stencil_entries = [
     (( 0, -1), -1.0),
     ((-1,  0), -1.0),
@@ -34,7 +34,7 @@ restriction_stencil_entries = [
 
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
-A = base.generate_operator('A', fine_grid_size, stencil.Stencil(operator_stencil_entries))
+A = base.generate_operator('A', fine_grid_size, stencils.Stencil(operator_stencil_entries))
 bytes_per_word = 8
 peak_performance = 4 * 16 * 3.3 * 1e9
 peak_bandwidth = 34.1 * 1e9
@@ -45,15 +45,15 @@ coarsening_factor = 4
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
 A_coarse = multigrid.get_coarse_operator(A, coarsening_factor)
 S_coarse = multigrid.get_coarse_grid_solver(u_coarse)
-P = multigrid.get_interpolation(u, u_coarse, stencil.Stencil(interpolation_stencil_entries))
-R = multigrid.get_restriction(u, u_coarse, stencil.Stencil(interpolation_stencil_entries))
+P = multigrid.get_interpolation(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))
+R = multigrid.get_restriction(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))
 smoother = base.Inverse(base.Diagonal(A))
-tmp = multigrid.correct(smoother, u, A, b)
+tmp = multigrid.correct(A, b, smoother, u)
 print(f'Runtime:{evaluator.estimate_runtime(tmp)}')
 
 coarse_grid_correction = base.Multiplication(P, base.Multiplication(S_coarse, R))
-tmp = multigrid.correct(coarse_grid_correction, tmp, A, b)
+tmp = multigrid.correct(A, b, coarse_grid_correction, tmp)
 print(f'Runtime:{evaluator.estimate_runtime(tmp)}')
-two_grid = multigrid.correct(smoother, tmp, A, b)
+two_grid = multigrid.correct(A, b, smoother, tmp)
 print(f'Runtime:{evaluator.estimate_runtime(two_grid)}')
 

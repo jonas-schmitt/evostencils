@@ -94,21 +94,21 @@ class RooflineEvaluator:
             combined_stencil = stencils.mul(iteration_matrix_stencil, operator_stencil)
             operations = self.operations_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
                 + self.operations_for_stencil_application(combined_stencil.number_of_entries) \
-                + self.operations_for_subtraction() + self.operations_for_addition() + 3 * self.operations_for_scaling()
+                + self.operations_for_subtraction() + self.operations_for_addition() + 2 * self.operations_for_scaling()
             words = self.words_transferred_for_stencil_application(combined_stencil.number_of_entries) \
                 + self.words_transferred_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
                 + self.words_transferred_for_load() + self.words_transferred_for_store()
             list_of_metrics.append((operations, words, problem_size))
         else:
-            # u = (1 - omega) * u + omega * correction
+            # u = u + omega * correction
             # r = (b - A*x)
             operations_residual = self.operations_for_stencil_application(operator_stencil.number_of_entries) \
                 + self.operations_for_subtraction()
             words_residual = self.words_transferred_for_load() \
                 + self.words_transferred_for_stencil_application(operator_stencil.number_of_entries) \
                 + self.words_transferred_for_store()
-            list_of_metrics.append((operations_residual, words_residual, problem_size))
-            list_of_metrics[-1] = (list_of_metrics[-1][0] + self.operations_for_addition() + 2 * self.operations_for_scaling(),
+            #list_of_metrics.append((operations_residual, words_residual, problem_size))
+            list_of_metrics[-1] = (list_of_metrics[-1][0] + self.operations_for_addition() + self.operations_for_scaling(),
                                    list_of_metrics[-1][1] + self.words_transferred_for_load(), problem_size)
         return list_of_metrics
 

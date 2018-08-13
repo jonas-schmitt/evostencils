@@ -257,17 +257,17 @@ class Optimizer:
             expression = transformations.set_weights(expression, individual.weights)
         iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-
-        if spectral_radius == 0.0 or spectral_radius >= 1.0:
+        if spectral_radius == 0.0:
             return self.infinity,
-        elif spectral_radius < 1.0:
+        else:
             if self._performance_evaluator is not None:
                 runtime = self.performance_evaluator.estimate_runtime(expression)
-                return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                if spectral_radius < 1.0:
+                    return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                else:
+                    return self.infinity * spectral_radius * runtime,
             else:
                 return spectral_radius,
-        else:
-            raise RuntimeError("Spectral radius out of range")
 
     def simple_gp(self, population, generations, crossover_probability, mutation_probability):
         random.seed()

@@ -10,9 +10,9 @@ import math
 
 def main():
     infinity = 1e10
-    epsilon = 1e-12
+    epsilon = 1e-9
     dimension = 2
-    fine_grid_size = (100, 100)
+    fine_grid_size = (1000, 1000)
     operator_stencil_entries = [
         (( 0, -1), -1.0),
         ((-1,  0), -1.0),
@@ -39,7 +39,6 @@ def main():
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
     pop, log, hof = optimizer.default_optimization(1000, 20, 0.5, 0.3)
 
-    optimizer.visualize_tree(hof[0], "tree")
     i = 1
     print('\n')
     for ind in hof:
