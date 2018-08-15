@@ -86,12 +86,18 @@ class Zero(Operator):
 
 class Grid(Entity):
     def __init__(self, name, size):
+        import operator
         self._name = name
-        self._shape = (size, 1)
+        self._size = size
+        self._shape = (reduce(operator.mul, size), 1)
 
     @property
     def size(self):
-        return self._shape[0]
+        return self._size
+
+    @property
+    def dimension(self):
+        return len(self.size)
 
     @staticmethod
     def generate_stencil():
@@ -264,8 +270,7 @@ def scale(factor, operand):
 
 
 def generate_grid(name: str, grid_size: tuple) -> Grid:
-    n = reduce(builtin_mul, grid_size, 1)
-    return Grid(name, n)
+    return Grid(name, grid_size)
 
 
 def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:

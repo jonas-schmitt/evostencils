@@ -8,7 +8,10 @@ class Stencil:
 
     @property
     def dimension(self):
-        return len(self.entries[0])
+        if len(self.entries) == 0:
+            return None
+        else:
+            return len(self.entries[0][0])
 
     @property
     def number_of_entries(self):
