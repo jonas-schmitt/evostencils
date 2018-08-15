@@ -107,7 +107,7 @@ class RooflineEvaluator:
             words_residual = self.words_transferred_for_load() \
                 + self.words_transferred_for_stencil_application(operator_stencil.number_of_entries) \
                 + self.words_transferred_for_store()
-            #list_of_metrics.append((operations_residual, words_residual, problem_size))
+            list_of_metrics.append((operations_residual, words_residual, problem_size))
             list_of_metrics[-1] = (list_of_metrics[-1][0] + self.operations_for_addition() + self.operations_for_scaling(),
                                    list_of_metrics[-1][1] + self.words_transferred_for_load(), problem_size)
         return list_of_metrics

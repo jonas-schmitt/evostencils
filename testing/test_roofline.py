@@ -41,9 +41,9 @@ peak_bandwidth = 34.1 * 1e9
 evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
 
 
-coarsening_factor = 4
+coarsening_factor = (2, 2)
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
-A_coarse = multigrid.get_coarse_operator(A, coarsening_factor)
+A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 S_coarse = multigrid.get_coarse_grid_solver(u_coarse)
 P = multigrid.get_interpolation(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))
 R = multigrid.get_restriction(u, u_coarse, stencils.Stencil(interpolation_stencil_entries))

@@ -17,24 +17,24 @@ fine = lfa.Grid(2, [1.0, 1.0])
 # Create a poisson operator.
 fine_operator = lfa.gallery.poisson_2d(fine)
 
-coarsening_factor = 2
+coarsening_factor = (2, 2)
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
-A_coarse = multigrid.get_coarse_operator(A, coarsening_factor)
+A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 P = multigrid.get_interpolation(u, u_coarse)
 R = multigrid.get_restriction(u, u_coarse)
 
 coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2, 2)))
 evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
 smoother = base.Inverse(base.Diagonal(A))
-tmp = multigrid.correct(A, b, smoother, u, 0.5)
+tmp = multigrid.correct(A, b, smoother, u, 1)
 coarse_grid_correction = base.Multiplication(P, base.Multiplication(multigrid.CoarseGridSolver(u_coarse), R))
-tmp = multigrid.correct(A, b, coarse_grid_correction, tmp, 1.2)
-tmp = multigrid.correct(A, b, smoother, tmp, 0.5)
+tmp = multigrid.correct(A, b, coarse_grid_correction, tmp, 1)
+tmp = multigrid.correct(A, b, smoother, tmp, 1)
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
 print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
-jacobi = lfa_lab.jacobi(fine_operator, 0.5)
+jacobi = lfa_lab.jacobi(fine_operator, 1)
 reference = jacobi * lfa_lab.coarse_grid_correction(fine_operator, coarse_operator, evaluator.interpolation, evaluator.restriction, coarse_error=None) * jacobi
 print(reference.symbol().spectral_radius())
 

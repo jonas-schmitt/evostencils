@@ -5,7 +5,7 @@ class Restriction(base.Operator):
     def __init__(self, grid, coarse_grid, stencil=None):
         self._grid = grid
         self._coarse_grid = coarse_grid
-        super(Restriction, self).__init__(f'R_{grid.size}', (coarse_grid.size, grid.size), stencil)
+        super(Restriction, self).__init__(f'R_{grid.shape[0]}', (coarse_grid.shape[0], grid.shape[0]), stencil)
 
     def __repr__(self):
         return f'Restriction({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
@@ -15,7 +15,7 @@ class Interpolation(base.Operator):
     def __init__(self, grid, coarse_grid, stencil=None):
         self._grid = grid
         self._coarse_grid = coarse_grid
-        super(Interpolation, self).__init__(f'I_{coarse_grid.size}', (grid.size, coarse_grid.size), stencil)
+        super(Interpolation, self).__init__(f'I_{coarse_grid.shape[0]}', (grid.shape[0], coarse_grid.shape[0]), stencil)
 
     def __repr__(self):
         return f'Interpolation({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
@@ -24,7 +24,7 @@ class Interpolation(base.Operator):
 class CoarseGridSolver(base.Operator):
     def __init__(self, coarse_grid):
         self._grid = coarse_grid
-        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.size}', (coarse_grid.size, coarse_grid.size), None)
+        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.shape[0]}', (coarse_grid.shape[0], coarse_grid.shape[0]), None)
 
     def __repr__(self):
         return f'CoarseGridSolver({repr(self._grid)})'
@@ -88,21 +88,23 @@ def residual(grid, operator, rhs):
     return base.Subtraction(rhs, base.Multiplication(operator, grid))
 
 
-def get_interpolation(grid, coarse_grid, stencil=None):
+def get_interpolation(grid: base.Grid, coarse_grid: base.Grid, stencil=None):
     return Interpolation(grid, coarse_grid, stencil)
 
 
-def get_restriction(grid, coarse_grid, stencil=None):
+def get_restriction(grid: base.Grid, coarse_grid: base.Grid, stencil=None):
     return Restriction(grid, coarse_grid, stencil)
 
 
-def get_coarse_grid(grid, coarsening_factor):
-    return base.Grid(f'{grid.name}_coarse', grid.size / coarsening_factor)
+def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
+    from functools import reduce
+    import operator
+    coarse_size = tuple(grid.size[i] // coarsening_factor[i] for i in range(len(grid.size)))
+    return base.Grid(f'{grid.name}_{reduce(operator.mul, coarse_size)}', coarse_size)
 
 
-def get_coarse_operator(operator, coarsening_factor, stencil=None):
-    return base.Operator(f'{operator.name}_coarse', (operator.shape[0] / coarsening_factor,
-                                                     operator.shape[1] / coarsening_factor), stencil)
+def get_coarse_operator(operator, coarse_grid, stencil=None):
+    return base.Operator(f'{operator.name}_{coarse_grid.shape[0]}', (coarse_grid.shape[0], coarse_grid.shape[0]), stencil)
 
 
 def get_coarse_grid_solver(coarse_grid):
