@@ -37,7 +37,7 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
 
 def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
     result = expression.apply(fold_intergrid_operations)
-    if isinstance(expression, base.Multiplication):
+    if isinstance(result, base.Multiplication):
         child1 = result.operand1
         child2 = result.operand2
         if isinstance(child1, multigrid.Interpolation) and isinstance(child2, multigrid.Restriction):
@@ -50,45 +50,24 @@ def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
 
 
 def remove_identity_operations(expression: base.Expression) -> base.Expression:
-    if isinstance(expression, multigrid.Correction):
-        iteration_matrix = remove_identity_operations(expression.iteration_matrix)
-        grid = remove_identity_operations(expression.grid)
-        operator = remove_identity_operations(expression.operator)
-        rhs = remove_identity_operations(expression.rhs)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
-    elif isinstance(expression, base.Subtraction):
-        operand1 = remove_identity_operations(expression.operand1)
-        operand2 = remove_identity_operations(expression.operand2)
+    result = expression.apply(remove_identity_operations)
+    if isinstance(result, base.Subtraction):
+        operand1 = result.operand1
+        operand2 = result.operand2
         if isinstance(operand1, base.Identity) and isinstance(operand2, base.Identity):
             return base.Zero(expression.shape)
-        else:
-            return base.Subtraction(operand1, operand2)
-    elif isinstance(expression, base.Multiplication):
-        operand1 = remove_identity_operations(expression.operand1)
-        operand2 = remove_identity_operations(expression.operand2)
+    elif isinstance(result, base.Multiplication):
+        operand1 = result.operand1
+        operand2 = result.operand2
         if isinstance(operand1, base.Identity) and base.is_quadratic(operand1):
             return operand2
         elif isinstance(operand2, base.Identity) and base.is_quadratic(operand2):
             return operand1
-        else:
-            return base.Multiplication(operand1, operand2)
-    elif isinstance(expression, base.BinaryExpression):
-        operand1 = remove_identity_operations(expression.operand1)
-        operand2 = remove_identity_operations(expression.operand2)
-        return type(expression)(operand1, operand2)
-    elif isinstance(expression, base.Scaling):
-        operand = remove_identity_operations(expression.operand)
-        return base.Scaling(expression.factor, operand)
-    elif isinstance(expression, base.Inverse) or isinstance(expression, base.Transpose):
-        operand = remove_identity_operations(expression.operand)
+    elif isinstance(result, base.Inverse) or isinstance(result, base.Transpose):
+        operand = result.operand
         if isinstance(operand, base.Identity) and base.is_quadratic(operand):
             return operand
-        else:
-            return type(expression)(operand)
-    elif isinstance(expression, base.UnaryExpression):
-        return type(expression)(expression.operand)
-    else:
-        return expression
+    return result
 
 
 def substitute_entity(expression: base.Expression, source: base.Entity, destination: base.Entity) -> base.Expression:
