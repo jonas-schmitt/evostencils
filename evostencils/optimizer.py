@@ -96,7 +96,8 @@ class Optimizer:
         restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
         self.add_terminal(base.Zero(A), matrixtypes.generate_matrix_type(coarse_grid.shape))
-        self.add_terminal(multigrid.CoarseGridSolver(coarse_grid), matrixtypes.generate_matrix_type(coarse_operator.shape), 'S_coarse')
+        self.add_terminal(multigrid.CoarseGridSolver(coarse_grid),
+                          matrixtypes.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, matrixtypes.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, matrixtypes.generate_matrix_type(restriction.shape), 'R')
 
@@ -244,7 +245,7 @@ class Optimizer:
         from evostencils.expressions.transformations import propagate_zero, substitute_entity
         tmp = substitute_entity(expression, rhs, base.Zero(rhs.shape))
         tmp = propagate_zero(tmp)
-        return substitute_entity(tmp, grid, base.Identity(grid.shape))
+        return substitute_entity(tmp, grid, base.Identity(grid.shape, grid.dimension))
 
     def evaluate(self, individual):
         import math
@@ -275,7 +276,8 @@ class Optimizer:
         stats.register("std", np.std)
         stats.register("min", np.min)
         stats.register("max", np.max)
-        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations, stats=stats, halloffame=hof, verbose=True)
+        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations,
+                                       stats=stats, halloffame=hof, verbose=True)
         return pop, log, hof
 
     def harm_gp(self, population, generations, crossover_probability, mutation_probability):
@@ -291,8 +293,8 @@ class Optimizer:
         mstats.register("min", np.min)
         mstats.register("max", np.max)
 
-        pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats,
-                           halloffame=hof, verbose=True)
+        pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations,
+                           alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
         for individual in hof:
             weights, spectral_radius = self.optimize_weights(individual)
             individual.set_weights(weights)

@@ -38,7 +38,8 @@ class RooflineEvaluator:
         from functools import reduce
         import operator
         list_of_metrics = self.estimate_operations_per_word(expression)
-        tmp = ((N * operations, self.compute_arithmetic_intensity(operations, words)) for operations, words, N in list_of_metrics)
+        tmp = ((N * operations, self.compute_arithmetic_intensity(operations, words))
+               for operations, words, N in list_of_metrics)
         runtimes = ((total_number_of_operations / self.compute_performance(arithmetic_intensity))
                     for total_number_of_operations, arithmetic_intensity in tmp)
         return reduce(operator.add, runtimes)
@@ -143,9 +144,11 @@ class RooflineEvaluator:
                                expression.operand2.shape[0]))
             # (A + B) * u = A * u + B * u => op(A*u) + op(B*u) + 1
             if isinstance(expression, base.Addition):
-                metrics = [(operations + self.operations_for_addition(), words, problem_size) for operations, words, problem_size in metrics]
+                metrics = [(operations + self.operations_for_addition(), words, problem_size)
+                           for operations, words, problem_size in metrics]
             elif isinstance(expression, base.Subtraction):
-                metrics = [(operations + self.operations_for_subtraction(), words, problem_size) for operations, words, problem_size in metrics]
+                metrics = [(operations + self.operations_for_subtraction(), words, problem_size)
+                           for operations, words, problem_size in metrics]
             # A * B * u => op(A*u) + op(B*u)
             return True, metrics
         elif isinstance(expression, base.UnaryExpression):

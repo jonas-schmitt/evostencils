@@ -1,13 +1,12 @@
 import lfa_lab
 from evostencils.expressions import base, multigrid
-from functools import reduce
-import operator
 
 
 class ConvergenceEvaluator:
 
     def __init__(self, fine_operator, coarse_operator, fine_grid, fine_grid_size, coarsening_factor):
-        assert len(fine_grid_size) == len(coarsening_factor), 'Dimensions of the fine grid size and the coarsening factor must match'
+        assert len(fine_grid_size) == len(coarsening_factor), \
+            'Dimensions of the fine grid size and the coarsening factor must match'
         self._fine_operator = fine_operator
         self._fine_grid = fine_grid
         self._fine_grid_size = fine_grid_size
@@ -78,15 +77,14 @@ class ConvergenceEvaluator:
             return self._coarse_operator.inverse()
         elif isinstance(expression, base.Operator):
             return self.fine_operator
-        else:
-            raise NotImplementedError("Not implemented")
+        raise NotImplementedError("Not implemented")
 
     def compute_spectral_radius(self, expression: base.Expression):
         try:
             smoother = self.transform(expression)
             symbol = smoother.symbol()
             return symbol.spectral_radius()
-        except RuntimeError as re:
+        except RuntimeError as _:
             return 0.0
 
 

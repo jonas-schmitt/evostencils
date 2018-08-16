@@ -40,7 +40,8 @@ class Interpolation(base.Operator):
 class CoarseGridSolver(base.Operator):
     def __init__(self, coarse_grid):
         self._grid = coarse_grid
-        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.shape[0]}', (coarse_grid.shape[0], coarse_grid.shape[0]), None)
+        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.shape[0]}',
+                                               (coarse_grid.shape[0], coarse_grid.shape[0]), None)
 
     @property
     def grid(self):
@@ -51,7 +52,8 @@ class CoarseGridSolver(base.Operator):
 
 
 class Correction(base.Expression):
-    def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression, rhs: base.Expression, weight=1.0):
+    def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression,
+                 rhs: base.Expression, weight=1.0):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
@@ -94,7 +96,8 @@ class Correction(base.Expression):
         return base.Addition(u, base.Scaling(self.weight, base.Multiplication(B, residual(u, A, f))))
 
     def __repr__(self):
-        return f'Correction({repr(self.iteration_matrix)}, {repr(self.grid)}, {repr(self.operator)}, {repr(self.rhs)}, {repr(self.weight)})'
+        return f'Correction({repr(self.iteration_matrix)}, {repr(self.grid)}, {repr(self.operator)}, ' \
+               f'{repr(self.rhs)}, {repr(self.weight)})'
 
     def __str__(self):
         return str(self.generate_expression())
@@ -131,7 +134,8 @@ def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
 
 
 def get_coarse_operator(operator, coarse_grid, stencil=None):
-    return base.Operator(f'{operator.name}_{coarse_grid.shape[0]}', (coarse_grid.shape[0], coarse_grid.shape[0]), stencil)
+    return base.Operator(f'{operator.name}_{coarse_grid.shape[0]}',
+                         (coarse_grid.shape[0], coarse_grid.shape[0]), stencil)
 
 
 def get_coarse_grid_solver(coarse_grid):
@@ -141,18 +145,3 @@ def get_coarse_grid_solver(coarse_grid):
 def is_intergrid_operation(expression: base.Expression) -> bool:
     return isinstance(expression, Restriction) or isinstance(expression, Interpolation) \
            or isinstance(expression, CoarseGridSolver)
-
-
-def contains_intergrid_operation(expression: base.Expression) -> bool:
-    if isinstance(expression, Restriction) or isinstance(expression.Interpolation):
-        return True
-    elif isinstance(expression, base.Entity):
-        return False
-    elif isinstance(expression, base.UnaryExpression):
-        return contains_intergrid_operation(expression.operand)
-    elif isinstance(expression, base.BinaryExpression):
-        return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
-    elif isinstance(expression, base.Scaling):
-        return contains_intergrid_operation(expression.operand)
-    else:
-        raise NotImplementedError("Not implemented")

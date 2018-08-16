@@ -18,7 +18,8 @@ class WeightOptimizer:
 
         def evaluate(weights):
             weighted_expression = transformations.set_weights(expression, weights)
-            iteration_matrix = self._gp_optimizer.get_iteration_matrix(weighted_expression, self._gp_optimizer.grid, self._gp_optimizer.rhs)
+            iteration_matrix = self._gp_optimizer.get_iteration_matrix(weighted_expression, self._gp_optimizer.grid,
+                                                                       self._gp_optimizer.rhs)
             spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             if spectral_radius == 0.0:
                 return self._gp_optimizer.infinity,

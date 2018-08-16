@@ -85,7 +85,8 @@ def set_weights(expression: base.Expression, weights: list) -> base.Expression:
         if len(weights) == 0:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
-        return multigrid.Correction(expression.iteration_matrix, set_weights(expression.grid, tail), expression.operator, expression.rhs, weight=head)
+        return multigrid.Correction(expression.iteration_matrix, set_weights(expression.grid, tail),
+                                    expression.operator, expression.rhs, weight=head)
     elif isinstance(expression, base.Grid):
         if len(weights) > 0:
             raise RuntimeError("Too many weights have been supplied")

@@ -81,12 +81,16 @@ class Operator(Entity):
 
 
 class Identity(Operator):
-    def __init__(self, shape, dimension=None):
+    def __init__(self, shape, dimension):
         self._dimension = dimension
         super(Identity, self).__init__('I', shape, stencils.get_unit_stencil(dimension))
 
+    @property
+    def dimension(self):
+        return self._dimension
+
     def __repr__(self):
-        return f'Identity({repr(self.shape)}, {repr(self._dimension)})'
+        return f'Identity({repr(self.shape)}, {repr(self.dimension)})'
 
 
 class Zero(Operator):

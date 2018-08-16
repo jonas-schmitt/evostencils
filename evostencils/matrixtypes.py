@@ -4,12 +4,14 @@ import sympy as sp
 from functools import reduce
 import operator
 
+
 class MatrixTypeMetaClass(type):
     def __new__(mcs, class_name, bases, dct):
         return super(MatrixTypeMetaClass, mcs).__new__(mcs, class_name, bases, dct)
 
     def __eq__(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') and hasattr(other, 'upper_triangle'):
+        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') \
+                and hasattr(other, 'upper_triangle'):
             return self.shape == other.shape \
                and self.diagonal == other.diagonal \
                and self.lower_triangle == other.lower_triangle \
@@ -18,7 +20,8 @@ class MatrixTypeMetaClass(type):
             return False
 
     def __subclasscheck__(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') and hasattr(other, 'upper_triangle'):
+        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') \
+                and hasattr(other, 'upper_triangle'):
             is_subclass = True
             if self.shape != other.shape:
                 return False
