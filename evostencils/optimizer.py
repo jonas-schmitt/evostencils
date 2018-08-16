@@ -249,6 +249,7 @@ class Optimizer:
     def evaluate(self, individual):
         import math
         expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+        expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:
             expression = transformations.set_weights(expression, individual.weights)
         iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)

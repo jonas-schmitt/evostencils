@@ -7,6 +7,14 @@ class Restriction(base.Operator):
         self._coarse_grid = coarse_grid
         super(Restriction, self).__init__(f'R_{grid.shape[0]}', (coarse_grid.shape[0], grid.shape[0]), stencil)
 
+    @property
+    def grid(self):
+        return self._grid
+
+    @property
+    def coarse_grid(self):
+        return self._coarse_grid
+
     def __repr__(self):
         return f'Restriction({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
@@ -17,6 +25,14 @@ class Interpolation(base.Operator):
         self._coarse_grid = coarse_grid
         super(Interpolation, self).__init__(f'I_{coarse_grid.shape[0]}', (grid.shape[0], coarse_grid.shape[0]), stencil)
 
+    @property
+    def grid(self):
+        return self._grid
+
+    @property
+    def coarse_grid(self):
+        return self._coarse_grid
+
     def __repr__(self):
         return f'Interpolation({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
@@ -26,12 +42,16 @@ class CoarseGridSolver(base.Operator):
         self._grid = coarse_grid
         super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.shape[0]}', (coarse_grid.shape[0], coarse_grid.shape[0]), None)
 
+    @property
+    def grid(self):
+        return self._grid
+
     def __repr__(self):
         return f'CoarseGridSolver({repr(self._grid)})'
 
 
 class Correction(base.Expression):
-    def __init__(self, iteration_matrix: base.Expression, grid, operator: base.Operator, rhs: base.Grid, weight=1.0):
+    def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression, rhs: base.Expression, weight=1.0):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
@@ -79,8 +99,15 @@ class Correction(base.Expression):
     def __str__(self):
         return str(self.generate_expression())
 
+    def apply(self, transform: callable):
+        iteration_matrix = transform(self.iteration_matrix)
+        grid = transform(self.grid)
+        operator = transform(self.operator)
+        rhs = transform(self.operator)
+        return Correction(iteration_matrix, grid, operator, rhs, self.weight)
 
-def correct(operator, rhs, iteration_matrix, grid, weight=0.5):
+
+def correct(operator, rhs, iteration_matrix, grid, weight=1.0):
     return Correction(iteration_matrix, grid, operator, rhs, weight)
 
 

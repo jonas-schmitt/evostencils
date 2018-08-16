@@ -24,6 +24,9 @@ class Entity(Expression):
     def __str__(self):
         return f'{self.name}'
 
+    def apply(self, _):
+        return self
+
 
 class UnaryExpression(Expression):
     def __init__(self, operand):
@@ -38,6 +41,9 @@ class UnaryExpression(Expression):
     def shape(self):
         return self._shape
 
+    def apply(self, transform: callable):
+        return type(self)(transform(self.operand))
+
 
 class BinaryExpression(Expression):
     @property
@@ -51,6 +57,9 @@ class BinaryExpression(Expression):
     @property
     def shape(self):
         return self._shape
+
+    def apply(self, transform: callable):
+        return type(self)(transform(self.operand1), transform(self.operand2))
 
 
 # Entities
@@ -247,6 +256,9 @@ class Scaling(Expression):
     def __repr__(self):
         return f'Scaling({repr(self.factor)}, {repr(self.operand)})'
 
+    def apply(self, transform: callable):
+        return Scaling(self.factor, transform(self.operand))
+
 
 # Wrapper functions
 def inv(operand):
@@ -276,3 +288,7 @@ def generate_grid(name: str, grid_size: tuple) -> Grid:
 def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:
     n = reduce(builtin_mul, grid_size, 1)
     return Operator(name, (n, n), stencil)
+
+
+def is_quadratic(expression: Expression) -> bool:
+    return expression.shape[0] == expression.shape[1]
