@@ -71,27 +71,13 @@ def remove_identity_operations(expression: base.Expression) -> base.Expression:
 
 
 def substitute_entity(expression: base.Expression, source: base.Entity, destination: base.Entity) -> base.Expression:
-    if isinstance(expression, multigrid.Correction):
-        iteration_matrix = substitute_entity(expression.iteration_matrix, source, destination)
-        grid = substitute_entity(expression.grid, source, destination)
-        operator = substitute_entity(expression.operator, source, destination)
-        rhs = substitute_entity(expression.rhs, source, destination)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
-    elif isinstance(expression, base.Entity):
-        if expression.name == source.name:
+    result = expression.apply(substitute_entity, source, destination)
+    if isinstance(result, base.Entity):
+        if result.name == source.name:
             return destination
         else:
             return expression
-    elif isinstance(expression, base.UnaryExpression):
-        return type(expression)(substitute_entity(expression.operand, source, destination))
-    elif isinstance(expression, base.BinaryExpression):
-        child1 = substitute_entity(expression.operand1, source, destination)
-        child2 = substitute_entity(expression.operand2, source, destination)
-        return type(expression)(child1, child2)
-    elif isinstance(expression, base.Scaling):
-        return base.Scaling(expression.factor, substitute_entity(expression.operand, source, destination))
-    else:
-        raise NotImplementedError("Not implemented")
+    return result
 
 
 def set_weights(expression: base.Expression, weights: list) -> base.Expression:

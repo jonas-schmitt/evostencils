@@ -11,6 +11,10 @@ class Expression(abc.ABC):
     def shape(self):
         pass
 
+    @abc.abstractmethod
+    def apply(self, transform: callable):
+        pass
+
 
 class Entity(Expression):
     @property
@@ -24,7 +28,7 @@ class Entity(Expression):
     def __str__(self):
         return f'{self.name}'
 
-    def apply(self, _):
+    def apply(self, _, *args):
         return self
 
 
@@ -41,8 +45,8 @@ class UnaryExpression(Expression):
     def shape(self):
         return self._shape
 
-    def apply(self, transform: callable):
-        return type(self)(transform(self.operand))
+    def apply(self, transform: callable, *args):
+        return type(self)(transform(self.operand, *args))
 
 
 class BinaryExpression(Expression):
@@ -58,8 +62,8 @@ class BinaryExpression(Expression):
     def shape(self):
         return self._shape
 
-    def apply(self, transform: callable):
-        return type(self)(transform(self.operand1), transform(self.operand2))
+    def apply(self, transform: callable, *args):
+        return type(self)(transform(self.operand1, *args), transform(self.operand2, *args))
 
 
 # Entities
@@ -256,8 +260,8 @@ class Scaling(Expression):
     def __repr__(self):
         return f'Scaling({repr(self.factor)}, {repr(self.operand)})'
 
-    def apply(self, transform: callable):
-        return Scaling(self.factor, transform(self.operand))
+    def apply(self, transform: callable, *args):
+        return Scaling(self.factor, transform(self.operand, *args))
 
 
 # Wrapper functions

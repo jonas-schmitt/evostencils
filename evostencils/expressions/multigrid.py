@@ -99,11 +99,11 @@ class Correction(base.Expression):
     def __str__(self):
         return str(self.generate_expression())
 
-    def apply(self, transform: callable):
-        iteration_matrix = transform(self.iteration_matrix)
-        grid = transform(self.grid)
-        operator = transform(self.operator)
-        rhs = transform(self.rhs)
+    def apply(self, transform: callable, *args):
+        iteration_matrix = transform(self.iteration_matrix, *args)
+        grid = transform(self.grid, *args)
+        operator = transform(self.operator, *args)
+        rhs = transform(self.rhs, *args)
         return Correction(iteration_matrix, grid, operator, rhs, self.weight)
 
 
