@@ -3,61 +3,36 @@ from evostencils.expressions import base
 
 
 def propagate_zero(expression: base.Expression) -> base.Expression:
-    if isinstance(expression, multigrid.Correction):
-        iteration_matrix = propagate_zero(expression.iteration_matrix)
-        grid = propagate_zero(expression.grid)
-        operator = propagate_zero(expression.operator)
-        rhs = propagate_zero(expression.rhs)
-        if isinstance(iteration_matrix, base.Zero):
-            return grid
-        else:
-            return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
-    elif isinstance(expression, base.Addition):
-        child1 = propagate_zero(expression.operand1)
-        child2 = propagate_zero(expression.operand2)
-        if isinstance(child1, base.Zero):
-            return child2
-        elif isinstance(child2, base.Zero):
-            return child1
-        else:
-            return base.Addition(child1, child2)
-    elif isinstance(expression, base.Subtraction):
-        child1 = propagate_zero(expression.operand1)
-        child2 = propagate_zero(expression.operand2)
-        if isinstance(child1, base.Zero):
-            if isinstance(child2, base.Zero):
-                return child1
+    result = expression.apply(propagate_zero)
+    if isinstance(result, multigrid.Correction):
+        if isinstance(result.iteration_matrix, base.Zero):
+            return result.grid
+    if isinstance(result, base.Addition):
+        if isinstance(result.operand1, base.Zero):
+            return result.operand2
+        elif isinstance(result.operand2, base.Zero):
+            return result.operand1
+    elif isinstance(result, base.Subtraction):
+        if isinstance(result.operand1, base.Zero):
+            if isinstance(result.operand2, base.Zero):
+                return result.operand1
             else:
-                return base.Scaling(-1, child2)
-        elif isinstance(child2, base.Zero):
-            return child1
-    elif isinstance(expression, base.Multiplication):
-        child1 = propagate_zero(expression.operand1)
-        child2 = propagate_zero(expression.operand2)
-        if isinstance(child1, base.Zero) or isinstance(child2, base.Zero):
+                return base.Scaling(-1, result.operand2)
+        elif isinstance(result.operand2, base.Zero):
+            return result.operand1
+    elif isinstance(result, base.Multiplication):
+        if isinstance(result.operand1, base.Zero) or isinstance(result.operand2, base.Zero):
             return base.Zero(expression.shape)
-        else:
-            return base.Multiplication(child1, child2)
-    elif isinstance(expression, base.Scaling):
-        child = propagate_zero(expression.operand)
-        if isinstance(child, base.Zero):
-            return child
-        else:
-            return base.Scaling(expression.factor, child)
-    elif isinstance(expression, base.Inverse):
-        child = propagate_zero(expression.operand)
-        if isinstance(child, base.Zero):
-            return child
-        else:
-            return base.Inverse(child)
-    elif isinstance(expression, base.Transpose):
-        child = propagate_zero(expression.operand)
-        if isinstance(child, base.Zero):
+    elif isinstance(result, base.Scaling):
+        if isinstance(result.operand, base.Zero):
+            return result.operand
+    elif isinstance(result, base.Inverse):
+        if isinstance(result.operand, base.Zero):
+            return result.operand
+    elif isinstance(result, base.Transpose):
+        if isinstance(result.operand, base.Zero):
             return base.Zero(expression.shape)
-        else:
-            return base.Transpose(child)
-    else:
-        return expression
+    return result
 
 
 def fold_intergrid_operations(expression: base.Expression) -> base.Expression:

@@ -103,7 +103,7 @@ class Correction(base.Expression):
         iteration_matrix = transform(self.iteration_matrix)
         grid = transform(self.grid)
         operator = transform(self.operator)
-        rhs = transform(self.operator)
+        rhs = transform(self.rhs)
         return Correction(iteration_matrix, grid, operator, rhs, self.weight)
 
 
