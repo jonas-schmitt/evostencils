@@ -36,35 +36,17 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
 
 
 def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
-    if isinstance(expression, multigrid.Correction):
-        iteration_matrix = fold_intergrid_operations(expression.iteration_matrix)
-        grid = fold_intergrid_operations(expression.grid)
-        operator = fold_intergrid_operations(expression.operator)
-        rhs = fold_intergrid_operations(expression.rhs)
-        return multigrid.Correction(iteration_matrix, grid, operator, rhs, expression.weight)
-    elif isinstance(expression, base.Multiplication):
-        child1 = fold_intergrid_operations(expression.operand1)
-        child2 = fold_intergrid_operations(expression.operand2)
+    result = expression.apply(fold_intergrid_operations)
+    if isinstance(expression, base.Multiplication):
+        child1 = result.operand1
+        child2 = result.operand2
         if isinstance(child1, multigrid.Interpolation) and isinstance(child2, multigrid.Restriction):
             stencil = expression.generate_stencil()
             if stencil is None:
                 return base.Identity(expression.shape)
             else:
                 return base.Identity(expression.shape, stencil.dimension)
-        else:
-            return base.Multiplication(child1, child2)
-    elif isinstance(expression, base.Scaling):
-        child = fold_intergrid_operations(expression.operand)
-        return base.Scaling(expression.factor, child)
-    elif isinstance(expression, base.UnaryExpression):
-        child = fold_intergrid_operations(expression.operand)
-        return type(expression)(child)
-    elif isinstance(expression, base.BinaryExpression):
-        child1 = fold_intergrid_operations(expression.operand1)
-        child2 = fold_intergrid_operations(expression.operand2)
-        return type(expression)(child1, child2)
-    else:
-        return expression
+    return expression
 
 
 def remove_identity_operations(expression: base.Expression) -> base.Expression:
