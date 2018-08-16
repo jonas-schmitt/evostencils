@@ -1,6 +1,6 @@
 from evostencils.evaluation.roofline import *
 
-fine_grid_size = (100, 100)
+fine_grid_size = (1000, 1000)
 operator_stencil_entries = [
     (( 0, -1), -1.0),
     ((-1,  0), -1.0),
