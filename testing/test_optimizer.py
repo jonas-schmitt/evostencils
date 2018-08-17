@@ -1,11 +1,9 @@
 from evostencils.optimizer import Optimizer
-from evostencils.expressions import transformations, multigrid
-from evostencils.stencils import Stencil
+from evostencils.expressions import transformations
+from evostencils.stencils.constant import Stencil
 from evostencils.evaluation.convergence import *
 from evostencils.evaluation.roofline import *
-import sympy as sp
 import lfa_lab as lfa
-import math
 
 
 def main():
@@ -37,7 +35,7 @@ def main():
 
     optimizer = Optimizer(A, x, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(200, 15, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(50000, 30, 0.5, 0.3)
 
     i = 1
     print('\n')

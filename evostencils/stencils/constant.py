@@ -92,9 +92,12 @@ def transpose(self):
     return map_stencil(self, lambda o, v: (-np.array(o), v))
 
 
-# Note that this is not equivalent to matrix inversion
+# Note that this is only equivalent to matrix inversion for diagonal matrices
 def inverse(self):
-    return map_stencil(self, lambda o, v: (o, 1.0 / v))
+    def reciprocal(offsets, value):
+        assert all(i == 0 for i in offsets), "Only diagonal stencils can be inverted"
+        return offsets, 1.0 / value
+    return map_stencil(self, reciprocal)
 
 
 def add(stencil1, stencil2):

@@ -1,7 +1,7 @@
 import abc
 from operator import mul as builtin_mul
 from functools import reduce
-from evostencils import stencils as stencils
+from evostencils.stencils import constant as stencils
 
 
 # Base classes

@@ -1,5 +1,5 @@
 from evostencils.expressions import base, multigrid
-import evostencils.stencils as stencils
+import evostencils.stencils.constant as stencils
 
 
 class RooflineEvaluator:

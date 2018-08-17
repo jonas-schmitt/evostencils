@@ -1,4 +1,4 @@
-import evostencils.stencils as stencils
+import evostencils.stencils.constant as stencils
 import copy
 
 stencil1 = stencils.Stencil((((0,), -2),

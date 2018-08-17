@@ -2,13 +2,13 @@ import numpy as np
 import deap.base
 from deap import gp, creator, tools, algorithms
 import random
-from evostencils import matrixtypes
+from evostencils import matrix_types
 import evostencils.expressions.base as base
 import evostencils.expressions.multigrid as multigrid
 import evostencils.expressions.transformations as transformations
 import operator
 import functools
-from evostencils.stencils import Stencil
+from evostencils.stencils.constant import Stencil
 from evostencils.weight_optimizer import WeightOptimizer
 
 
@@ -43,7 +43,7 @@ class Optimizer:
         self._types = set()
         self._symbol_types = {}
         self._symbol_names = {}
-        self._primitive_set = gp.PrimitiveSetTyped("main", [], matrixtypes.generate_matrix_type(self._grid.shape))
+        self._primitive_set = gp.PrimitiveSetTyped("main", [], matrix_types.generate_matrix_type(self._grid.shape))
         self._init_terminals()
         self._init_operators()
         self._init_creator()
@@ -58,13 +58,13 @@ class Optimizer:
 
         identity_matrix = base.Identity(A.shape, self.dimension)
         # Add primitives to set
-        self.add_terminal(A, matrixtypes.generate_matrix_type(A.shape), 'A')
-        self.add_terminal(u, matrixtypes.generate_matrix_type(u.shape), 'u')
+        self.add_terminal(A, matrix_types.generate_matrix_type(A.shape), 'A')
+        self.add_terminal(u, matrix_types.generate_matrix_type(u.shape), 'u')
 
-        self.add_terminal(identity_matrix, matrixtypes.generate_diagonal_matrix_type(A.shape), 'I')
-        self.add_terminal(D, matrixtypes.generate_diagonal_matrix_type(A.shape), 'A_d')
-        self.add_terminal(base.LowerTriangle(A), matrixtypes.generate_matrix_type(A.shape), 'A_l')
-        self.add_terminal(base.UpperTriangle(A), matrixtypes.generate_matrix_type(A.shape), 'A_u')
+        self.add_terminal(identity_matrix, matrix_types.generate_diagonal_matrix_type(A.shape), 'I')
+        self.add_terminal(D, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_d')
+        self.add_terminal(base.LowerTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_l')
+        self.add_terminal(base.UpperTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_u')
 
         #TODO quick hack for testing here
         interpolation_stencil_entries = [
@@ -95,11 +95,11 @@ class Optimizer:
         interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
         restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
-        self.add_terminal(base.Zero(A), matrixtypes.generate_matrix_type(coarse_grid.shape))
+        self.add_terminal(base.Zero(A), matrix_types.generate_matrix_type(coarse_grid.shape))
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid),
-                          matrixtypes.generate_matrix_type(coarse_operator.shape), 'S_coarse')
-        self.add_terminal(interpolation, matrixtypes.generate_matrix_type(interpolation.shape), 'P')
-        self.add_terminal(restriction, matrixtypes.generate_matrix_type(restriction.shape), 'R')
+                          matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
+        self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
+        self.add_terminal(restriction, matrix_types.generate_matrix_type(restriction.shape), 'R')
 
         self._coarse_grid = coarse_grid
         self._coarse_operator = coarse_operator
@@ -109,9 +109,9 @@ class Optimizer:
     def _init_operators(self):
         A = self._operator
         u = self._grid
-        OperatorType = matrixtypes.generate_matrix_type(A.shape)
-        GridType = matrixtypes.generate_matrix_type(u.shape)
-        DiagonalOperatorType = matrixtypes.generate_diagonal_matrix_type(self._diagonal.shape)
+        OperatorType = matrix_types.generate_matrix_type(A.shape)
+        GridType = matrix_types.generate_matrix_type(u.shape)
+        DiagonalOperatorType = matrix_types.generate_diagonal_matrix_type(self._diagonal.shape)
 
         # Add primitives to full set
         self.add_operator(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'add')
@@ -131,9 +131,9 @@ class Optimizer:
         self.add_operator(correct, [OperatorType, GridType], GridType, 'correct')
 
         # Multigrid recipes
-        InterpolationType = matrixtypes.generate_matrix_type(self._interpolation.shape)
-        RestrictionType = matrixtypes.generate_matrix_type(self._restriction.shape)
-        CoarseOperatorType = matrixtypes.generate_matrix_type(self._coarse_operator.shape)
+        InterpolationType = matrix_types.generate_matrix_type(self._interpolation.shape)
+        RestrictionType = matrix_types.generate_matrix_type(self._restriction.shape)
+        CoarseOperatorType = matrix_types.generate_matrix_type(self._coarse_operator.shape)
 
         # Create intergrid operators
         self.add_operator(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, 'mul')
@@ -307,7 +307,7 @@ class Optimizer:
     def optimize_weights(self, individual):
         expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         weights = transformations.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(weights), 10)
+        best_individual = self._weight_optimizer.optimize(expression, len(weights), 100)
         best_weights = list(best_individual)
         spectral_radius = best_individual.fitness.values[0]
         return best_weights, spectral_radius
