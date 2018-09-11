@@ -158,6 +158,38 @@ class UpperTriangle(UnaryExpression):
         return f'UpperTriangle({repr(self.operand)})'
 
 
+class RedBlackPartitioning(UnaryExpression):
+    def generate_stencil(self):
+        #TODO
+        return self.operand.generate_stencil()
+
+    def __str__(self):
+        return f'{str(self.operand)}.red_black'
+
+    def __repr__(self):
+        return f'RedBlackPartitioning({repr(self.operand)})'
+
+
+class BlockDiagonal(UnaryExpression):
+    def __init__(self, operand, block_size):
+        self._block_size = block_size
+        super(BlockDiagonal, self).__init__(operand)
+
+    def generate_stencil(self):
+        #TODO
+        return self.operand.generate_stencil()
+
+    @property
+    def block_size(self):
+        return self._block_size
+
+    def __str__(self):
+        return f'{str(self.operand)}.block_diag'
+
+    def __repr__(self):
+        return f'BlockDiagonal({repr(self.operand)}, {repr(self.block_size)})'
+
+
 class Inverse(UnaryExpression):
     def generate_stencil(self):
         return stencils.inverse(self.operand.generate_stencil())

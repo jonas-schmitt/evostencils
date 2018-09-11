@@ -17,6 +17,15 @@ class Stencil:
         return self._dimension
 
 
+def convert_constant_to_periodic_stencil(constant_stencil: constant.Stencil):
+    def recurse(dimension):
+        if dimension == 1:
+            return constant_stencil
+        else:
+            return recurse(dimension-1),
+    return recurse(constant_stencil.dimension)
+
+
 def map_stencil(periodic_stencil: Stencil, f):
     if periodic_stencil is None:
         return periodic_stencil
@@ -25,7 +34,7 @@ def map_stencil(periodic_stencil: Stencil, f):
         if dimension == 1:
             return tuple(f(constant_stencil) for constant_stencil in array)
         else:
-            tuple(recurse(element, dimension - 1) for element in array)
+            return tuple(recurse(element, dimension - 1) for element in array)
 
     result = recurse(periodic_stencil.constant_stencils, periodic_stencil.dimension)
     return Stencil(result, periodic_stencil.dimension)
