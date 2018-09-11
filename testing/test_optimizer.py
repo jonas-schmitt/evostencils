@@ -46,7 +46,10 @@ def main():
         print(f'Update expression: {repr(expression)}')
         iteration_matrix = optimizer.get_iteration_matrix(expression, optimizer.grid, optimizer.rhs)
         print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
-        optimizer.visualize_tree(ind, f'tree{i}')
+        try:
+            optimizer.visualize_tree(ind, f'tree{i}')
+        except:
+            pass
         i = i + 1
     return pop, log, hof
 

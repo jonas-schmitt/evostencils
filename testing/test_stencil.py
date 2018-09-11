@@ -13,4 +13,6 @@ d = stencils.mul(stencil1, stencil2)
 e = stencils.diagonal(stencil1)
 f = stencils.upper(stencil1)
 g = stencils.lower(stencil1)
+inv_diag = stencils.inverse(stencils.diagonal(stencil1))
+jacobi = stencils.mul(stencils.inverse(stencils.diagonal(stencil1)), stencils.add(stencils.lower(stencil1), stencils.upper(stencil1)))
 pass
