@@ -26,17 +26,31 @@ def convert_constant_to_periodic_stencil(constant_stencil: constant.Stencil):
     return recurse(constant_stencil.dimension)
 
 
+def map_stencil_with_index(periodic_stencil: Stencil, f):
+    if periodic_stencil is None:
+        return periodic_stencil
+
+    def recursive_descent(array, index, dimension):
+        if dimension == 1:
+            return tuple(f(array[i], index + (i,)) for i in len(array))
+        else:
+            return tuple(recursive_descent(array[i], dimension - 1, index + (i,)) for i in len(array))
+
+    result = recursive_descent(periodic_stencil.constant_stencils, periodic_stencil.dimension, ())
+    return Stencil(result, periodic_stencil.dimension)
+
+
 def map_stencil(periodic_stencil: Stencil, f):
     if periodic_stencil is None:
         return periodic_stencil
 
-    def recurse(array, dimension):
+    def recursive_descent(array, dimension):
         if dimension == 1:
             return tuple(f(constant_stencil) for constant_stencil in array)
         else:
-            return tuple(recurse(element, dimension - 1) for element in array)
+            return tuple(recursive_descent(element, dimension - 1) for element in array)
 
-    result = recurse(periodic_stencil.constant_stencils, periodic_stencil.dimension)
+    result = recursive_descent(periodic_stencil.constant_stencils, periodic_stencil.dimension)
     return Stencil(result, periodic_stencil.dimension)
 
 
@@ -62,14 +76,14 @@ def combine(periodic_stencil1: Stencil, periodic_stencil2: Stencil, f):
     assert periodic_stencil1.dimension == periodic_stencil2.dimension, "Dimensions must match"
     dim = periodic_stencil1.dimension
 
-    def recurse(array1, array2, dimension):
+    def recursive_descent(array1, array2, dimension):
         max_period = max(len(array1), len(array2))
         if dimension == 1:
             return tuple(f(array1[i % len(array1)], array2[i % len(array2)]) for i in max_period)
         else:
-            return tuple(recurse(array1[i % len(array1)], array2[i % len(array2)]) for i in max_period)
+            return tuple(recursive_descent(array1[i % len(array1)], array2[i % len(array2)]) for i in max_period)
 
-    result = recurse(periodic_stencil1.constant_stencils, periodic_stencil2.constant_stencils, dim)
+    result = recursive_descent(periodic_stencil1.constant_stencils, periodic_stencil2.constant_stencils, dim)
     return Stencil(result, dim)
 
 
@@ -89,13 +103,13 @@ def scale(factor, periodic_stencil: Stencil):
     return map_stencil(periodic_stencil, lambda s: constant.scale(factor, s))
 
 
-def create_ndimensional_array_of_stencils(shape):
+def create_ndimensional_array(shape):
     assert len(shape) >= 1, "The dimension must be greater or equal 1"
 
-    def recurse(dimension):
+    def recursive_descent(dimension):
         index = -dimension
         if dimension == 1:
             return tuple(None for _ in shape[index])
         else:
-            return tuple(recurse(dimension - 1) for _ in shape[index])
-    return recurse(len(shape))
+            return tuple(recursive_descent(dimension - 1) for _ in shape[index])
+    return recursive_descent(len(shape))
