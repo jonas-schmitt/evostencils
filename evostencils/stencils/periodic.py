@@ -87,3 +87,15 @@ def mul(periodic_stencil1: Stencil, periodic_stencil2: Stencil):
 
 def scale(factor, periodic_stencil: Stencil):
     return map_stencil(periodic_stencil, lambda s: constant.scale(factor, s))
+
+
+def create_ndimensional_array_of_stencils(shape):
+    assert len(shape) >= 1, "The dimension must be greater or equal 1"
+
+    def recurse(dimension):
+        index = -dimension
+        if dimension == 1:
+            return tuple(None for _ in shape[index])
+        else:
+            return tuple(recurse(dimension - 1) for _ in shape[index])
+    return recurse(len(shape))
