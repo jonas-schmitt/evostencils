@@ -21,4 +21,5 @@ g = constant.lower(stencil1)
 inv_diag = constant.inverse(constant.diagonal(stencil1))
 jacobi = constant.mul(constant.inverse(constant.diagonal(stencil1)), constant.add(constant.lower(stencil1), constant.upper(stencil1)))
 periodic_stencil = periodic.block_diagonal(stencil1, (2, 2))
+tmp = periodic.add(periodic_stencil, constant.get_unit_stencil(2))
 pass
