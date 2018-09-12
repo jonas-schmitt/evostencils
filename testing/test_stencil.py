@@ -1,18 +1,24 @@
-import evostencils.stencils.constant as stencils
+import evostencils.stencils.constant as constant
+import evostencils.stencils.periodic as periodic
 import copy
+entries = [
+        (( 0, -1), -1.0),
+        ((-1,  0), -1.0),
+        (( 0,  0),  4.0),
+        (( 1,  0), -1.0),
+        (( 0,  1), -1.0)
+    ]
+stencil1 = constant.Stencil(entries)
+stencil2 = constant.Stencil(copy.deepcopy(entries))
 
-stencil1 = stencils.Stencil((((0,), -2),
-                             ((-1,),  1),
-                             (( 1,),  1)))
-stencil2 = stencils.Stencil(copy.deepcopy(stencil1.entries))
-
-a = stencils.scale(2, stencil1)
-b = stencils.add(stencil1, stencil2)
-c = stencils.sub(stencil1, stencil2)
-d = stencils.mul(stencil1, stencil2)
-e = stencils.diagonal(stencil1)
-f = stencils.upper(stencil1)
-g = stencils.lower(stencil1)
-inv_diag = stencils.inverse(stencils.diagonal(stencil1))
-jacobi = stencils.mul(stencils.inverse(stencils.diagonal(stencil1)), stencils.add(stencils.lower(stencil1), stencils.upper(stencil1)))
+a = constant.scale(2, stencil1)
+b = constant.add(stencil1, stencil2)
+c = constant.sub(stencil1, stencil2)
+d = constant.mul(stencil1, stencil2)
+e = constant.diagonal(stencil1)
+f = constant.upper(stencil1)
+g = constant.lower(stencil1)
+inv_diag = constant.inverse(constant.diagonal(stencil1))
+jacobi = constant.mul(constant.inverse(constant.diagonal(stencil1)), constant.add(constant.lower(stencil1), constant.upper(stencil1)))
+periodic_stencil = periodic.block_diagonal(stencil1, (2, 2))
 pass

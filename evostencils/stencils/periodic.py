@@ -30,11 +30,11 @@ def map_stencil_with_index(periodic_stencil: Stencil, f):
     if periodic_stencil is None:
         return periodic_stencil
 
-    def recursive_descent(array, index, dimension):
+    def recursive_descent(array, dimension, index):
         if dimension == 1:
-            return tuple(f(array[i], index + (i,)) for i in len(array))
+            return tuple(f(element, index + (i,)) for i, element in enumerate(array))
         else:
-            return tuple(recursive_descent(array[i], dimension - 1, index + (i,)) for i in len(array))
+            return tuple(recursive_descent(element, dimension - 1, index + (i,)) for i, element in enumerate(array))
 
     result = recursive_descent(periodic_stencil.constant_stencils, periodic_stencil.dimension, ())
     return Stencil(result, periodic_stencil.dimension)
@@ -79,9 +79,9 @@ def combine(periodic_stencil1: Stencil, periodic_stencil2: Stencil, f):
     def recursive_descent(array1, array2, dimension):
         max_period = max(len(array1), len(array2))
         if dimension == 1:
-            return tuple(f(array1[i % len(array1)], array2[i % len(array2)]) for i in max_period)
+            return tuple(f(array1[i % len(array1)], array2[i % len(array2)]) for i in range(max_period))
         else:
-            return tuple(recursive_descent(array1[i % len(array1)], array2[i % len(array2)]) for i in max_period)
+            return tuple(recursive_descent(array1[i % len(array1)], array2[i % len(array2)]) for i in range(max_period))
 
     result = recursive_descent(periodic_stencil1.constant_stencils, periodic_stencil2.constant_stencils, dim)
     return Stencil(result, dim)
@@ -103,13 +103,29 @@ def scale(factor, periodic_stencil: Stencil):
     return map_stencil(periodic_stencil, lambda s: constant.scale(factor, s))
 
 
-def create_ndimensional_array(shape):
+def create_multidimensional_array(shape):
     assert len(shape) >= 1, "The dimension must be greater or equal 1"
 
     def recursive_descent(dimension):
         index = -dimension
         if dimension == 1:
-            return tuple(None for _ in shape[index])
+            return tuple(None for _ in range(shape[index]))
         else:
-            return tuple(recursive_descent(dimension - 1) for _ in shape[index])
-    return recursive_descent(len(shape))
+            return tuple(recursive_descent(dimension - 1) for _ in range(shape[index]))
+    result = recursive_descent(len(shape))
+    return result
+
+
+def block_diagonal(stencil: constant.Stencil, block_size):
+    stencils = create_multidimensional_array(block_size)
+    periodic_stencil = Stencil(stencils, stencil.dimension)
+
+    def f(_, index):
+        def predicate(offset, _):
+            tmp = tuple(o + index[i] for i, o in enumerate(offset))
+            for i in range(len(tmp)):
+                if tmp[i] < 0 or tmp[i] >= block_size[i]:
+                    return False
+            return True
+        return constant.filter_stencil(stencil, predicate)
+    return map_stencil_with_index(periodic_stencil, f)
