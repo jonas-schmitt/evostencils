@@ -174,6 +174,16 @@ class RooflineEvaluator:
                            for operations, words, problem_size in metrics]
             # A * B * u => op(A*u) + op(B*u)
             return True, metrics
+        elif isinstance(expression, base.Inverse):
+            if base.contains_block_node(expression):
+                #TODO
+                # Handle block node
+                stencil = expression.generate_stencil()
+                number_of_entries_list = periodic.count_number_of_entries(stencil)
+                return False, []
+            else:
+                return False, []
+
         elif isinstance(expression, base.UnaryExpression):
             return False, []
         elif isinstance(expression, base.Scaling):

@@ -1,7 +1,8 @@
 import abc
 from operator import mul as builtin_mul
 from functools import reduce
-from evostencils.stencils import constant as stencils
+from evostencils.stencils import periodic
+from evostencils.stencils import constant
 
 
 # Base classes
@@ -83,7 +84,7 @@ class Operator(Entity):
 class Identity(Operator):
     def __init__(self, shape, dimension):
         self._dimension = dimension
-        super(Identity, self).__init__('I', shape, stencils.get_unit_stencil(dimension))
+        super(Identity, self).__init__('I', shape, constant.get_unit_stencil(dimension))
 
     @property
     def dimension(self):
@@ -95,7 +96,7 @@ class Identity(Operator):
 
 class Zero(Operator):
     def __init__(self, shape):
-        super(Zero, self).__init__('0', shape, stencils.get_null_stencil())
+        super(Zero, self).__init__('0', shape, constant.get_null_stencil())
 
     def __repr__(self):
         return f'Zero({repr(self.shape)})'
@@ -127,7 +128,7 @@ class Grid(Entity):
 # Unary Expressions
 class Diagonal(UnaryExpression):
     def generate_stencil(self):
-        return stencils.diagonal(self.operand.generate_stencil())
+        return periodic.diagonal(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.diag'
@@ -138,7 +139,7 @@ class Diagonal(UnaryExpression):
 
 class LowerTriangle(UnaryExpression):
     def generate_stencil(self):
-        return stencils.lower(self.operand.generate_stencil())
+        return periodic.lower(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.lower'
@@ -149,7 +150,7 @@ class LowerTriangle(UnaryExpression):
 
 class UpperTriangle(UnaryExpression):
     def generate_stencil(self):
-        return stencils.upper(self.operand.generate_stencil())
+        return periodic.upper(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.upper'
@@ -176,8 +177,7 @@ class BlockDiagonal(UnaryExpression):
         super(BlockDiagonal, self).__init__(operand)
 
     def generate_stencil(self):
-        #TODO
-        return self.operand.generate_stencil()
+        return periodic.block_diagonal(self.operand.generate_stencil(), self.block_size)
 
     @property
     def block_size(self):
@@ -192,7 +192,7 @@ class BlockDiagonal(UnaryExpression):
 
 class Inverse(UnaryExpression):
     def generate_stencil(self):
-        return stencils.inverse(self.operand.generate_stencil())
+        return periodic.inverse(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.I'
@@ -207,7 +207,7 @@ class Transpose(UnaryExpression):
         self._shape = (operand.shape[1], operand.shape[0])
 
     def generate_stencil(self):
-        return stencils.transpose(self.operand.generate_stencil())
+        return periodic.transpose(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.T'
@@ -225,7 +225,7 @@ class Addition(BinaryExpression):
         self._shape = operand1.shape
 
     def generate_stencil(self):
-        return stencils.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return periodic.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} + {str(self.operand2)})'
@@ -242,7 +242,7 @@ class Subtraction(BinaryExpression):
         self._shape = operand1.shape
 
     def generate_stencil(self):
-        return stencils.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return periodic.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} - {str(self.operand2)})'
@@ -259,7 +259,7 @@ class Multiplication(BinaryExpression):
         self._shape = (operand1.shape[0], operand2.shape[1])
 
     def generate_stencil(self):
-        return stencils.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return periodic.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} * {str(self.operand2)})'
@@ -288,7 +288,7 @@ class Scaling(Expression):
         return self._shape
 
     def generate_stencil(self):
-        return stencils.scale(self.factor, self.operand.generate_stencil())
+        return periodic.scale(self.factor, self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.factor)} * {str(self.operand)}'
@@ -332,3 +332,18 @@ def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:
 
 def is_quadratic(expression: Expression) -> bool:
     return expression.shape[0] == expression.shape[1]
+
+
+def contains_block_node(expression: Expression) -> bool:
+    if isinstance(expression, BlockDiagonal):
+        return True
+    elif isinstance(expression, Entity):
+        return False
+    elif isinstance(expression, UnaryExpression):
+        return contains_block_node(expression.operand)
+    elif isinstance(expression, BinaryExpression):
+        return contains_block_node(expression.operand1) or contains_block_node(expression.operand2)
+    elif isinstance(expression, Scaling):
+        return contains_block_node(expression.operand)
+    else:
+        raise NotImplementedError("Not implemented")

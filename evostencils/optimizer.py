@@ -55,6 +55,7 @@ class Optimizer:
         u = self._grid
         f = self._rhs
         D = self._diagonal
+        block_diagonal = base.BlockDiagonal(self.operator, tuple(2 for _ in range(self.dimension)))
 
         identity_matrix = base.Identity(A.shape, self.dimension)
         # Add primitives to set
@@ -63,6 +64,7 @@ class Optimizer:
 
         self.add_terminal(identity_matrix, matrix_types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_d')
+        #self.add_terminal(block_diagonal, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_bd')
         self.add_terminal(base.LowerTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(base.UpperTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_u')
 

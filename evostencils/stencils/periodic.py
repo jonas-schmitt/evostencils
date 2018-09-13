@@ -94,6 +94,10 @@ def transpose(stencil):
     return map_stencil(stencil, constant.transpose)
 
 
+def inverse(stencil):
+    return map_stencil(stencil, constant.inverse)
+
+
 @convert_constant_stencils
 def combine(stencil1, stencil2, f):
     return indexed_combine(stencil1, stencil2, lambda s1, s2, i: f(s1, s2))
