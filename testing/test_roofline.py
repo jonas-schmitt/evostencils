@@ -1,4 +1,5 @@
 from evostencils.evaluation.roofline import *
+import evostencils.stencils.constant as constant
 
 fine_grid_size = (1000, 1000)
 operator_stencil_entries = [
@@ -34,7 +35,7 @@ restriction_stencil_entries = [
 
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
-A = base.generate_operator('A', fine_grid_size, constant_stencils.Stencil(operator_stencil_entries))
+A = base.generate_operator('A', fine_grid_size, constant.Stencil(operator_stencil_entries))
 bytes_per_word = 8
 peak_performance = 4 * 16 * 3.3 * 1e9
 peak_bandwidth = 34.1 * 1e9
@@ -45,8 +46,8 @@ coarsening_factor = (2, 2)
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
 A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 S_coarse = multigrid.get_coarse_grid_solver(u_coarse)
-P = multigrid.get_interpolation(u, u_coarse, constant_stencils.Stencil(interpolation_stencil_entries))
-R = multigrid.get_restriction(u, u_coarse, constant_stencils.Stencil(interpolation_stencil_entries))
+P = multigrid.get_interpolation(u, u_coarse, constant.Stencil(interpolation_stencil_entries))
+R = multigrid.get_restriction(u, u_coarse, constant.Stencil(interpolation_stencil_entries))
 smoother = base.Inverse(base.Diagonal(A))
 tmp = multigrid.correct(A, b, smoother, u)
 print(f'Runtime:{evaluator.estimate_runtime(tmp)}')

@@ -1,5 +1,6 @@
 from evostencils.expressions import base, multigrid
-import evostencils.stencils.constant as stencils
+import evostencils.stencils.constant as constant
+import evostencils.stencils.periodic as periodic
 
 
 class RooflineEvaluator:
@@ -91,37 +92,59 @@ class RooflineEvaluator:
         operator_stencil = correction.operator.generate_stencil()
         if not evaluated:
             # u = (1 - omega) * u + omega * B * u - omega * B * A * u
+
             iteration_matrix_stencil = iteration_matrix.generate_stencil()
-            combined_stencil = stencils.mul(iteration_matrix_stencil, operator_stencil)
-            operations = self.operations_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
-                + self.operations_for_stencil_application(combined_stencil.number_of_entries) \
-                + self.operations_for_subtraction() + self.operations_for_addition() + 2 * self.operations_for_scaling()
-            words = self.words_transferred_for_stencil_application(combined_stencil.number_of_entries) \
-                + self.words_transferred_for_stencil_application(iteration_matrix_stencil.number_of_entries) \
-                + self.words_transferred_for_load() + self.words_transferred_for_store()
-            list_of_metrics.append((operations, words, problem_size))
+            combined_stencil = periodic.mul(iteration_matrix_stencil, operator_stencil)
+            iteration_matrix_stencil_number_of_entries_list = periodic.count_number_of_entries(iteration_matrix_stencil)
+            combined_stencil_number_of_entries_list = periodic.count_number_of_entries(combined_stencil)
+
+            if len(iteration_matrix_stencil_number_of_entries_list) < len(combined_stencil_number_of_entries_list):
+                unit_stencil = periodic.map_stencil(combined_stencil, lambda s: constant.get_null_stencil())
+                iteration_matrix_stencil = periodic.add(unit_stencil, iteration_matrix_stencil)
+                iteration_matrix_stencil_number_of_entries_list = periodic.count_number_of_entries(iteration_matrix_stencil)
+            elif len(iteration_matrix_stencil_number_of_entries_list) > len(combined_stencil_number_of_entries_list):
+                unit_stencil = periodic.map_stencil(iteration_matrix_stencil, lambda s: constant.get_null_stencil())
+                combined_stencil = periodic.add(unit_stencil, combined_stencil)
+                combined_stencil_number_of_entries_list = periodic.count_number_of_entries(combined_stencil)
+
+            for iteration_matrix_stencil_number_of_entries, combined_stencil_number_of_entries in \
+                    zip(iteration_matrix_stencil_number_of_entries_list, combined_stencil_number_of_entries_list):
+
+                operations = self.operations_for_stencil_application(iteration_matrix_stencil_number_of_entries) \
+                             + self.operations_for_stencil_application(combined_stencil_number_of_entries) \
+                             + self.operations_for_subtraction() + self.operations_for_addition() \
+                             + 2 * self.operations_for_scaling()
+
+                words = self.words_transferred_for_stencil_application(combined_stencil_number_of_entries) \
+                    + self.words_transferred_for_stencil_application(iteration_matrix_stencil_number_of_entries) \
+                    + self.words_transferred_for_load() + self.words_transferred_for_store()
+
+                list_of_metrics.append((operations, words,
+                                        float(problem_size) / len(combined_stencil_number_of_entries_list)))
+
         else:
             # u = u + omega * correction
             # r = (b - A*x)
-            operations_residual = self.operations_for_stencil_application(operator_stencil.number_of_entries) \
-                + self.operations_for_subtraction()
-            words_residual = self.words_transferred_for_load() \
-                + self.words_transferred_for_stencil_application(operator_stencil.number_of_entries) \
-                + self.words_transferred_for_store()
-            list_of_metrics.append((operations_residual, words_residual, problem_size))
-            list_of_metrics[-1] = (list_of_metrics[-1][0] + self.operations_for_addition() + self.operations_for_scaling(),
-                                   list_of_metrics[-1][1] + self.words_transferred_for_load(), problem_size)
+            operator_stencil_number_of_entries_list = periodic.count_number_of_entries(operator_stencil)
+            for operator_stencil_number_of_entries in operator_stencil_number_of_entries_list:
+                operations_residual = self.operations_for_stencil_application(operator_stencil_number_of_entries) \
+                    + self.operations_for_subtraction()
+                words_residual = self.words_transferred_for_load() \
+                    + self.words_transferred_for_stencil_application(operator_stencil_number_of_entries) \
+                    + self.words_transferred_for_store()
+                list_of_metrics.append((operations_residual, words_residual, problem_size))
+            list_of_metrics.append((self.operations_for_addition() + self.operations_for_scaling(),
+                                   self.words_transferred_for_load(), problem_size))
         return list_of_metrics
 
     @staticmethod
-    def estimate_operations_per_word_for_stencil(stencil: stencils.Stencil, problem_size) -> tuple:
-        number_of_entries = stencil.number_of_entries
-        operations = RooflineEvaluator.operations_for_stencil_application(number_of_entries)
-        words = RooflineEvaluator.operations_for_stencil_application(number_of_entries) \
-            + RooflineEvaluator.words_transferred_for_store()
-        # if any(all(i == 0 for i in entry[0]) for entry in stencil.entries):
-        #    words -= 1
-        return operations, words, problem_size
+    def estimate_operations_per_word_for_stencil(stencil, problem_size) -> list:
+        number_of_entries_list = periodic.count_number_of_entries(stencil)
+        return [(RooflineEvaluator.operations_for_stencil_application(number_of_entries),
+                 RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries) +
+                 RooflineEvaluator.words_transferred_for_store(),
+                 float(problem_size) / len(number_of_entries_list))
+                for number_of_entries in number_of_entries_list]
 
     def _estimate_operations_per_word_for_iteration(self, expression: base.Expression) -> tuple:
         if isinstance(expression, base.BinaryExpression):
@@ -134,13 +157,13 @@ class RooflineEvaluator:
             if evaluated1:
                 metrics.extend(result1)
             else:
-                metrics.append(self.estimate_operations_per_word_for_stencil(expression.operand1.generate_stencil(),
+                metrics.extend(self.estimate_operations_per_word_for_stencil(expression.operand1.generate_stencil(),
                                                                              expression.operand1.shape[0]))
 
             if evaluated2:
                 metrics.extend(result2)
             else:
-                metrics.append(self.estimate_operations_per_word_for_stencil(expression.operand2.generate_stencil(),
+                metrics.extend(self.estimate_operations_per_word_for_stencil(expression.operand2.generate_stencil(),
                                expression.operand2.shape[0]))
             # (A + B) * u = A * u + B * u => op(A*u) + op(B*u) + 1
             if isinstance(expression, base.Addition):
@@ -169,7 +192,7 @@ class RooflineEvaluator:
             return True, [(*self.solver_properties, expression.shape[0])]
         elif isinstance(expression, base.Operator):
             metrics = self.estimate_operations_per_word_for_stencil(expression.generate_stencil(), expression.shape[0])
-            return True, [metrics]
+            return True, metrics
         else:
             raise NotImplementedError("Not implemented")
 

@@ -44,7 +44,27 @@ def convert_constant_stencils(func):
 
 
 @convert_constant_stencils
-def map_stencil_with_index(stencil, f):
+def count_number_of_entries(stencil):
+    from itertools import chain
+
+    def recursive_descent(array, dimension):
+        if dimension == 1:
+            return (element.number_of_entries for element in array if element is not None)
+        else:
+            result = chain()
+            for element in array:
+                result = chain(result, recursive_descent(element, dimension - 1))
+            return result
+    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimension))
+
+
+@convert_constant_stencils
+def map_stencil(stencil, f):
+    return indexed_map_stencil(stencil, lambda s, i: f(s))
+
+
+@convert_constant_stencils
+def indexed_map_stencil(stencil, f):
     if stencil is None:
         return stencil
 
@@ -55,21 +75,6 @@ def map_stencil_with_index(stencil, f):
             return tuple(recursive_descent(element, dimension - 1, index + (i,)) for i, element in enumerate(array))
 
     result = recursive_descent(stencil.constant_stencils, stencil.dimension, ())
-    return Stencil(result, stencil.dimension)
-
-
-@convert_constant_stencils
-def map_stencil(stencil, f):
-    if stencil is None:
-        return stencil
-
-    def recursive_descent(array, dimension):
-        if dimension == 1:
-            return tuple(f(constant_stencil) for constant_stencil in array)
-        else:
-            return tuple(recursive_descent(element, dimension - 1) for element in array)
-
-    result = recursive_descent(stencil.constant_stencils, stencil.dimension)
     return Stencil(result, stencil.dimension)
 
 
@@ -91,19 +96,24 @@ def transpose(stencil):
 
 @convert_constant_stencils
 def combine(stencil1, stencil2, f):
+    return indexed_combine(stencil1, stencil2, lambda s1, s2, i: f(s1, s2))
+
+
+@convert_constant_stencils
+def indexed_combine(stencil1, stencil2, f):
     if stencil1 is None or stencil2 is None:
         return None
     assert stencil1.dimension == stencil2.dimension, "Dimensions must match"
     dim = stencil1.dimension
 
-    def recursive_descent(array1, array2, dimension):
+    def recursive_descent(array1, array2, dimension, index):
         max_period = max(len(array1), len(array2))
         if dimension == 1:
-            return tuple(f(array1[i % len(array1)], array2[i % len(array2)]) for i in range(max_period))
+            return tuple(f(array1[i % len(array1)], array2[i % len(array2)], index + (i,)) for i in range(max_period))
         else:
-            return tuple(recursive_descent(array1[i % len(array1)], array2[i % len(array2)], dimension - 1) for i in range(max_period))
+            return tuple(recursive_descent(array1[i % len(array1)], array2[i % len(array2)], dimension - 1, index + (i,)) for i in range(max_period))
 
-    result = recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, dim)
+    result = recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, dim, ())
     return Stencil(result, dim)
 
 
@@ -136,19 +146,19 @@ def create_empty_multidimensional_array(shape):
     return result
 
 
-def block_diagonal(stencil: constant.Stencil, block_size):
+def block_diagonal(stencil, block_size):
     stencils = create_empty_multidimensional_array(block_size)
-    periodic_stencil = Stencil(stencils, stencil.dimension)
+    empty_stencil = Stencil(stencils, stencil.dimension)
 
-    def f(_, index):
+    def f(constant_stencil, _, index):
         def predicate(offset, _):
             tmp = tuple(o + index[i] for i, o in enumerate(offset))
             for i in range(len(tmp)):
                 if tmp[i] < 0 or tmp[i] >= block_size[i]:
                     return False
             return True
-        return constant.filter_stencil(stencil, predicate)
-    return map_stencil_with_index(periodic_stencil, f)
+        return constant.filter_stencil(constant_stencil, predicate)
+    return indexed_combine(stencil, empty_stencil, f)
 
 
 
