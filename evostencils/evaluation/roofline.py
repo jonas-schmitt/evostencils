@@ -176,11 +176,17 @@ class RooflineEvaluator:
             return True, metrics
         elif isinstance(expression, base.Inverse):
             if base.contains_block_node(expression):
-                #TODO
                 # Handle block node
                 stencil = expression.generate_stencil()
                 number_of_entries_list = periodic.count_number_of_entries(stencil)
-                return False, []
+                metrics = []
+                for number_of_entries in number_of_entries_list:
+                    # Solving the small system with Gaussian-Elimination
+                    operations = 2.0/3.0 * number_of_entries * number_of_entries * number_of_entries
+                    words = number_of_entries * self.words_transferred_for_load() * self.words_transferred_for_store()
+                    problem_size = float(expression.shape[0]) / (len(number_of_entries_list) * number_of_entries)
+                    metrics.append((operations, words, problem_size))
+                return True, metrics
             else:
                 return False, []
 
