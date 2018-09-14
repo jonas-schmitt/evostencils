@@ -333,17 +333,3 @@ def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:
 def is_quadratic(expression: Expression) -> bool:
     return expression.shape[0] == expression.shape[1]
 
-
-def contains_block_node(expression: Expression) -> bool:
-    if isinstance(expression, BlockDiagonal):
-        return True
-    elif isinstance(expression, Entity):
-        return False
-    elif isinstance(expression, UnaryExpression):
-        return contains_block_node(expression.operand)
-    elif isinstance(expression, BinaryExpression):
-        return contains_block_node(expression.operand1) or contains_block_node(expression.operand2)
-    elif isinstance(expression, Scaling):
-        return contains_block_node(expression.operand)
-    else:
-        raise NotImplementedError("Not implemented")

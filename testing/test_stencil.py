@@ -29,4 +29,6 @@ periodic_stencil = periodic.block_diagonal(stencil1, (2, 2))
 print(periodic.count_number_of_entries(periodic_stencil))
 tmp = periodic.add(periodic_stencil, constant.get_unit_stencil(2))
 print(periodic.count_number_of_entries(tmp))
+print(periodic.determine_maximal_shape(tmp))
+tmp = periodic.red_black_partitioning(periodic_stencil)
 pass

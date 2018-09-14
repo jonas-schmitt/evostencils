@@ -78,6 +78,22 @@ def count_number_of_entries(stencil):
 
 
 @convert_constant_stencils
+def determine_maximal_shape(stencil):
+    def recursive_descent(array, dimension):
+        if dimension == 1:
+            return [len(array)]
+        else:
+            tmp = [recursive_descent(element, dimension - 1) for element in array]
+            max_shape = tmp[0]
+            for a in tmp:
+                for i, b in enumerate(a):
+                    if b > max_shape[i]:
+                        max_shape[i] = b
+            return [len(array)] + max_shape
+    return recursive_descent(stencil.constant_stencils, stencil.dimension)
+
+
+@convert_constant_stencils
 def map_stencil(stencil, f):
     return indexed_map_stencil(stencil, lambda s, i: f(s))
 
@@ -183,5 +199,25 @@ def block_diagonal(stencil, block_size):
         return constant.filter_stencil(constant_stencil, predicate)
     return indexed_combine(stencil, empty_stencil, f)
 
+
+def red_black_partitioning(stencil) -> tuple:
+    tmp = determine_maximal_shape(stencil)
+    shape = tuple(2 * n for n in tmp)
+    empty_stencil = Stencil(create_empty_multidimensional_array(shape), stencil.dimension)
+
+    def red(_, index):
+        if sum(tuple(i // j for i, j in zip(index, tmp))) % 2 == 0:
+            return constant.get_unit_stencil(stencil.dimension)
+        else:
+            return constant.get_null_stencil()
+
+    def black(_, index):
+        if sum(tuple(i // j for i, j in zip(index, tmp))) % 2 == 0:
+            return constant.get_null_stencil()
+        else:
+            return constant.get_unit_stencil(stencil.dimension)
+    red_filter = indexed_map_stencil(empty_stencil, red)
+    black_filter = indexed_map_stencil(empty_stencil, black)
+    return add(red_filter, mul(black_filter, stencil)), add(black_filter, mul(red_filter, stencil))
 
 

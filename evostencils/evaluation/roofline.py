@@ -91,7 +91,7 @@ class RooflineEvaluator:
         evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
         operator_stencil = correction.operator.generate_stencil()
         if not evaluated:
-            # u = (1 - omega) * u + omega * B * u - omega * B * A * u
+            # u = u + omega * B * u - omega * B * A * u
 
             iteration_matrix_stencil = iteration_matrix.generate_stencil()
             combined_stencil = periodic.mul(iteration_matrix_stencil, operator_stencil)
@@ -137,7 +137,6 @@ class RooflineEvaluator:
                                    self.words_transferred_for_load(), problem_size))
         return list_of_metrics
 
-
     @staticmethod
     def estimate_operations_per_word_for_solving_matrix(number_of_unknowns, problem_size) -> tuple:
         n = number_of_unknowns
@@ -145,7 +144,6 @@ class RooflineEvaluator:
         operations = 2.0/3.0 * n * n * n
         words = n * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
         return operations, words, float(problem_size) / n
-
 
     @staticmethod
     def estimate_operations_per_word_for_stencil(stencil, problem_size) -> list:
@@ -189,11 +187,24 @@ class RooflineEvaluator:
             if periodic.is_diagonal(stencil):
                 return False, []
             else:
-                # Handle block node
-                number_of_entries_list = periodic.count_number_of_entries(stencil)
-                number_of_unknowns = len(number_of_entries_list)
-                return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
-                                                                                   expression.shape[0])]
+                # In case we have a block smoother we have to solve a small system of equations for each block
+                subexpression = expression.operand
+                if isinstance(subexpression, base.RedBlackPartitioning):
+                    red_stencil, black_stencil = periodic.red_black_partitioning(subexpression.operand)
+                    red_number_of_entries_list = periodic.count_number_of_entries(red_stencil)
+                    red_number_of_unknowns = len(tuple(filter(lambda n: n > 1, red_number_of_entries_list)))
+                    black_number_of_entries_list = periodic.count_number_of_entries(black_stencil)
+                    black_number_of_unknowns = len(tuple(filter(lambda n: n > 1, black_number_of_entries_list)))
+                    return True, [self.estimate_operations_per_word_for_solving_matrix(red_number_of_unknowns,
+                                                                                       expression.shape[0] / 2),
+                                  self.estimate_operations_per_word_for_solving_matrix(black_number_of_unknowns,
+                                                                                       expression.shape[0] / 2)]
+
+                else:
+                    number_of_entries_list = periodic.count_number_of_entries(stencil)
+                    number_of_unknowns = len(tuple(filter(lambda n: n > 1, number_of_entries_list)))
+                    return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
+                                                                                       expression.shape[0])]
 
         elif isinstance(expression, base.UnaryExpression):
             return False, []
