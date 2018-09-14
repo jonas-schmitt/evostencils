@@ -1,6 +1,11 @@
 import evostencils.stencils.constant as constant
 import evostencils.stencils.periodic as periodic
 import copy
+#entries = [
+#        ((0,), 2),
+#        ((-1,), -1),
+#        ((1,), -1)
+#]
 entries = [
         (( 0, -1), -1.0),
         ((-1,  0), -1.0),

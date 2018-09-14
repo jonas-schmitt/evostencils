@@ -17,6 +17,25 @@ class Stencil:
         return self._dimension
 
 
+def check_predicate(stencil, predicate):
+    if stencil is None:
+        return False
+
+    def recursive_descent(array, dimension):
+        if dimension == 1:
+            return all(map(predicate, array))
+        else:
+            return all(recursive_descent(element, dimension - 1) for element in array)
+
+    return recursive_descent(stencil.constant_stencils, stencil.dimension)
+
+
+def is_diagonal(stencil):
+    def predicate(constant_stencil):
+        all(i == 0 for i in constant_stencil.entries[0])
+    return check_predicate(stencil, predicate)
+
+
 def convert_constant_stencils(func):
     def wrapper(*args, **kwargs):
         def to_periodic_stencil(constant_stencil: constant.Stencil):

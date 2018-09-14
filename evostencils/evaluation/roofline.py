@@ -137,6 +137,16 @@ class RooflineEvaluator:
                                    self.words_transferred_for_load(), problem_size))
         return list_of_metrics
 
+
+    @staticmethod
+    def estimate_operations_per_word_for_solving_matrix(number_of_unknowns, problem_size) -> tuple:
+        n = number_of_unknowns
+        # Gaussian Elimination
+        operations = 2.0/3.0 * n * n * n
+        words = n * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
+        return operations, words, float(problem_size) / n
+
+
     @staticmethod
     def estimate_operations_per_word_for_stencil(stencil, problem_size) -> list:
         number_of_entries_list = periodic.count_number_of_entries(stencil)
@@ -175,20 +185,15 @@ class RooflineEvaluator:
             # A * B * u => op(A*u) + op(B*u)
             return True, metrics
         elif isinstance(expression, base.Inverse):
-            if base.contains_block_node(expression):
-                # Handle block node
-                stencil = expression.generate_stencil()
-                number_of_entries_list = periodic.count_number_of_entries(stencil)
-                metrics = []
-                for number_of_entries in number_of_entries_list:
-                    # Solving the small system with Gaussian-Elimination
-                    operations = 2.0/3.0 * number_of_entries * number_of_entries * number_of_entries
-                    words = number_of_entries * self.words_transferred_for_load() * self.words_transferred_for_store()
-                    problem_size = float(expression.shape[0]) / (len(number_of_entries_list) * number_of_entries)
-                    metrics.append((operations, words, problem_size))
-                return True, metrics
-            else:
+            stencil = expression.operand.generate_stencil()
+            if periodic.is_diagonal(stencil):
                 return False, []
+            else:
+                # Handle block node
+                number_of_entries_list = periodic.count_number_of_entries(stencil)
+                number_of_unknowns = len(number_of_entries_list)
+                return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
+                                                                                   expression.shape[0])]
 
         elif isinstance(expression, base.UnaryExpression):
             return False, []

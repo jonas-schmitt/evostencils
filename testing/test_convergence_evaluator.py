@@ -4,7 +4,7 @@ from evostencils.optimizer import Optimizer
 import sympy as sp
 import lfa_lab as lfa
 
-fine_grid_size = (64,64)
+fine_grid_size = (64,)
 
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
@@ -12,19 +12,19 @@ A = base.generate_operator('A', fine_grid_size)
 
 from evostencils.evaluation.convergence import *
 # Create a 2D grid with step-size (1/32, 1/32).
-fine = lfa.Grid(2, [1.0, 1.0])
+fine = lfa.Grid(1, [1.0])
 
 # Create a poisson operator.
-fine_operator = lfa.gallery.poisson_2d(fine)
+fine_operator = lfa.gallery.poisson_1d(fine)
 
-coarsening_factor = (2, 2)
+coarsening_factor = (2,)
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
 A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 P = multigrid.get_interpolation(u, u_coarse)
 R = multigrid.get_restriction(u, u_coarse)
 
-coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2,2)))
-evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
+coarse_operator = lfa.gallery.poisson_1d(fine.coarse((2,)))
+evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2,))
 smoother = base.Inverse(base.Diagonal(A))
 tmp = multigrid.correct(A, b, smoother, u, 1)
 coarse_grid_correction = base.Multiplication(P, base.Multiplication(multigrid.CoarseGridSolver(u_coarse), R))
@@ -39,10 +39,10 @@ reference = jacobi * lfa.coarse_grid_correction(fine_operator, coarse_operator, 
 print(reference.symbol().spectral_radius())
 rb_jacobi = lfa.rb_jacobi(fine_operator, 1.0)
 print(rb_jacobi.symbol().spectral_radius())
-block_jacobi = lfa.block_jacobi(fine_operator, (2,2), 1.0)
+block_jacobi = lfa.block_jacobi(fine_operator, (2,), 1.0)
 print(block_jacobi.symbol().spectral_radius())
 
-rb_block_jacobi = lfa.rb_block_jacobi(fine_operator, (2,2), 1.0)
+rb_block_jacobi = lfa.rb_block_jacobi(fine_operator, (2,), 1.0)
 print(rb_block_jacobi.symbol().spectral_radius())
 
 
