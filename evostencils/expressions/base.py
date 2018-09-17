@@ -189,6 +189,9 @@ class BlockDiagonal(UnaryExpression):
     def __repr__(self):
         return f'BlockDiagonal({repr(self.operand)}, {repr(self.block_size)})'
 
+    def apply(self, transform: callable, *args):
+        return type(self)(transform(self.operand, *args), self.block_size)
+
 
 class Inverse(UnaryExpression):
     def generate_stencil(self):

@@ -64,7 +64,7 @@ class Optimizer:
 
         self.add_terminal(identity_matrix, matrix_types.generate_diagonal_matrix_type(A.shape), 'I')
         self.add_terminal(D, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_d')
-        #self.add_terminal(block_diagonal, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_bd')
+        self.add_terminal(block_diagonal, matrix_types.generate_block_diagonal_matrix_type(A.shape), 'A_bd')
         self.add_terminal(base.LowerTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_l')
         self.add_terminal(base.UpperTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_u')
 
@@ -114,18 +114,29 @@ class Optimizer:
         OperatorType = matrix_types.generate_matrix_type(A.shape)
         GridType = matrix_types.generate_matrix_type(u.shape)
         DiagonalOperatorType = matrix_types.generate_diagonal_matrix_type(self._diagonal.shape)
+        BlockDiagonalOperatorType = matrix_types.generate_block_diagonal_matrix_type(A.shape)
 
         # Add primitives to full set
         self.add_operator(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'add')
+        self.add_operator(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
+        self.add_operator(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
+        self.add_operator(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'add')
         self.add_operator(base.add, [OperatorType, OperatorType], OperatorType, 'add')
 
         self.add_operator(base.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'sub')
+        self.add_operator(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
+        self.add_operator(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
+        self.add_operator(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
         self.add_operator(base.sub, [OperatorType, OperatorType], OperatorType, 'sub')
 
         self.add_operator(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'mul')
+        self.add_operator(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
+        self.add_operator(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
+        self.add_operator(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
         self.add_operator(base.mul, [OperatorType, OperatorType], OperatorType, 'mul')
 
         self.add_operator(base.inv, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
+        self.add_operator(base.inv, [BlockDiagonalOperatorType], OperatorType, 'inverse')
 
         # Correction
 

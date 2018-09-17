@@ -1,5 +1,21 @@
 import lfa_lab
+import evostencils.stencils.periodic as periodic
 from evostencils.expressions import base, multigrid
+
+
+@periodic.convert_constant_stencils
+def stencil_to_lfa(stencil: periodic.Stencil, grid):
+    def recursive_descent(array, dimension):
+        if dimension == 1:
+            return [lfa_lab.SparseStencil(element.entries) for element in array]
+        else:
+            return [recursive_descent(element, dimension - 1) for element in array]
+
+    tmp = recursive_descent(stencil.constant_stencils, stencil.dimension)
+
+    ndarray = lfa_lab.NdArray(tmp)
+    tmp = lfa_lab.PeriodicStencil(ndarray)
+    return lfa_lab.from_periodic_stencil(tmp, grid)
 
 
 class ConvergenceEvaluator:
@@ -61,6 +77,9 @@ class ConvergenceEvaluator:
             return self.transform(expression.operand).transpose()
         elif isinstance(expression, base.Diagonal):
             return self.transform(expression.operand).diag()
+        elif isinstance(expression, base.BlockDiagonal):
+            stencil = expression.generate_stencil()
+            return stencil_to_lfa(stencil, self._fine_grid)
         elif isinstance(expression, base.LowerTriangle):
             return self.transform(expression.operand).lower()
         elif isinstance(expression, base.UpperTriangle):

@@ -34,7 +34,23 @@ iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
 print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
+import evostencils.stencils.constant as constant
+import evostencils.stencils.periodic as periodic
+entries = [
+        (( 0, -1), -1.0),
+        ((-1,  0), -1.0),
+        (( 0,  0),  4.0),
+        (( 1,  0), -1.0),
+        (( 0,  1), -1.0)
+    ]
+
+stencil = constant.Stencil(entries)
+jacobi = constant.mul(constant.inverse(constant.diagonal(stencil)), constant.add(constant.lower(stencil), constant.upper(stencil)))
+jacobi = stencil_to_lfa(jacobi, fine)
+print(jacobi.symbol().spectral_radius())
+
 jacobi = lfa.jacobi(fine_operator, 1)
+print(jacobi.symbol().spectral_radius())
 reference = jacobi * lfa.coarse_grid_correction(fine_operator, coarse_operator, evaluator.interpolation, evaluator.restriction, coarse_error=None) * jacobi
 print(reference.symbol().spectral_radius())
 rb_jacobi = lfa.rb_jacobi(fine_operator, 1.0)

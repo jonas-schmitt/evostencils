@@ -32,7 +32,7 @@ def check_predicate(stencil, predicate):
 
 def is_diagonal(stencil):
     def predicate(constant_stencil):
-        all(i == 0 for i in constant_stencil.entries[0])
+        return all(all(i == 0 for i in offset) for offset, _ in constant_stencil.entries)
     return check_predicate(stencil, predicate)
 
 

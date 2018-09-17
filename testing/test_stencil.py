@@ -1,6 +1,8 @@
 import evostencils.stencils.constant as constant
 import evostencils.stencils.periodic as periodic
+import evostencils.evaluation.convergence as convergence
 import copy
+import lfa_lab
 #entries = [
 #        ((0,), 2),
 #        ((-1,), -1),
@@ -25,6 +27,9 @@ f = constant.upper(stencil1)
 g = constant.lower(stencil1)
 inv_diag = constant.inverse(constant.diagonal(stencil1))
 jacobi = constant.mul(constant.inverse(constant.diagonal(stencil1)), constant.add(constant.lower(stencil1), constant.upper(stencil1)))
+
+fine = lfa_lab.Grid(2, [1.0, 1.0])
+tmp = convergence.stencil_to_lfa(jacobi, fine)
 periodic_stencil = periodic.block_diagonal(stencil1, (2, 2))
 print(periodic.count_number_of_entries(periodic_stencil))
 tmp = periodic.add(periodic_stencil, constant.get_unit_stencil(2))
