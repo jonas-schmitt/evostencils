@@ -34,24 +34,15 @@ R = multigrid.get_restriction(u, u_coarse)
 
 coarse_operator = lfa.gallery.poisson_2d(fine.coarse((2,2)))
 evaluator = ConvergenceEvaluator(fine_operator, coarse_operator, fine, fine_grid_size, (2, 2))
-smoother = base.Inverse(base.Diagonal(A))
-tmp = multigrid.correct(A, b, smoother, u, partitioning=base.RedBlackPartitioning, weight=1)
-#coarse_grid_correction = base.Multiplication(P, base.Multiplication(multigrid.CoarseGridSolver(u_coarse), R))
-#tmp = multigrid.correct(A, b, coarse_grid_correction, tmp, weight=1)
-#tmp = multigrid.correct(A, b, smoother, tmp, weight=1)
+#smoother = base.Inverse(base.Diagonal(A))
+smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
+tmp = multigrid.correct(A, b, smoother, u, partitioning=base.NonePartitioning, weight=1)
+coarse_grid_correction = base.Multiplication(P, base.Multiplication(multigrid.CoarseGridSolver(u_coarse), R))
+tmp = multigrid.correct(A, b, coarse_grid_correction, tmp, weight=1)
+tmp = multigrid.correct(A, b, smoother, tmp, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
 print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
-
-
-
-entries = [
-        (( 0, -1), -1.0),
-        ((-1,  0), -1.0),
-        (( 0,  0),  4.0),
-        (( 1,  0), -1.0),
-        (( 0,  1), -1.0)
-    ]
 
 stencil = constant.Stencil(entries)
 jacobi = constant.mul(constant.inverse(constant.diagonal(stencil)), constant.add(constant.lower(stencil), constant.upper(stencil)))

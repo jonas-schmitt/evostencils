@@ -300,14 +300,20 @@ class Partitioning(abc.ABC):
 
 class NonePartitioning:
     @staticmethod
-    def generate(_):
-        return None
+    def generate(stencil):
+        if stencil is None:
+            return [None]
+        else:
+            return [constant.get_unit_stencil(stencil.dimension)]
 
 
 class RedBlackPartitioning:
     @staticmethod
     def generate(stencil):
-        return periodic.red_black_partitioning(stencil)
+        if stencil is None:
+            return [None]
+        else:
+            return periodic.red_black_partitioning(stencil)
 
 
 # Wrapper functions

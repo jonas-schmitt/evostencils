@@ -95,8 +95,10 @@ def transpose(self):
 # Note that this is only equivalent to matrix inversion for diagonal matrices
 def inverse(self):
     def reciprocal(offsets, value):
-        assert all(i == 0 for i in offsets), "Only diagonal stencils can be inverted"
-        return offsets, 1.0 / value
+        if all(i == 0 for i in offsets):
+            return offsets, 1.0 / value
+        else:
+            return offsets, value
     return map_stencil(self, reciprocal)
 
 

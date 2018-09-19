@@ -102,8 +102,8 @@ class Optimizer:
                           matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, matrix_types.generate_matrix_type(restriction.shape), 'R')
-        self.add_terminal(base.NonePartitioning, base.Partitioning, 'no_partitioning')
-        self.add_terminal(base.RedBlackPartitioning, base.Partitioning, 'red_black_partitioning')
+        self.add_terminal(base.NonePartitioning, base.Partitioning, 'single')
+        self.add_terminal(base.RedBlackPartitioning, base.Partitioning, 'red_black')
 
         self._coarse_grid = coarse_grid
         self._coarse_operator = coarse_operator

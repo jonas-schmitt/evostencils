@@ -62,9 +62,9 @@ class ConvergenceEvaluator:
             iteration_matrix = expression.iteration_matrix
             stencil = iteration_matrix.generate_stencil()
             partition_stencils = expression.partitioning.generate(stencil)
-            if partition_stencils is None:
+            if len(partition_stencils) == 1:
                 return self.transform(expression.generate_expression())
-            else:
+            elif len(partition_stencils) == 2:
                 A = self.transform(expression.operator)
                 u = self.transform(expression.grid)
                 f = self.transform(expression.rhs)
@@ -73,6 +73,8 @@ class ConvergenceEvaluator:
                 partition_stencils = [stencil_to_lfa(s, self._fine_grid) for s in partition_stencils]
                 return (partition_stencils[0] + partition_stencils[1] * correction) \
                     * (partition_stencils[1] + partition_stencils[0] * correction)
+            else:
+                raise NotImplementedError("Not implemented")
         elif isinstance(expression, base.BinaryExpression):
             child1 = self.transform(expression.operand1)
             child2 = self.transform(expression.operand2)
