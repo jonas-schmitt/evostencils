@@ -200,7 +200,9 @@ def block_diagonal(stencil, block_size):
     return indexed_combine(stencil, empty_stencil, f)
 
 
-def red_black_partitioning(stencil) -> tuple:
+def red_black_partitioning(stencil):
+    if stencil is None:
+        return None
     tmp = determine_maximal_shape(stencil)
     shape = tuple(2 * n for n in tmp)
     empty_stencil = Stencil(create_empty_multidimensional_array(shape), stencil.dimension)
@@ -218,6 +220,6 @@ def red_black_partitioning(stencil) -> tuple:
             return constant.get_unit_stencil(stencil.dimension)
     red_filter = indexed_map_stencil(empty_stencil, red)
     black_filter = indexed_map_stencil(empty_stencil, black)
-    return add(red_filter, mul(black_filter, stencil)), add(black_filter, mul(red_filter, stencil))
+    return red_filter, black_filter
 
 

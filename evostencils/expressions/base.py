@@ -159,18 +159,6 @@ class UpperTriangle(UnaryExpression):
         return f'UpperTriangle({repr(self.operand)})'
 
 
-class RedBlackPartitioning(UnaryExpression):
-    def generate_stencil(self):
-        #TODO
-        return self.operand.generate_stencil()
-
-    def __str__(self):
-        return f'{str(self.operand)}.red_black'
-
-    def __repr__(self):
-        return f'RedBlackPartitioning({repr(self.operand)})'
-
-
 class BlockDiagonal(UnaryExpression):
     def __init__(self, operand, block_size):
         self._block_size = block_size
@@ -301,6 +289,25 @@ class Scaling(Expression):
 
     def apply(self, transform: callable, *args):
         return Scaling(self.factor, transform(self.operand, *args))
+
+
+class Partitioning(abc.ABC):
+    @staticmethod
+    @abc.abstractmethod
+    def generate(_):
+        pass
+
+
+class NonePartitioning:
+    @staticmethod
+    def generate(_):
+        return None
+
+
+class RedBlackPartitioning:
+    @staticmethod
+    def generate(stencil):
+        return periodic.red_black_partitioning(stencil)
 
 
 # Wrapper functions

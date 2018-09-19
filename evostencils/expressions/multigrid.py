@@ -53,12 +53,13 @@ class CoarseGridSolver(base.Operator):
 
 class Correction(base.Expression):
     def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression,
-                 rhs: base.Expression, weight=1.0):
+                 rhs: base.Expression, partitioning=base.NonePartitioning, weight=1.0):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
         self._rhs = rhs
         self._weight = weight
+        self._partitioning = partitioning
 
     @property
     def shape(self):
@@ -88,6 +89,10 @@ class Correction(base.Expression):
     def weight(self):
         return self._weight
 
+    @property
+    def partitioning(self):
+        return self._partitioning
+
     def generate_expression(self):
         A = self.operator
         u = self.grid
@@ -97,7 +102,7 @@ class Correction(base.Expression):
 
     def __repr__(self):
         return f'Correction({repr(self.iteration_matrix)}, {repr(self.grid)}, {repr(self.operator)}, ' \
-               f'{repr(self.rhs)}, {repr(self.weight)})'
+               f'{repr(self.rhs)}, {repr(self.partitioning)}, {repr(self.weight)}'
 
     def __str__(self):
         return str(self.generate_expression())
@@ -107,11 +112,11 @@ class Correction(base.Expression):
         grid = transform(self.grid, *args)
         operator = transform(self.operator, *args)
         rhs = transform(self.rhs, *args)
-        return Correction(iteration_matrix, grid, operator, rhs, self.weight)
+        return Correction(iteration_matrix, grid, operator, rhs, self.partitioning, self.weight)
 
 
-def correct(operator, rhs, iteration_matrix, grid, weight=1.0):
-    return Correction(iteration_matrix, grid, operator, rhs, weight)
+def correct(operator, rhs, iteration_matrix, grid, partitioning=base.NonePartitioning, weight=1.0):
+    return Correction(iteration_matrix, grid, operator, rhs, partitioning, weight)
 
 
 def residual(grid, operator, rhs):
@@ -145,3 +150,4 @@ def get_coarse_grid_solver(coarse_grid):
 def is_intergrid_operation(expression: base.Expression) -> bool:
     return isinstance(expression, Restriction) or isinstance(expression, Interpolation) \
            or isinstance(expression, CoarseGridSolver)
+

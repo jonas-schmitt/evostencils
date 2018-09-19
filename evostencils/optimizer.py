@@ -102,6 +102,8 @@ class Optimizer:
                           matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, matrix_types.generate_matrix_type(restriction.shape), 'R')
+        self.add_terminal(base.NonePartitioning, base.Partitioning, 'no_partitioning')
+        self.add_terminal(base.RedBlackPartitioning, base.Partitioning, 'red_black_partitioning')
 
         self._coarse_grid = coarse_grid
         self._coarse_operator = coarse_operator
@@ -141,7 +143,7 @@ class Optimizer:
         # Correction
 
         correct = functools.partial(multigrid.correct, self._operator, self._rhs)
-        self.add_operator(correct, [OperatorType, GridType], GridType, 'correct')
+        self.add_operator(correct, [OperatorType, GridType, base.Partitioning], GridType, 'correct')
 
         # Multigrid recipes
         InterpolationType = matrix_types.generate_matrix_type(self._interpolation.shape)
@@ -160,6 +162,7 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
+        self.add_operator(noop, [base.Partitioning], base.Partitioning, 'noop')
 
     @staticmethod
     def _init_creator():

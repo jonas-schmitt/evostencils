@@ -59,7 +59,20 @@ class ConvergenceEvaluator:
 
     def transform(self, expression: base.Expression):
         if isinstance(expression, multigrid.Correction):
-            return self.transform(expression.generate_expression())
+            iteration_matrix = expression.iteration_matrix
+            stencil = iteration_matrix.generate_stencil()
+            partition_stencils = expression.partitioning.generate(stencil)
+            if partition_stencils is None:
+                return self.transform(expression.generate_expression())
+            else:
+                A = self.transform(expression.operator)
+                u = self.transform(expression.grid)
+                f = self.transform(expression.rhs)
+                B = self.transform(iteration_matrix)
+                correction = u + expression.weight * B * (f - A*u)
+                partition_stencils = [stencil_to_lfa(s, self._fine_grid) for s in partition_stencils]
+                return (partition_stencils[0] + partition_stencils[1] * correction) \
+                    * (partition_stencils[1] + partition_stencils[0] * correction)
         elif isinstance(expression, base.BinaryExpression):
             child1 = self.transform(expression.operand1)
             child2 = self.transform(expression.operand2)

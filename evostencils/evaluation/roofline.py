@@ -187,24 +187,11 @@ class RooflineEvaluator:
             if periodic.is_diagonal(stencil):
                 return False, []
             else:
-                # In case we have a block smoother we have to solve a small system of equations for each block
                 subexpression = expression.operand
-                if isinstance(subexpression, base.RedBlackPartitioning):
-                    red_stencil, black_stencil = periodic.red_black_partitioning(subexpression.operand)
-                    red_number_of_entries_list = periodic.count_number_of_entries(red_stencil)
-                    red_number_of_unknowns = len(tuple(filter(lambda n: n > 1, red_number_of_entries_list)))
-                    black_number_of_entries_list = periodic.count_number_of_entries(black_stencil)
-                    black_number_of_unknowns = len(tuple(filter(lambda n: n > 1, black_number_of_entries_list)))
-                    return True, [self.estimate_operations_per_word_for_solving_matrix(red_number_of_unknowns,
-                                                                                       expression.shape[0] / 2),
-                                  self.estimate_operations_per_word_for_solving_matrix(black_number_of_unknowns,
-                                                                                       expression.shape[0] / 2)]
-
-                else:
-                    number_of_entries_list = periodic.count_number_of_entries(stencil)
-                    number_of_unknowns = len(tuple(filter(lambda n: n > 1, number_of_entries_list)))
-                    return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
-                                                                                       expression.shape[0])]
+                number_of_entries_list = periodic.count_number_of_entries(stencil)
+                number_of_unknowns = len(number_of_entries_list)
+                return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
+                                                                                    expression.shape[0])]
 
         elif isinstance(expression, base.UnaryExpression):
             return False, []

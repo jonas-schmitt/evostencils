@@ -22,7 +22,8 @@ class MatrixTypeMetaClass(type):
             return False
 
     def __subclasscheck__(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'lower_triangle') \
+        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'block_diagonal') \
+                and hasattr(other, 'lower_triangle') \
                 and hasattr(other, 'upper_triangle'):
             is_subclass = True
             if self.shape != other.shape:
