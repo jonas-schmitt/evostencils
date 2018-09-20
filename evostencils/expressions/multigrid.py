@@ -1,4 +1,5 @@
 from evostencils.expressions import base
+from evostencils.expressions import partitioning as part
 
 
 class Restriction(base.Operator):
@@ -53,7 +54,7 @@ class CoarseGridSolver(base.Operator):
 
 class Correction(base.Expression):
     def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression,
-                 rhs: base.Expression, partitioning=base.NonePartitioning, weight=1.0):
+                 rhs: base.Expression, partitioning=part.Single, weight=1.0):
         self._iteration_matrix = iteration_matrix
         self._grid = grid
         self._operator = operator
@@ -115,7 +116,7 @@ class Correction(base.Expression):
         return Correction(iteration_matrix, grid, operator, rhs, self.partitioning, self.weight)
 
 
-def correct(operator, rhs, iteration_matrix, grid, partitioning=base.NonePartitioning, weight=1.0):
+def correct(operator, rhs, iteration_matrix, grid, partitioning=part.Single, weight=1.0):
     return Correction(iteration_matrix, grid, operator, rhs, partitioning, weight)
 
 

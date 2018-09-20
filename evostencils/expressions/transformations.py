@@ -41,7 +41,7 @@ def fold_intergrid_operations(expression: base.Expression) -> base.Expression:
         child1 = result.operand1
         child2 = result.operand2
         if isinstance(child1, multigrid.Interpolation) and isinstance(child2, multigrid.Restriction):
-            stencil = expression.generate_stencil()
+            stencil = result.generate_stencil()
             if stencil is None:
                 return base.Identity(expression.shape)
             else:

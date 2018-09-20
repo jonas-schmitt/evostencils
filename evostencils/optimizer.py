@@ -4,6 +4,7 @@ from deap import gp, creator, tools, algorithms
 import random
 from evostencils import matrix_types
 import evostencils.expressions.base as base
+import evostencils.expressions.partitioning as part
 import evostencils.expressions.multigrid as multigrid
 import evostencils.expressions.transformations as transformations
 import operator
@@ -102,8 +103,8 @@ class Optimizer:
                           matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
         self.add_terminal(restriction, matrix_types.generate_matrix_type(restriction.shape), 'R')
-        self.add_terminal(base.NonePartitioning, base.Partitioning, 'single')
-        self.add_terminal(base.RedBlackPartitioning, base.Partitioning, 'red_black')
+        self.add_terminal(part.Single, part.Partitioning, 'single')
+        self.add_terminal(part.RedBlack, part.Partitioning, 'red_black')
 
         self._coarse_grid = coarse_grid
         self._coarse_operator = coarse_operator
@@ -143,7 +144,7 @@ class Optimizer:
         # Correction
 
         correct = functools.partial(multigrid.correct, self._operator, self._rhs)
-        self.add_operator(correct, [OperatorType, GridType, base.Partitioning], GridType, 'correct')
+        self.add_operator(correct, [OperatorType, GridType, part.Partitioning], GridType, 'correct')
 
         # Multigrid recipes
         InterpolationType = matrix_types.generate_matrix_type(self._interpolation.shape)
@@ -162,7 +163,7 @@ class Optimizer:
         self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
         self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
         self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
-        self.add_operator(noop, [base.Partitioning], base.Partitioning, 'noop')
+        self.add_operator(noop, [part.Partitioning], part.Partitioning, 'noop')
 
     @staticmethod
     def _init_creator():

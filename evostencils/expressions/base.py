@@ -291,30 +291,6 @@ class Scaling(Expression):
         return Scaling(self.factor, transform(self.operand, *args))
 
 
-class Partitioning(abc.ABC):
-    @staticmethod
-    @abc.abstractmethod
-    def generate(_):
-        pass
-
-
-class NonePartitioning:
-    @staticmethod
-    def generate(stencil):
-        if stencil is None:
-            return [None]
-        else:
-            return [constant.get_unit_stencil(stencil.dimension)]
-
-
-class RedBlackPartitioning:
-    @staticmethod
-    def generate(stencil):
-        if stencil is None:
-            return [None]
-        else:
-            return periodic.red_black_partitioning(stencil)
-
 
 # Wrapper functions
 def inv(operand):
