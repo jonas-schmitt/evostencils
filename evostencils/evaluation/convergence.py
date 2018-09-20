@@ -101,7 +101,7 @@ class ConvergenceEvaluator:
             return self.transform(expression.operand).upper()
         elif isinstance(expression, base.Identity):
             return self.fine_operator.matching_identity()
-        elif isinstance(expression, base.Zero):
+        elif isinstance(expression, base.ZeroOperator):
             return self.fine_operator.matching_zero()
         elif type(expression) == multigrid.Restriction:
             return self._restriction

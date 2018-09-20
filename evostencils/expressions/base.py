@@ -94,9 +94,9 @@ class Identity(Operator):
         return f'Identity({repr(self.shape)}, {repr(self.dimension)})'
 
 
-class Zero(Operator):
+class ZeroOperator(Operator):
     def __init__(self, shape):
-        super(Zero, self).__init__('0', shape, constant.get_null_stencil())
+        super(ZeroOperator, self).__init__('0', shape, constant.get_null_stencil())
 
     def __repr__(self):
         return f'Zero({repr(self.shape)})'
@@ -123,6 +123,11 @@ class Grid(Entity):
 
     def __repr__(self):
         return f'Grid({repr(self.name)}, {repr(self.size)})'
+
+
+class ZeroGrid(Grid):
+    def __init__(self, size):
+        super(ZeroGrid, self).__init__('0', size)
 
 
 # Unary Expressions

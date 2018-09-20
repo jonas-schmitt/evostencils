@@ -98,7 +98,7 @@ class Optimizer:
         interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
         restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
 
-        self.add_terminal(base.Zero(A), matrix_types.generate_matrix_type(coarse_grid.shape))
+        self.add_terminal(base.ZeroOperator(A), matrix_types.generate_matrix_type(coarse_grid.shape))
         self.add_terminal(multigrid.CoarseGridSolver(coarse_grid),
                           matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
         self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
@@ -260,7 +260,7 @@ class Optimizer:
     @staticmethod
     def get_iteration_matrix(expression, grid, rhs):
         from evostencils.expressions.transformations import propagate_zero, substitute_entity
-        tmp = substitute_entity(expression, rhs, base.Zero(rhs.shape))
+        tmp = substitute_entity(expression, rhs, base.ZeroOperator(rhs.shape))
         tmp = propagate_zero(tmp)
         return substitute_entity(tmp, grid, base.Identity(grid.shape, grid.dimension))
 

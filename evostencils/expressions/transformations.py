@@ -5,33 +5,33 @@ from evostencils.expressions import base
 def propagate_zero(expression: base.Expression) -> base.Expression:
     result = expression.apply(propagate_zero)
     if isinstance(result, multigrid.Correction):
-        if isinstance(result.iteration_matrix, base.Zero):
+        if isinstance(result.iteration_matrix, base.ZeroOperator):
             return result.grid
     if isinstance(result, base.Addition):
-        if isinstance(result.operand1, base.Zero):
+        if isinstance(result.operand1, base.ZeroOperator):
             return result.operand2
-        elif isinstance(result.operand2, base.Zero):
+        elif isinstance(result.operand2, base.ZeroOperator):
             return result.operand1
     elif isinstance(result, base.Subtraction):
-        if isinstance(result.operand1, base.Zero):
-            if isinstance(result.operand2, base.Zero):
+        if isinstance(result.operand1, base.ZeroOperator):
+            if isinstance(result.operand2, base.ZeroOperator):
                 return result.operand1
             else:
                 return base.Scaling(-1, result.operand2)
-        elif isinstance(result.operand2, base.Zero):
+        elif isinstance(result.operand2, base.ZeroOperator):
             return result.operand1
     elif isinstance(result, base.Multiplication):
-        if isinstance(result.operand1, base.Zero) or isinstance(result.operand2, base.Zero):
-            return base.Zero(expression.shape)
+        if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
+            return base.ZeroOperator(expression.shape)
     elif isinstance(result, base.Scaling):
-        if isinstance(result.operand, base.Zero):
+        if isinstance(result.operand, base.ZeroOperator):
             return result.operand
     elif isinstance(result, base.Inverse):
-        if isinstance(result.operand, base.Zero):
+        if isinstance(result.operand, base.ZeroOperator):
             return result.operand
     elif isinstance(result, base.Transpose):
-        if isinstance(result.operand, base.Zero):
-            return base.Zero(expression.shape)
+        if isinstance(result.operand, base.ZeroOperator):
+            return base.ZeroOperator(expression.shape)
     return result
 
 
@@ -55,7 +55,7 @@ def remove_identity_operations(expression: base.Expression) -> base.Expression:
         operand1 = result.operand1
         operand2 = result.operand2
         if isinstance(operand1, base.Identity) and isinstance(operand2, base.Identity):
-            return base.Zero(expression.shape)
+            return base.ZeroOperator(expression.shape)
     elif isinstance(result, base.Multiplication):
         operand1 = result.operand1
         operand2 = result.operand2
