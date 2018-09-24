@@ -2,7 +2,8 @@ from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
 from evostencils.expressions import partitioning as part
 from evostencils.stencils import constant
-from evostencils import matrix_types
+from evostencils.types import matrix as matrix_types
+from evostencils.types import grid as grid_types
 from deap import gp
 
 
@@ -49,7 +50,7 @@ class Terminals:
         self.lower = base.LowerTriangle(operator)
         self.upper = base.UpperTriangle(operator)
         self.coarse_grid = mg.get_coarse_grid(self.grid, self.coarsening_factor)
-        self.coarse_operator = mg.get_coarse_operator(self.operator, self.coarsening_factor)
+        self.coarse_operator = mg.get_coarse_operator(self.operator, self.coarse_grid)
         self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.restriction = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.identity = base.Identity(self.operator.shape, self.dimension)
@@ -63,9 +64,10 @@ class Types:
         self.Operator = matrix_types.generate_matrix_type(terminals.operator.shape)
         self.LowerTriangularOperator = matrix_types.generate_lower_triangular_matrix_type(terminals.lower.shape)
         self.UpperTriangularOperator = matrix_types.generate_upper_triangular_matrix_type(terminals.lower.shape)
-        self.Grid = matrix_types.generate_matrix_type(terminals.grid.shape)
+        self.Grid = grid_types.generate_grid_type(terminals.grid.size)
+        self.Residual = grid_types.generate_residual_type(terminals.grid.size)
         self.DiagonalOperator = matrix_types.generate_diagonal_matrix_type(terminals.diagonal.shape)
-        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.block_diagonal)
+        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.block_diagonal.shape)
         self.Interpolation = matrix_types.generate_matrix_type(terminals.interpolation.shape)
         self.Restriction = matrix_types.generate_matrix_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_matrix_type(terminals.coarse_operator.shape)
@@ -73,9 +75,12 @@ class Types:
         self.Partitioning = part.Partitioning
 
 
-def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=None):
+def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=None):
     if types is None:
         types = Types(terminals)
+
+    pset.addTerminal(base.ZeroGrid(terminals.grid.size), types.Residual, 'r_0')
+    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size), types.CoarseGrid, '0')
     pset.addTerminal(terminals.operator, types.Operator, 'A')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, 'I')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, 'D')
@@ -117,15 +122,15 @@ def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, 'inverse')
 
-    pset.addPrimitive(base.mul, [OperatorType, GridType], GridType, 'mul')
+    pset.addPrimitive(base.mul, [OperatorType, types.Residual], types.Residual, 'mul')
 
 
     # Correction
     import functools
     residual = functools.partial(mg.residual, terminals.grid, terminals.operator)
-    pset.addPrimitive(residual, [GridType], GridType, 'residual')
-    correct = functools.partial(mg.correct, terminals.grid)
-    pset.addPrimitive(correct, [GridType, part.Partitioning], GridType, 'correct')
+    pset.addPrimitive(residual, [GridType], types.Residual, 'residual')
+    cycle = functools.partial(mg.cycle, terminals.grid)
+    pset.addPrimitive(cycle, [types.Residual, part.Partitioning], GridType, 'cycle')
 
     # Multigrid recipes
     CoarseGridType = types.CoarseGrid
@@ -138,28 +143,28 @@ def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=
     pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
     pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
 
-    pset.addPrimitive(base.mul, [RestrictionType, GridType], CoarseGridType, 'mul')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], GridType, 'mul')
+    pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, 'mul')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, 'mul')
     pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
 
-    pset.addPrimitive(lambda x: x, [CoarseOperatorType], CoarseOperatorType, 'noop')
-    pset.addPrimitive(lambda x: x, [RestrictionType], RestrictionType, 'noop')
-    pset.addPrimitive(lambda x: x, [InterpolationType], InterpolationType, 'noop')
-    pset.addPrimitive(lambda x: x, [part.Partitioning], part.Partitioning, 'noop')
+    pset.addPrimitive(lambda x: x, [CoarseOperatorType], CoarseOperatorType, 'noop1')
+    pset.addPrimitive(lambda x: x, [RestrictionType], RestrictionType, 'noop2')
+    pset.addPrimitive(lambda x: x, [InterpolationType], InterpolationType, 'noop3')
+    pset.addPrimitive(lambda x: x, [part.Partitioning], part.Partitioning, 'noop4')
 
 
-def generate_multigrid(operator, grid, rhs, dimension, coarsening_factor,
-                       interpolation_stencil=None, restriction_stencil=None, maximum_number_of_cycles=1):
+def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
+                           interpolation_stencil=None, restriction_stencil=None, maximum_number_of_cycles=1):
     assert maximum_number_of_cycles >= 1, "The maximum number of cycles must be greater zero"
-    terminals = Terminals(operator, grid, rhs, dimension, coarsening_factor, interpolation_stencil, restriction_stencil)
+    terminals = Terminals(operator, grid, dimension, coarsening_factor, interpolation_stencil, restriction_stencil)
     types = Types(terminals)
     pset = gp.PrimitiveSetTyped("main", [], types.Grid)
     pset.addTerminal(rhs, types.Grid, 'f')
-    add_multigrid_cycle(pset, terminals, types)
+    add_cycle(pset, terminals, types)
     for _ in range(1, maximum_number_of_cycles):
         coarse_grid = base.ZeroGrid(terminals.coarse_grid.size)
         terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
-        add_multigrid_cycle(pset, terminals)
+        add_cycle(pset, terminals)
 
     return pset

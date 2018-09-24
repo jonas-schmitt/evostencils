@@ -2,14 +2,9 @@ import numpy as np
 import deap.base
 from deap import gp, creator, tools, algorithms
 import random
-from evostencils import matrix_types
+import evostencils.multigrid as multigrid
 import evostencils.expressions.base as base
-import evostencils.expressions.partitioning as part
-import evostencils.expressions.multigrid as multigrid
 import evostencils.expressions.transformations as transformations
-import operator
-import functools
-from evostencils.stencils.constant import Stencil
 from evostencils.weight_optimizer import WeightOptimizer
 
 
@@ -39,131 +34,12 @@ class Optimizer:
         self._performance_evaluator = performance_evaluator
         self._epsilon = epsilon
         self._infinity = infinity
-        self._diagonal = base.Diagonal(self._operator)
-        self._symbols = set()
-        self._types = set()
-        self._symbol_types = {}
-        self._symbol_names = {}
-        self._primitive_set = gp.PrimitiveSetTyped("main", [], matrix_types.generate_matrix_type(self._grid.shape))
-        self._init_terminals()
-        self._init_operators()
+        self._primitive_set = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
+                                                               interpolation_stencil=None, restriction_stencil=None,
+                                                               maximum_number_of_cycles=1)
         self._init_creator()
         self._init_toolbox()
         self._weight_optimizer = WeightOptimizer(self)
-
-    def _init_terminals(self):
-        A = self._operator
-        u = self._grid
-        f = self._rhs
-        D = self._diagonal
-        block_diagonal = base.BlockDiagonal(self.operator, tuple(2 for _ in range(self.dimension)))
-
-        identity_matrix = base.Identity(A.shape, self.dimension)
-        # Add primitives to set
-        self.add_terminal(A, matrix_types.generate_matrix_type(A.shape), 'A')
-        self.add_terminal(u, matrix_types.generate_matrix_type(u.shape), 'u')
-
-        self.add_terminal(identity_matrix, matrix_types.generate_diagonal_matrix_type(A.shape), 'I')
-        self.add_terminal(D, matrix_types.generate_diagonal_matrix_type(A.shape), 'A_d')
-        self.add_terminal(block_diagonal, matrix_types.generate_block_diagonal_matrix_type(A.shape), 'A_bd')
-        self.add_terminal(base.LowerTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_l')
-        self.add_terminal(base.UpperTriangle(A), matrix_types.generate_matrix_type(A.shape), 'A_u')
-
-        #TODO quick hack for testing here
-        interpolation_stencil_entries = [
-            ((-1, -1), 1.0/4),
-            (( 0, -1), 1.0/2),
-            (( 1, -1), 1.0/4),
-            ((-1,  0), 1.0/2),
-            (( 0,  0), 1.0),
-            (( 1,  0), 1.0/2),
-            ((-1,  1), 1.0/4),
-            (( 0,  1), 1.0/2),
-            (( 1,  1), 1.0/4),
-        ]
-
-        restriction_stencil_entries = [
-            ((-1, -1), 1.0/16),
-            (( 0, -1), 1.0/8),
-            (( 1, -1), 1.0/16),
-            ((-1,  0), 1.0/8),
-            (( 0,  0), 1.0/4),
-            (( 1,  0), 1.0/8),
-            ((-1,  1), 1.0/16),
-            (( 0,  1), 1.0/8),
-            (( 1,  1), 1.0/16),
-        ]
-        coarse_grid = multigrid.get_coarse_grid(u, self._coarsening_factor)
-        coarse_operator = multigrid.get_coarse_operator(self.operator, coarse_grid)
-        interpolation = multigrid.get_interpolation(u, coarse_grid, Stencil(interpolation_stencil_entries))
-        restriction = multigrid.get_restriction(u, coarse_grid, Stencil(restriction_stencil_entries))
-
-        self.add_terminal(base.ZeroOperator(A), matrix_types.generate_matrix_type(coarse_grid.shape))
-        self.add_terminal(multigrid.CoarseGridSolver(coarse_grid),
-                          matrix_types.generate_matrix_type(coarse_operator.shape), 'S_coarse')
-        self.add_terminal(interpolation, matrix_types.generate_matrix_type(interpolation.shape), 'P')
-        self.add_terminal(restriction, matrix_types.generate_matrix_type(restriction.shape), 'R')
-        self.add_terminal(part.Single, part.Partitioning, 'single')
-        self.add_terminal(part.RedBlack, part.Partitioning, 'red_black')
-
-        self._coarse_grid = coarse_grid
-        self._coarse_operator = coarse_operator
-        self._interpolation = interpolation
-        self._restriction = restriction
-
-    def _init_operators(self):
-        A = self._operator
-        u = self._grid
-        OperatorType = matrix_types.generate_matrix_type(A.shape)
-        GridType = matrix_types.generate_matrix_type(u.shape)
-        DiagonalOperatorType = matrix_types.generate_diagonal_matrix_type(self._diagonal.shape)
-        BlockDiagonalOperatorType = matrix_types.generate_block_diagonal_matrix_type(A.shape)
-
-        # Add primitives to full set
-        self.add_operator(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'add')
-        self.add_operator(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-        self.add_operator(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-        self.add_operator(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-        self.add_operator(base.add, [OperatorType, OperatorType], OperatorType, 'add')
-
-        self.add_operator(base.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'sub')
-        self.add_operator(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-        self.add_operator(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-        self.add_operator(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-        self.add_operator(base.sub, [OperatorType, OperatorType], OperatorType, 'sub')
-
-        self.add_operator(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'mul')
-        self.add_operator(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-        self.add_operator(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-        self.add_operator(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-        self.add_operator(base.mul, [OperatorType, OperatorType], OperatorType, 'mul')
-
-        self.add_operator(base.inv, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
-        self.add_operator(base.inv, [BlockDiagonalOperatorType], OperatorType, 'inverse')
-
-        # Correction
-
-        correct = functools.partial(multigrid.correct, self._operator, self._rhs)
-        self.add_operator(correct, [OperatorType, GridType, part.Partitioning], GridType, 'correct')
-
-        # Multigrid recipes
-        InterpolationType = matrix_types.generate_matrix_type(self._interpolation.shape)
-        RestrictionType = matrix_types.generate_matrix_type(self._restriction.shape)
-        CoarseOperatorType = matrix_types.generate_matrix_type(self._coarse_operator.shape)
-
-        # Create intergrid operators
-        self.add_operator(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, 'mul')
-        self.add_operator(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
-        self.add_operator(base.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
-
-        # Dummy operations
-        def noop(A):
-            return A
-
-        self.add_operator(noop, [CoarseOperatorType], CoarseOperatorType, 'noop')
-        self.add_operator(noop, [RestrictionType], RestrictionType, 'noop')
-        self.add_operator(noop, [InterpolationType], InterpolationType, 'noop')
-        self.add_operator(noop, [part.Partitioning], part.Partitioning, 'noop')
 
     @staticmethod
     def _init_creator():
@@ -180,15 +56,9 @@ class Optimizer:
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", gp.genFull, min_=1, max_=3)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
-
+        import operator
         self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
         self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
-
-    def set_matrix_type(self, symbol, matrix_type):
-        self._symbol_types[symbol] = matrix_type
-
-    def get_symbol_type(self, symbol):
-        return self._symbol_types[symbol]
 
     @property
     def operator(self) -> base.Operator:
@@ -225,31 +95,6 @@ class Optimizer:
     @property
     def infinity(self):
         return self._infinity
-
-    @property
-    def get_symbols(self) -> list:
-        return self._symbols
-
-    @property
-    def get_matrix_types(self) -> list:
-        return self._types
-
-    def add_terminal(self, symbol, matrix_type, name=None):
-        self._symbols.add(symbol)
-        self._types.add(matrix_type)
-        self._symbol_types[symbol] = matrix_type
-        if name:
-            self._symbol_names[symbol] = name
-            self._primitive_set.addTerminal(symbol, matrix_type, name=name)
-        else:
-            self._symbol_names[symbol] = symbol.name
-            self._primitive_set.addTerminal(symbol, matrix_type)
-
-    def add_operator(self, primitive, argument_types, result_type, name: str):
-        for argument_type in argument_types:
-            self._types.add(argument_type)
-        self._types.add(result_type)
-        self._primitive_set.addPrimitive(primitive, argument_types, result_type, name)
 
     def generate_individual(self):
         return self._toolbox.individual()

@@ -1,4 +1,4 @@
-from evostencils.matrix_types import *
+from evostencils.types.matrix import *
 from evostencils.expressions import base
 
 grid_size = (2,)
