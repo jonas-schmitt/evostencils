@@ -120,6 +120,56 @@ def correct(operator, rhs, iteration_matrix, grid, partitioning=part.Single, wei
     return Correction(iteration_matrix, grid, operator, rhs, partitioning, weight)
 
 
+class Cycle(base.Expression):
+    def __init__(self, correction: base.Expression, grid: base.Expression, partitioning=part.Single, weight=1.0):
+        self._correction = correction
+        self._grid = grid
+        self._weight = weight
+        self._partitioning = partitioning
+
+    @property
+    def shape(self):
+        return self._grid.shape
+
+    @property
+    def stencil(self):
+        return None
+
+    @property
+    def correction(self):
+        return self._correction
+
+    @property
+    def grid(self):
+        return self._grid
+
+    @property
+    def weight(self):
+        return self._weight
+
+    @property
+    def partitioning(self):
+        return self._partitioning
+
+    def generate_expression(self):
+        return base.Addition(self.grid, base.Scaling(self.weight, self.correction))
+
+    def __repr__(self):
+        return f'Cycle({repr(self.correction)}, {repr(self.grid)}, {repr(self.partitioning)}, {repr(self.weight)}'
+
+    def __str__(self):
+        return str(self.generate_expression())
+
+    def apply(self, transform: callable, *args):
+        correction = transform(self.correction, *args)
+        grid = transform(self.grid, *args)
+        return Cycle(correction, grid, self.partitioning, self.weight)
+
+
+def cycle(grid, correction, partitioning=part.Single, weight=1.0):
+    return Cycle(correction, grid, partitioning, weight)
+
+
 def residual(grid, operator, rhs):
     return base.Subtraction(rhs, base.Multiplication(operator, grid))
 

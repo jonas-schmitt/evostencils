@@ -7,10 +7,9 @@ from deap import gp
 
 
 class Terminals:
-    def __init__(self, operator, grid, rhs, dimension, coarsening_factor, interpolation_stencil=None, restriction_stencil=None):
+    def __init__(self, operator, grid, dimension, coarsening_factor, interpolation_stencil=None, restriction_stencil=None):
         self.operator = operator
         self.grid = grid
-        self.rhs = rhs
         self.dimension = dimension
         self.coarsening_factor = coarsening_factor
         if interpolation_stencil is None:
@@ -74,11 +73,10 @@ class Types:
         self.Partitioning = part.Partitioning
 
 
-def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals):
-
-    types = Types(terminals)
+def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=None):
+    if types is None:
+        types = Types(terminals)
     pset.addTerminal(terminals.operator, types.Operator, 'A')
-    pset.addTerminal(terminals.grid, types.Grid, 'u')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, 'I')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, 'D')
     pset.addTerminal(terminals.lower, types.LowerTriangularOperator, 'L')
@@ -114,15 +112,23 @@ def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals):
     pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
     pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, 'mul')
 
+    pset.addPrimitive(base.minus, [OperatorType], OperatorType, 'minus')
+
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, 'inverse')
 
+    pset.addPrimitive(base.mul, [OperatorType, GridType], GridType, 'mul')
+
+
     # Correction
     import functools
-    correct = functools.partial(mg.correct, terminals.operator, terminals.rhs)
-    pset.addPrimitive(correct, [OperatorType, GridType, part.Partitioning], GridType, 'correct')
+    residual = functools.partial(mg.residual, terminals.grid, terminals.operator)
+    pset.addPrimitive(residual, [GridType], GridType, 'residual')
+    correct = functools.partial(mg.correct, terminals.grid)
+    pset.addPrimitive(correct, [GridType, part.Partitioning], GridType, 'correct')
 
     # Multigrid recipes
+    CoarseGridType = types.CoarseGrid
     CoarseOperatorType = types.CoarseOperator
     InterpolationType = types.Interpolation
     RestrictionType = types.Restriction
@@ -132,7 +138,28 @@ def add_multigrid_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals):
     pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
     pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
 
+    pset.addPrimitive(base.mul, [RestrictionType, GridType], CoarseGridType, 'mul')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], GridType, 'mul')
+    pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
+
     pset.addPrimitive(lambda x: x, [CoarseOperatorType], CoarseOperatorType, 'noop')
     pset.addPrimitive(lambda x: x, [RestrictionType], RestrictionType, 'noop')
     pset.addPrimitive(lambda x: x, [InterpolationType], InterpolationType, 'noop')
     pset.addPrimitive(lambda x: x, [part.Partitioning], part.Partitioning, 'noop')
+
+
+def generate_multigrid(operator, grid, rhs, dimension, coarsening_factor,
+                       interpolation_stencil=None, restriction_stencil=None, maximum_number_of_cycles=1):
+    assert maximum_number_of_cycles >= 1, "The maximum number of cycles must be greater zero"
+    terminals = Terminals(operator, grid, rhs, dimension, coarsening_factor, interpolation_stencil, restriction_stencil)
+    types = Types(terminals)
+    pset = gp.PrimitiveSetTyped("main", [], types.Grid)
+    pset.addTerminal(rhs, types.Grid, 'f')
+    add_multigrid_cycle(pset, terminals, types)
+    for _ in range(1, maximum_number_of_cycles):
+        coarse_grid = base.ZeroGrid(terminals.coarse_grid.size)
+        terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
+                              interpolation_stencil, restriction_stencil)
+        add_multigrid_cycle(pset, terminals)
+
+    return pset

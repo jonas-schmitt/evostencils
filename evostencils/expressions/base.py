@@ -296,7 +296,6 @@ class Scaling(Expression):
         return Scaling(self.factor, transform(self.operand, *args))
 
 
-
 # Wrapper functions
 def inv(operand):
     return Inverse(operand)
@@ -316,6 +315,10 @@ def mul(operand1, operand2):
 
 def scale(factor, operand):
     return Scaling(factor, operand)
+
+
+def minus(operand):
+    return Scaling(-1, operand)
 
 
 def generate_grid(name: str, grid_size: tuple) -> Grid:
