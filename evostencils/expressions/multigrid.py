@@ -39,40 +39,11 @@ class Interpolation(base.Operator):
 
 
 class CoarseGridSolver(base.Operator):
-    def __init__(self, coarse_grid):
-        self._grid = coarse_grid
-        super(CoarseGridSolver, self).__init__(f'S_{coarse_grid.shape[0]}',
-                                               (coarse_grid.shape[0], coarse_grid.shape[0]), None)
-
-    @property
-    def grid(self):
-        return self._grid
-
-    def __repr__(self):
-        return f'CoarseGridSolver({repr(self._grid)})'
-
-
-class Correction(base.Expression):
-    def __init__(self, iteration_matrix: base.Expression, grid: base.Expression, operator: base.Expression,
-                 rhs: base.Expression, partitioning=part.Single, weight=1.0):
-        self._iteration_matrix = iteration_matrix
+    def __init__(self, grid, operator):
         self._grid = grid
         self._operator = operator
-        self._rhs = rhs
-        self._weight = weight
-        self._partitioning = partitioning
-
-    @property
-    def shape(self):
-        return self._grid.shape
-
-    @property
-    def stencil(self):
-        return None
-
-    @property
-    def iteration_matrix(self):
-        return self._iteration_matrix
+        super(CoarseGridSolver, self).__init__(f'S_{grid.shape[0]}',
+                                               (grid.shape[0], grid.shape[0]), None)
 
     @property
     def grid(self):
@@ -82,42 +53,8 @@ class Correction(base.Expression):
     def operator(self):
         return self._operator
 
-    @property
-    def rhs(self):
-        return self._rhs
-
-    @property
-    def weight(self):
-        return self._weight
-
-    @property
-    def partitioning(self):
-        return self._partitioning
-
-    def generate_expression(self):
-        A = self.operator
-        u = self.grid
-        f = self.rhs
-        B = self.iteration_matrix
-        return base.Addition(u, base.Scaling(self.weight, base.Multiplication(B, residual(u, A, f))))
-
     def __repr__(self):
-        return f'Correction({repr(self.iteration_matrix)}, {repr(self.grid)}, {repr(self.operator)}, ' \
-               f'{repr(self.rhs)}, {repr(self.partitioning)}, {repr(self.weight)}'
-
-    def __str__(self):
-        return str(self.generate_expression())
-
-    def apply(self, transform: callable, *args):
-        iteration_matrix = transform(self.iteration_matrix, *args)
-        grid = transform(self.grid, *args)
-        operator = transform(self.operator, *args)
-        rhs = transform(self.rhs, *args)
-        return Correction(iteration_matrix, grid, operator, rhs, self.partitioning, self.weight)
-
-
-def correct(operator, rhs, iteration_matrix, grid, partitioning=part.Single, weight=1.0):
-    return Correction(iteration_matrix, grid, operator, rhs, partitioning, weight)
+        return f'CoarseGridSolver({repr(self._grid)})'
 
 
 class Cycle(base.Expression):

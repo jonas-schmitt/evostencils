@@ -4,10 +4,10 @@ from evostencils.expressions import base
 
 def propagate_zero(expression: base.Expression) -> base.Expression:
     result = expression.apply(propagate_zero)
-    if isinstance(result, multigrid.Correction):
-        if isinstance(result.iteration_matrix, base.ZeroOperator):
+    if isinstance(result, multigrid.Cycle):
+        if isinstance(result.correction, base.ZeroGrid):
             return result.grid
-    if isinstance(result, base.Addition):
+    elif isinstance(result, base.Addition):
         if isinstance(result.operand1, base.ZeroOperator):
             return result.operand2
         elif isinstance(result.operand2, base.ZeroOperator):
@@ -21,7 +21,10 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
         elif isinstance(result.operand2, base.ZeroOperator):
             return result.operand1
     elif isinstance(result, base.Multiplication):
-        if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
+        if isinstance(result.operand1, base.ZeroOperator):
+            if isinstance(result.operand2, base.Grid):
+                return base.ZeroGrid(result.operand2.size)
+        elif isinstance(result.operand2, base.ZeroOperator):
             return base.ZeroOperator(expression.shape)
     elif isinstance(result, base.Scaling):
         if isinstance(result.operand, base.ZeroOperator):
@@ -80,26 +83,28 @@ def substitute_entity(expression: base.Expression, source: base.Entity, destinat
     return result
 
 
-def set_weights(expression: base.Expression, weights: list) -> base.Expression:
-    if isinstance(expression, multigrid.Correction):
+def set_weights(expression: base.Expression, weights: list) -> tuple:
+    if isinstance(expression, multigrid.Cycle):
         if len(weights) == 0:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
-        return multigrid.Correction(expression.iteration_matrix, set_weights(expression.grid, tail),
-                                    expression.operator, expression.rhs, partitioning=expression.partitioning, weight=head)
-    elif isinstance(expression, base.Grid):
-        if len(weights) > 0:
+        grid, tail = set_weights(expression.grid, tail)
+        correction, tail = set_weights(expression.correction, tail)
+        if len(tail) > 0:
             raise RuntimeError("Too many weights have been supplied")
-        return expression
+        return multigrid.Cycle(correction, grid, partitioning=expression.partitioning, weight=head), tail
+    elif isinstance(expression, base.Grid):
+        return expression, weights
     else:
         raise NotImplementedError("Not implemented")
 
 
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
-    if isinstance(expression, multigrid.Correction):
+    if isinstance(expression, multigrid.Cycle):
         weights.append(expression.weight)
         weights.extend(obtain_weights(expression.grid))
+        weights.extend(obtain_weights(expression.correction))
         return weights
     elif isinstance(expression, base.Grid):
         return weights

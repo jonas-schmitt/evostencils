@@ -54,7 +54,7 @@ class Terminals:
         self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.restriction = mg.get_restriction(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.identity = base.Identity(self.operator.shape, self.dimension)
-        self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_grid)
+        self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_grid, self.coarse_operator)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
 
