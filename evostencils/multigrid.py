@@ -52,7 +52,7 @@ class Terminals:
         self.coarse_grid = mg.get_coarse_grid(self.grid, self.coarsening_factor)
         self.coarse_operator = mg.get_coarse_operator(self.operator, self.coarse_grid)
         self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
-        self.restriction = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
+        self.restriction = mg.get_restriction(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.identity = base.Identity(self.operator.shape, self.dimension)
         self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_grid)
         self.no_partitioning = part.Single
@@ -71,66 +71,64 @@ class Types:
         self.Interpolation = matrix_types.generate_matrix_type(terminals.interpolation.shape)
         self.Restriction = matrix_types.generate_matrix_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_matrix_type(terminals.coarse_operator.shape)
-        self.CoarseGrid = matrix_types.generate_matrix_type(terminals.coarse_grid.shape)
+        self.CoarseGrid = grid_types.generate_grid_type(terminals.coarse_grid.size)
         self.Partitioning = part.Partitioning
 
 
-def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=None):
+def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=None):
     if types is None:
         types = Types(terminals)
 
-    pset.addTerminal(base.ZeroGrid(terminals.grid.size), types.Residual, 'r_0')
-    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size), types.CoarseGrid, '0')
-    pset.addTerminal(terminals.operator, types.Operator, 'A')
-    pset.addTerminal(terminals.identity, types.DiagonalOperator, 'I')
-    pset.addTerminal(terminals.diagonal, types.DiagonalOperator, 'D')
-    pset.addTerminal(terminals.lower, types.LowerTriangularOperator, 'L')
-    pset.addTerminal(terminals.upper, types.UpperTriangularOperator, 'U')
-    pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, 'BD')
-    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, 'S')
-    # Note: Omitted zero matrix, because it should not be required
-    pset.addTerminal(terminals.interpolation, types.Interpolation, 'P')
-    pset.addTerminal(terminals.restriction, types.Restriction, 'R')
-    pset.addTerminal(terminals.no_partitioning, types.Partitioning, 'no_partitioning')
-    pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, 'red_black')
+    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size), types.CoarseGrid, f'zero_{level}')
+    pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
+    pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
+    pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
+    pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
+    pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
+    pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
+    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
+    pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
+    pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
+    pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no_{level}')
+    pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'rb_{level}')
 
     OperatorType = types.Operator
     GridType = types.Grid
     DiagonalOperatorType = types.DiagonalOperator
     BlockDiagonalOperatorType = types.BlockDiagonalOperator
 
-    pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'add')
-    pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-    pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-    pset.addPrimitive(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'add')
-    pset.addPrimitive(base.add, [OperatorType, OperatorType], OperatorType, 'add')
+    pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'add_{level}')
+    pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    pset.addPrimitive(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    pset.addPrimitive(base.add, [OperatorType, OperatorType], OperatorType, f'add_{level}')
 
-    pset.addPrimitive(base.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'sub')
-    pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-    pset.addPrimitive(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-    pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'sub')
-    pset.addPrimitive(base.sub, [OperatorType, OperatorType], OperatorType, 'sub')
+    pset.addPrimitive(base.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [OperatorType, OperatorType], OperatorType, f'sub_{level}')
 
-    pset.addPrimitive(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, 'mul')
-    pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-    pset.addPrimitive(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-    pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, 'mul')
-    pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, 'mul')
+    pset.addPrimitive(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, f'mul_{level}')
 
-    pset.addPrimitive(base.minus, [OperatorType], OperatorType, 'minus')
+    pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
-    pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, 'inverse')
-    pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, 'inverse')
+    pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
+    pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
-    pset.addPrimitive(base.mul, [OperatorType, types.Residual], types.Residual, 'mul')
+    pset.addPrimitive(base.mul, [OperatorType, types.Residual], types.Residual, f'mul_{level}')
 
 
     # Correction
     import functools
     residual = functools.partial(mg.residual, terminals.grid, terminals.operator)
-    pset.addPrimitive(residual, [GridType], types.Residual, 'residual')
+    pset.addPrimitive(residual, [GridType], types.Residual, f'residual_{level}')
     cycle = functools.partial(mg.cycle, terminals.grid)
-    pset.addPrimitive(cycle, [types.Residual, part.Partitioning], GridType, 'cycle')
+    pset.addPrimitive(cycle, [types.Residual, part.Partitioning], GridType, f'cycle_{level}')
 
     # Multigrid recipes
     CoarseGridType = types.CoarseGrid
@@ -139,18 +137,19 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types=None):
     RestrictionType = types.Restriction
 
     # Create intergrid operators
-    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, 'mul')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, 'mul')
-    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, 'mul')
+    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
 
-    pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, 'mul')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, 'mul')
-    pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, 'mul')
+    pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, f'mul_{level}')
+    pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, f'mul_{level}')
 
-    pset.addPrimitive(lambda x: x, [CoarseOperatorType], CoarseOperatorType, 'noop1')
-    pset.addPrimitive(lambda x: x, [RestrictionType], RestrictionType, 'noop2')
-    pset.addPrimitive(lambda x: x, [InterpolationType], InterpolationType, 'noop3')
-    pset.addPrimitive(lambda x: x, [part.Partitioning], part.Partitioning, 'noop4')
+    def noop(x):
+        return x
+
+    pset.addPrimitive(noop, [CoarseOperatorType], CoarseOperatorType, f'noop_{level}')
+    pset.addPrimitive(noop, [part.Partitioning], part.Partitioning, f'noop_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
@@ -160,11 +159,11 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     types = Types(terminals)
     pset = gp.PrimitiveSetTyped("main", [], types.Grid)
     pset.addTerminal(rhs, types.Grid, 'f')
-    add_cycle(pset, terminals, types)
-    for _ in range(1, maximum_number_of_cycles):
+    add_cycle(pset, terminals, 0, types)
+    for i in range(1, maximum_number_of_cycles):
         coarse_grid = base.ZeroGrid(terminals.coarse_grid.size)
         terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
-        add_cycle(pset, terminals)
+        add_cycle(pset, terminals, i)
 
     return pset

@@ -10,7 +10,7 @@ class GridTypeMetaClass(type):
             return False
 
     def __subclasscheck__(self, other):
-        if hasattr(other, 'size') and hasattr(other, 'residual'):
+        if hasattr(other, 'size') and hasattr(other, 'is_residual'):
             is_subclass = True
             if self.size != other.size:
                 return False
@@ -21,13 +21,13 @@ class GridTypeMetaClass(type):
             return False
 
     def __hash__(self):
-        return hash((self.size, self.is_residual))
+        return hash((*self.size, self.is_residual))
 
 
 def generate_grid_type(size):
-    return GridTypeMetaClass("MatrixType", (), {"size": size, "is_residual": False})
+    return GridTypeMetaClass("GridType", (), {"size": size, "is_residual": False})
 
 
 def generate_residual_type(size):
-    return GridTypeMetaClass("MatrixType", (), {"size": size, "is_residual": True})
+    return GridTypeMetaClass("GridType", (), {"size": size, "is_residual": True})
 
