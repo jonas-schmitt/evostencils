@@ -127,6 +127,8 @@ def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
 
 
 def get_coarse_operator(operator, coarse_grid, stencil=None):
+    if stencil is None:
+        stencil = operator.generate_stencil()
     return base.Operator(f'{operator.name}_{coarse_grid.shape[0]}',
                          (coarse_grid.shape[0], coarse_grid.shape[0]), stencil)
 

@@ -137,9 +137,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     RestrictionType = types.Restriction
 
     # Create intergrid operators
-    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
 
     pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, f'mul_{level}')
     pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, f'mul_{level}')
