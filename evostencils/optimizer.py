@@ -103,11 +103,12 @@ class Optimizer:
         return gp.compile(expression, self._primitive_set)
 
     @staticmethod
-    def get_iteration_matrix(expression, grid, rhs):
+    def get_iteration_matrix(expression, grid: base.Grid, rhs: base.Grid):
         from evostencils.expressions.transformations import propagate_zero, substitute_entity
-        tmp = substitute_entity(expression, rhs, base.ZeroOperator(rhs.shape))
-        tmp = propagate_zero(tmp)
-        return substitute_entity(tmp, grid, base.Identity(grid.shape, grid.dimension))
+        sources = [grid, rhs]
+        destinations = [base.Identity((grid.shape[0], grid.shape[0]), grid.dimension), base.ZeroOperator((rhs.shape[0], rhs.shape[0]))]
+        tmp = substitute_entity(expression, sources, destinations)
+        return propagate_zero(tmp)
 
     def evaluate(self, individual):
         import math

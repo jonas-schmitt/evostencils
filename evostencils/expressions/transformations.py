@@ -73,13 +73,12 @@ def remove_identity_operations(expression: base.Expression) -> base.Expression:
     return result
 
 
-def substitute_entity(expression: base.Expression, source: base.Entity, destination: base.Entity) -> base.Expression:
-    result = expression.apply(substitute_entity, source, destination)
+def substitute_entity(expression: base.Expression, sources: list, destinations: list) -> base.Expression:
+    result = expression.apply(substitute_entity, sources, destinations)
     if isinstance(result, base.Entity):
-        if result.name == source.name:
-            return destination
-        else:
-            return expression
+        for source, destination in zip(sources, destinations):
+            if result.name == source.name:
+                return destination
     return result
 
 

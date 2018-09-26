@@ -20,9 +20,10 @@ def stencil_to_lfa(stencil: periodic.Stencil, grid):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, grid, coarsening_factor, interpolation, restriction):
+    def __init__(self, grid, coarsening_factor, dimension, interpolation, restriction):
         self._grid = grid
         self._coarsening_factor = coarsening_factor
+        self._dimension = dimension
         self._interpolation = interpolation
         self._restriction = restriction
 
@@ -35,6 +36,10 @@ class ConvergenceEvaluator:
         return self._coarsening_factor
 
     @property
+    def dimension(self):
+        return self._dimension
+
+    @property
     def interpolation(self):
         return self._interpolation
 
@@ -44,7 +49,7 @@ class ConvergenceEvaluator:
 
     def transform(self, expression: base.Expression, grid):
         if isinstance(expression, multigrid.Cycle):
-            identity = base.Identity((expression.grid.size, expression.grid.size), expression.grid.dimension)
+            identity = base.Identity((expression.grid.shape[0], expression.grid.shape[0]), self.dimension)
             tmp = base.Addition(identity, base.Scaling(expression.weight, expression.correction))
             stencil = tmp.generate_stencil()
             partition_stencils = expression.partitioning.generate(stencil)
@@ -81,18 +86,18 @@ class ConvergenceEvaluator:
         elif isinstance(expression, base.Scaling):
             return expression.factor * self.transform(expression.operand, grid)
         elif isinstance(expression, base.Inverse):
-            return self.transform(expression.operand).inverse()
+            return self.transform(expression.operand, grid).inverse()
         elif isinstance(expression, base.Transpose):
-            return self.transform(expression.operand).transpose()
+            return self.transform(expression.operand, grid).transpose()
         elif isinstance(expression, base.Diagonal):
-            return self.transform(expression.operand).diag()
+            return self.transform(expression.operand, grid).diag()
         elif isinstance(expression, base.BlockDiagonal):
             stencil = expression.generate_stencil()
             return stencil_to_lfa(stencil, grid)
         elif isinstance(expression, base.LowerTriangle):
-            return self.transform(expression.operand).lower()
+            return self.transform(expression.operand, grid).lower()
         elif isinstance(expression, base.UpperTriangle):
-            return self.transform(expression.operand).upper()
+            return self.transform(expression.operand, grid).upper()
         elif isinstance(expression, base.Identity):
             return lfa_lab.identity(grid)
         elif isinstance(expression, base.ZeroOperator):
@@ -105,13 +110,10 @@ class ConvergenceEvaluator:
             return self.interpolation(grid, coarse_grid)
         elif type(expression) == multigrid.CoarseGridSolver and isinstance(expression, multigrid.CoarseGridSolver):
             stencil = expression.operator.generate_stencil()
-            tmp = stencil_to_lfa(stencil, grid)
-            op = lfa_lab.from_periodic_stencil(tmp, grid)
-            return op.inverse()
+            return stencil_to_lfa(stencil, grid).inverse()
         elif isinstance(expression, base.Operator):
             stencil = expression.generate_stencil()
-            tmp = stencil_to_lfa(stencil, grid)
-            return lfa_lab.from_periodic_stencil(tmp, grid)
+            return stencil_to_lfa(stencil, grid)
         raise NotImplementedError("Not implemented")
 
     def compute_spectral_radius(self, expression: base.Expression):
