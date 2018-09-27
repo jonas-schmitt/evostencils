@@ -134,17 +134,13 @@ def mul(stencil1, stencil2):
     return Stencil(new_entries)
 
 
-def get_unit_stencil(dimension=None) -> Stencil:
-    if dimension is None:
-        return None
-    else:
-        offsets = []
-        for i in range(dimension):
-            offsets.append(0)
-        entries = ((tuple(offsets), 1.0),)
-        #entries = ((0 for i in range(dimension)), 1.0)
-        return Stencil(entries)
+def get_unit_stencil(grid) -> Stencil:
+    offsets = []
+    for i in range(grid.dimension):
+        offsets.append(0)
+    entries = ((tuple(offsets), 1.0),)
+    return Stencil(entries)
 
 
-def get_null_stencil() -> Stencil:
+def get_null_stencil(_) -> Stencil:
     return Stencil(entries=())

@@ -35,7 +35,7 @@ restriction_stencil_entries = [
 
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
-A = base.generate_operator('A', fine_grid_size, constant.Stencil(operator_stencil_entries))
+A = base.generate_operator_on_grid('A', fine_grid_size, constant.Stencil(operator_stencil_entries))
 bytes_per_word = 8
 peak_performance = 4 * 16 * 3.3 * 1e9
 peak_bandwidth = 34.1 * 1e9

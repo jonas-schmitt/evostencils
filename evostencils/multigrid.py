@@ -54,7 +54,7 @@ class Terminals:
         self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.restriction = mg.get_restriction(self.grid, self.coarse_grid, self.interpolation_stencil)
         self.identity = base.Identity(self.operator.shape, self.dimension)
-        self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_grid, self.coarse_operator)
+        self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_operator)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
 
@@ -79,7 +79,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     if types is None:
         types = Types(terminals)
 
-    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size), types.CoarseGrid, f'zero_{level}')
+    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size,,, types.CoarseGrid, f'zero_{level}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
@@ -161,7 +161,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(rhs, types.Grid, 'f')
     add_cycle(pset, terminals, 0, types)
     for i in range(1, maximum_number_of_cycles):
-        coarse_grid = base.ZeroGrid(terminals.coarse_grid.size)
+        coarse_grid = base.ZeroGrid(terminals.coarse_grid.size,,
         terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
         add_cycle(pset, terminals, i)

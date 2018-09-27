@@ -3,7 +3,7 @@ from evostencils.expressions import base
 
 grid_size = (2,)
 
-A = base.generate_operator('A', grid_size)
+A = base.generate_operator_on_grid('A', grid_size)
 
 MatrixType1 = generate_diagonal_matrix_type(A.shape)
 MatrixType2 = generate_lower_triangular_matrix_type(A.shape)

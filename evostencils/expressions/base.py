@@ -69,41 +69,41 @@ class BinaryExpression(Expression):
 
 # Entities
 class Operator(Entity):
-    def __init__(self, name, shape, stencil=None):
+    def __init__(self, name, shape, grid, stencil_generator):
         self._name = name
         self._shape = shape
-        self._stencil = stencil
+        self._grid = grid
+        self._stencil_generator = stencil_generator
+
+    @property
+    def grid(self):
+        return self._grid
 
     def generate_stencil(self):
-        return self._stencil
+        return self._stencil_generator(self._grid)
 
     def __repr__(self):
-        return f'Operator({repr(self.name)}, {repr(self.shape)}, {repr(self.generate_stencil())})'
+        return f'Operator({repr(self.name)}, {repr(self.shape)}, {repr(self.shape)}, {repr(self._stencil_generator)})'
 
 
 class Identity(Operator):
-    def __init__(self, shape, dimension):
-        self._dimension = dimension
-        super(Identity, self).__init__('I', shape, constant.get_unit_stencil(dimension))
-
-    @property
-    def dimension(self):
-        return self._dimension
+    def __init__(self, shape, grid):
+        super(Identity, self).__init__('I', shape, grid, constant.get_unit_stencil)
 
     def __repr__(self):
-        return f'Identity({repr(self.shape)}, {repr(self.dimension)})'
+        return f'Identity({repr(self.shape)}, {repr(self.grid)})'
 
 
 class ZeroOperator(Operator):
-    def __init__(self, shape):
-        super(ZeroOperator, self).__init__('0', shape, constant.get_null_stencil())
+    def __init__(self, shape, grid):
+        super(ZeroOperator, self).__init__('0', shape, grid, constant.get_null_stencil)
 
     def __repr__(self):
-        return f'Zero({repr(self.shape)})'
+        return f'Zero({repr(self.shape)}, {repr(self.grid)})'
 
 
 class Grid(Entity):
-    def __init__(self, name, size):
+    def __init__(self, name, size, step_size):
         import operator
         self._name = name
         self._size = size
@@ -126,8 +126,8 @@ class Grid(Entity):
 
 
 class ZeroGrid(Grid):
-    def __init__(self, size):
-        super(ZeroGrid, self).__init__('0', size)
+    def __init__(self, size, step_size):
+        super(ZeroGrid, self).__init__('0', size, step_size)
 
 
 # Unary Expressions
@@ -322,12 +322,11 @@ def minus(operand):
 
 
 def generate_grid(name: str, grid_size: tuple) -> Grid:
-    return Grid(name, grid_size)
+    return Grid(name, grid_size, )
 
 
-def generate_operator(name: str, grid_size: tuple, stencil=None) -> Operator:
-    n = reduce(builtin_mul, grid_size, 1)
-    return Operator(name, (n, n), stencil)
+def generate_operator_on_grid(name: str, grid: Grid, stencil_generator: callable) -> Operator:
+    return Operator(name, (grid.shape[0], grid.shape[0]), stencil_generator)
 
 
 def is_quadratic(expression: Expression) -> bool:

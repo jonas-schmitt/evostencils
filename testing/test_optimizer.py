@@ -20,7 +20,7 @@ def main():
     ]
     x = base.generate_grid('x', fine_grid_size)
     b = base.generate_grid('b', fine_grid_size)
-    A = base.generate_operator('A', fine_grid_size, Stencil(operator_stencil_entries))
+    A = base.generate_operator_on_grid('A', fine_grid_size, Stencil(operator_stencil_entries))
 
     coarsening_factor = (2, 2)
     fine = lfa.Grid(dimension, [1.0, 1.0])

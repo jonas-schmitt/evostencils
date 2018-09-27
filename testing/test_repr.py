@@ -3,8 +3,8 @@ from evostencils.expressions.multigrid import *
 from evostencils.expressions import transformations
 
 A = Operator('A', (1,1))
-f = Grid('f', (1,))
-u = Grid('u', (1,))
+f = Grid('f', (1,), )
+u = Grid('u', (1,), )
 I = Identity((1, 1), 1)
 correct = Correction(I, u, A, f)
 str = repr(correct)

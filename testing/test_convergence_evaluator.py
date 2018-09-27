@@ -21,7 +21,7 @@ fine_grid_size = (64, 64)
 
 u = base.generate_grid('x', fine_grid_size)
 b = base.generate_grid('b', fine_grid_size)
-A = base.generate_operator('A', fine_grid_size, constant.Stencil(entries))
+A = base.generate_operator_on_grid('A', fine_grid_size, constant.Stencil(entries))
 
 # Create a poisson operator.
 fine_operator = lfa.gallery.poisson_2d(grid)
@@ -60,7 +60,7 @@ iteration_matrix = Optimizer.get_iteration_matrix(rb_jacobi, u, b)
 # Two-Grid
 tmp = multigrid.residual(u, A, b)
 tmp = base.mul(multigrid.Restriction(u, u_coarse), tmp)
-tmp = base.mul(multigrid.CoarseGridSolver(u_coarse, A_coarse), tmp)
+tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, tmp)
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
