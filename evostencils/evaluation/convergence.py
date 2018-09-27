@@ -131,11 +131,11 @@ class ConvergenceEvaluator:
         raise NotImplementedError("Not implemented")
 
     def compute_spectral_radius(self, expression: base.Expression):
-        try:
+        #try:
             smoother = self.transform(expression, self.grid)
             symbol = smoother.symbol()
             return symbol.spectral_radius()
-        except RuntimeError as _:
-            return 0.0
+        #except RuntimeError as _:
+        #    return 0.0
 
 

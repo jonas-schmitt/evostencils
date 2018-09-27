@@ -78,6 +78,10 @@ class Cycle(base.Expression):
     def partitioning(self):
         return self._partitioning
 
+    @staticmethod
+    def generate_stencil():
+        return None
+
     def generate_expression(self):
         return base.Addition(self.iterate, base.Scaling(self.weight, self.correction))
 

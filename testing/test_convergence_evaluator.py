@@ -30,7 +30,7 @@ evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, len(coarsening_fac
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
-jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.Single, weight=0.8)
+jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.Single, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(jacobi, u, b)
 #print(iteration_matrix)
 #print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
@@ -46,25 +46,33 @@ iteration_matrix = Optimizer.get_iteration_matrix(block_jacobi, u, b)
 # Red-Black-Block-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
-rb_jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.RedBlack, weight=0.8)
+rb_jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.RedBlack, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(rb_jacobi, u, b)
 #print(iteration_matrix)
-print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
+#print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
 
 # Two-Grid
 tmp = multigrid.residual(u, A, b)
 tmp = base.mul(multigrid.Restriction(u, u_coarse), tmp)
-tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
+zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
+tmp = multigrid.residual(zero, A_coarse, tmp)
+u_coarse_coarse = multigrid.get_coarse_grid(u_coarse, coarsening_factor)
+A_coarse_coarse = multigrid.get_coarse_operator(A_coarse, u_coarse_coarse)
+tmp = base.mul(multigrid.Restriction(u_coarse, u_coarse_coarse), tmp)
+tmp = base.mul(multigrid.CoarseGridSolver(A_coarse_coarse), tmp)
+tmp = base.mul(multigrid.Interpolation(u_coarse, u_coarse_coarse), tmp)
+tmp = multigrid.cycle(u_coarse, zero, tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
-tmp = multigrid.cycle(u, jacobi, tmp)
+tmp = multigrid.cycle(u, u, tmp)
+
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
 #print(iteration_matrix)
-#print(evaluator.compute_spectral_radius(iteration_matrix))
+print(evaluator.compute_spectral_radius(iteration_matrix))
 
 L = lfa.gallery.poisson_2d(lfa_grid)
 Lc = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
-S = lfa.jacobi(L, 0.8)
-RB = lfa.rb_jacobi(L, 0.8)
+S = lfa.jacobi(L, 1)
+RB = lfa.rb_jacobi(L, 1)
 
 # Create restriction and interpolation operators.
 restriction = lfa.gallery.fw_restriction(lfa_grid, lfa_grid.coarse(coarsening_factor))
@@ -78,6 +86,6 @@ cgc = lfa.coarse_grid_correction(
         restriction = restriction)
 
 # Apply one pre- and one post-smoothing step.
-E = RB
+E = cgc
 
 print(E.symbol().spectral_radius())

@@ -25,7 +25,7 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
             if isinstance(result.operand2, base.Grid):
                 return base.ZeroGrid(result.operand2.size, result.operand2.step_size)
         elif isinstance(result.operand2, base.ZeroOperator):
-            return base.ZeroOperator(expression.shape)
+            return base.ZeroOperator(expression.shape, result.operand2.grid)
     elif isinstance(result, base.Scaling):
         if isinstance(result.operand, base.ZeroOperator):
             return result.operand
@@ -73,12 +73,13 @@ def remove_identity_operations(expression: base.Expression) -> base.Expression:
     return result
 
 
-def substitute_entity(expression: base.Expression, sources: list, destinations: list) -> base.Expression:
-    result = expression.apply(substitute_entity, sources, destinations)
+def substitute_entity(expression: base.Expression, sources: list, destinations: list, f: lambda x: x) -> base.Expression:
+    result = expression.apply(substitute_entity, sources, destinations, f)
     if isinstance(result, base.Entity):
         for source, destination in zip(sources, destinations):
             if result.name == source.name:
                 return destination
+        return f(result)
     return result
 
 

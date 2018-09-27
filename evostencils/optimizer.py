@@ -106,8 +106,16 @@ class Optimizer:
     def get_iteration_matrix(expression, grid: base.Grid, rhs: base.Grid):
         from evostencils.expressions.transformations import propagate_zero, substitute_entity
         sources = [grid, rhs]
-        destinations = [base.Identity((grid.shape[0], grid.shape[0]), grid), base.ZeroOperator((rhs.shape[0], rhs.shape[0]), rhs)]
-        tmp = substitute_entity(expression, sources, destinations)
+        from evostencils.expressions import multigrid as mg
+        coarse = [mg.get_coarse_grid(grid, (2,2)), mg.get_coarse_grid(rhs, (2,2))]
+        destinations = [base.Identity((grid.shape[0], coarse[0].shape[0]), grid), base.ZeroOperator((rhs.shape[0], coarse[1].shape[0]), rhs)]
+
+        def transform_zero_grid(x):
+            if isinstance(x, base.ZeroGrid):
+                return base.ZeroOperator((x.shape[0], x.shape[0]), x)
+            else:
+                return x
+        tmp = substitute_entity(expression, sources, destinations, transform_zero_grid)
         return propagate_zero(tmp)
 
     def evaluate(self, individual):
