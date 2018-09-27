@@ -97,7 +97,7 @@ class Identity(Operator):
         super(Identity, self).__init__('I', shape, grid, constant.get_unit_stencil)
 
     def __repr__(self):
-        return f'Identity({repr(self.shape)}, {repr(self.grid)})'
+        return f'Identity({repr(self.shape)}, {repr(self.iterate)})'
 
 
 class ZeroOperator(Operator):
@@ -105,7 +105,7 @@ class ZeroOperator(Operator):
         super(ZeroOperator, self).__init__('0', shape, grid, constant.get_null_stencil)
 
     def __repr__(self):
-        return f'Zero({repr(self.shape)}, {repr(self.grid)})'
+        return f'Zero({repr(self.shape)}, {repr(self.iterate)})'
 
 
 class Grid(Entity):

@@ -47,23 +47,28 @@ class CoarseGridSolver(base.Entity):
 
 
 class Cycle(base.Expression):
-    def __init__(self, grid: base.Expression, correction: base.Expression, partitioning=part.Single, weight=1.0):
-        self._correction = correction
+    def __init__(self, grid: base.Grid, iterate: base.Expression, correction: base.Expression, partitioning=part.Single, weight=1.0):
         self._grid = grid
+        self._iterate = iterate
+        self._correction = correction
         self._weight = weight
         self._partitioning = partitioning
 
     @property
     def shape(self):
-        return self._grid.shape
-
-    @property
-    def correction(self):
-        return self._correction
+        return self._iterate.shape
 
     @property
     def grid(self):
         return self._grid
+
+    @property
+    def iterate(self):
+        return self._iterate
+
+    @property
+    def correction(self):
+        return self._correction
 
     @property
     def weight(self):
@@ -74,22 +79,22 @@ class Cycle(base.Expression):
         return self._partitioning
 
     def generate_expression(self):
-        return base.Addition(self.grid, base.Scaling(self.weight, self.correction))
+        return base.Addition(self.iterate, base.Scaling(self.weight, self.correction))
 
     def __repr__(self):
-        return f'Cycle({repr(self.correction)}, {repr(self.grid)}, {repr(self.partitioning)}, {repr(self.weight)}'
+        return f'Cycle({repr(self.correction)}, {repr(self.iterate)}, {repr(self.partitioning)}, {repr(self.weight)}'
 
     def __str__(self):
         return str(self.generate_expression())
 
     def apply(self, transform: callable, *args):
         correction = transform(self.correction, *args)
-        grid = transform(self.grid, *args)
-        return Cycle(correction, grid, self.partitioning, self.weight)
+        iterate = transform(self.iterate, *args)
+        return Cycle(self.grid, iterate, correction, self.partitioning, self.weight)
 
 
-def cycle(grid, correction, partitioning=part.Single, weight=1.0):
-    return Cycle(grid, correction, partitioning, weight)
+def cycle(grid, iterate, correction, partitioning=part.Single, weight=1.0):
+    return Cycle(grid, iterate, correction, partitioning, weight)
 
 
 def residual(grid, operator, rhs):

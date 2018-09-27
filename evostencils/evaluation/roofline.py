@@ -86,7 +86,7 @@ class RooflineEvaluator:
         return 1
 
     def _estimate_operations_per_word_for_correction(self, correction: multigrid.Correction) -> list:
-        problem_size = correction.grid.shape[0]
+        problem_size = correction.iterate.shape[0]
         iteration_matrix = correction.iteration_matrix
         evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
         operator_stencil = correction.operator.generate_stencil()

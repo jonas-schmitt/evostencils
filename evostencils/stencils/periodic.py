@@ -200,7 +200,7 @@ def block_diagonal(stencil, block_size):
     return indexed_combine(stencil, empty_stencil, f)
 
 
-def red_black_partitioning(stencil):
+def red_black_partitioning(stencil, grid):
     if stencil is None:
         return None
     tmp = determine_maximal_shape(stencil)
@@ -209,15 +209,15 @@ def red_black_partitioning(stencil):
 
     def red(_, index):
         if sum(tuple(i // j for i, j in zip(index, tmp))) % 2 == 0:
-            return constant.get_unit_stencil(stencil.dimension)
+            return constant.get_unit_stencil(grid)
         else:
-            return constant.get_null_stencil()
+            return constant.get_null_stencil(grid)
 
     def black(_, index):
         if sum(tuple(i // j for i, j in zip(index, tmp))) % 2 == 0:
-            return constant.get_null_stencil()
+            return constant.get_null_stencil(grid)
         else:
-            return constant.get_unit_stencil(stencil.dimension)
+            return constant.get_unit_stencil(grid)
     red_filter = indexed_map_stencil(empty_stencil, red)
     black_filter = indexed_map_stencil(empty_stencil, black)
     return red_filter, black_filter

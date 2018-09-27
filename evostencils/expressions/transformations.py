@@ -6,7 +6,7 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
     result = expression.apply(propagate_zero)
     if isinstance(result, multigrid.Cycle):
         if isinstance(result.correction, base.ZeroGrid):
-            return result.grid
+            return result.iterate
     elif isinstance(result, base.Addition):
         if isinstance(result.operand1, base.ZeroOperator):
             return result.operand2
@@ -87,11 +87,11 @@ def set_weights(expression: base.Expression, weights: list) -> tuple:
         if len(weights) == 0:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
-        grid, tail = set_weights(expression.grid, tail)
+        iterate, tail = set_weights(expression.iterate, tail)
         correction, tail = set_weights(expression.correction, tail)
         if len(tail) > 0:
             raise RuntimeError("Too many weights have been supplied")
-        return multigrid.Cycle(correction, grid, partitioning=expression.partitioning, weight=head), tail
+        return multigrid.Cycle(expression.grid, iterate, correction, partitioning=expression.partitioning, weight=head), tail
     elif isinstance(expression, base.Grid):
         return expression, weights
     else:
@@ -102,7 +102,7 @@ def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, multigrid.Cycle):
         weights.append(expression.weight)
-        weights.extend(obtain_weights(expression.grid))
+        weights.extend(obtain_weights(expression.iterate))
         weights.extend(obtain_weights(expression.correction))
         return weights
     elif isinstance(expression, base.Grid):

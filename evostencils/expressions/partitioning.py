@@ -12,18 +12,18 @@ class Partitioning(abc.ABC):
 
 class Single:
     @staticmethod
-    def generate(stencil):
+    def generate(stencil, grid):
         if stencil is None:
             return [None]
         else:
-            return [constant.get_unit_stencil(stencil.dimension)]
+            return [constant.get_unit_stencil(grid)]
 
 
 class RedBlack:
     @staticmethod
-    def generate(stencil):
+    def generate(stencil, grid):
         if stencil is None:
             return [None]
         else:
-            return periodic.red_black_partitioning(stencil)
+            return periodic.red_black_partitioning(stencil, grid)
 
