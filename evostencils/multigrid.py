@@ -1,49 +1,20 @@
 from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
 from evostencils.expressions import partitioning as part
-from evostencils.stencils import constant
 from evostencils.types import matrix as matrix_types
 from evostencils.types import grid as grid_types
 from deap import gp
 
 
 class Terminals:
-    def __init__(self, operator, grid, dimension, coarsening_factor, interpolation_stencil=None, restriction_stencil=None):
+    def __init__(self, operator, grid, dimension, coarsening_factor, interpolation_stencil_generator, restriction_stencil_generator):
         self.operator = operator
         self.grid = grid
         self.dimension = dimension
         self.coarsening_factor = coarsening_factor
-        if interpolation_stencil is None:
-            interpolation_stencil_entries = [
-                ((-1, -1), 1.0/4),
-                (( 0, -1), 1.0/2),
-                (( 1, -1), 1.0/4),
-                ((-1,  0), 1.0/2),
-                (( 0,  0), 1.0),
-                (( 1,  0), 1.0/2),
-                ((-1,  1), 1.0/4),
-                (( 0,  1), 1.0/2),
-                (( 1,  1), 1.0/4),
-            ]
-            self.interpolation_stencil = constant.Stencil(interpolation_stencil_entries)
-        else:
-            self.interpolation_stencil = interpolation_stencil
 
-        if restriction_stencil is None:
-            restriction_stencil_entries = [
-                ((-1, -1), 1.0/16),
-                (( 0, -1), 1.0/8),
-                (( 1, -1), 1.0/16),
-                ((-1,  0), 1.0/8),
-                (( 0,  0), 1.0/4),
-                (( 1,  0), 1.0/8),
-                ((-1,  1), 1.0/16),
-                (( 0,  1), 1.0/8),
-                (( 1,  1), 1.0/16),
-            ]
-            self.restriction_stencil = constant.Stencil(restriction_stencil_entries)
-        else:
-            self.restriction_stencil = restriction_stencil
+        self.interpolation_stencil_generator = interpolation_stencil_generator
+        self.restriction_stencil_generator = restriction_stencil_generator
 
         self.diagonal = base.Diagonal(operator)
         self.block_diagonal = base.BlockDiagonal(operator, tuple(2 for _ in range(self.dimension)))
@@ -51,9 +22,9 @@ class Terminals:
         self.upper = base.UpperTriangle(operator)
         self.coarse_grid = mg.get_coarse_grid(self.grid, self.coarsening_factor)
         self.coarse_operator = mg.get_coarse_operator(self.operator, self.coarse_grid)
-        self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil)
-        self.restriction = mg.get_restriction(self.grid, self.coarse_grid, self.interpolation_stencil)
-        self.identity = base.Identity(self.operator.shape, self.dimension)
+        self.interpolation = mg.get_interpolation(self.grid, self.coarse_grid, self.interpolation_stencil_generator)
+        self.restriction = mg.get_restriction(self.grid, self.coarse_grid, self.restriction_stencil_generator)
+        self.identity = base.Identity(self.operator.shape, self.grid)
         self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_operator)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
@@ -79,7 +50,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     if types is None:
         types = Types(terminals)
 
-    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size,,, types.CoarseGrid, f'zero_{level}')
+    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), types.CoarseGrid, f'zero_{level}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
@@ -161,7 +132,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(rhs, types.Grid, 'f')
     add_cycle(pset, terminals, 0, types)
     for i in range(1, maximum_number_of_cycles):
-        coarse_grid = base.ZeroGrid(terminals.coarse_grid.size,,
+        coarse_grid = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
         terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
         add_cycle(pset, terminals, i)

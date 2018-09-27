@@ -79,7 +79,13 @@ class Operator(Entity):
     def grid(self):
         return self._grid
 
+    @property
+    def stencil_generator(self):
+        return self._stencil_generator
+
     def generate_stencil(self):
+        if self._stencil_generator is None:
+            return None
         return self._stencil_generator(self._grid)
 
     def __repr__(self):
@@ -104,14 +110,20 @@ class ZeroOperator(Operator):
 
 class Grid(Entity):
     def __init__(self, name, size, step_size):
+        assert len(size) == len(step_size), "Dimensions of the size and step size must match"
         import operator
         self._name = name
         self._size = size
+        self._step_size = step_size
         self._shape = (reduce(operator.mul, size), 1)
 
     @property
     def size(self):
         return self._size
+
+    @property
+    def step_size(self):
+        return self._step_size
 
     @property
     def dimension(self):
@@ -122,7 +134,7 @@ class Grid(Entity):
         return None
 
     def __repr__(self):
-        return f'Grid({repr(self.name)}, {repr(self.size)})'
+        return f'Grid({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
 
 
 class ZeroGrid(Grid):
@@ -321,12 +333,12 @@ def minus(operand):
     return Scaling(-1, operand)
 
 
-def generate_grid(name: str, grid_size: tuple) -> Grid:
-    return Grid(name, grid_size, )
+def generate_grid(name: str, grid_size: tuple, step_size: tuple) -> Grid:
+    return Grid(name, grid_size, step_size)
 
 
 def generate_operator_on_grid(name: str, grid: Grid, stencil_generator: callable) -> Operator:
-    return Operator(name, (grid.shape[0], grid.shape[0]), stencil_generator)
+    return Operator(name, (grid.shape[0], grid.shape[0]), grid, stencil_generator)
 
 
 def is_quadratic(expression: Expression) -> bool:

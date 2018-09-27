@@ -106,7 +106,7 @@ class Optimizer:
     def get_iteration_matrix(expression, grid: base.Grid, rhs: base.Grid):
         from evostencils.expressions.transformations import propagate_zero, substitute_entity
         sources = [grid, rhs]
-        destinations = [base.Identity((grid.shape[0], grid.shape[0]), grid.dimension), base.ZeroOperator((rhs.shape[0], rhs.shape[0]))]
+        destinations = [base.Identity((grid.shape[0], grid.shape[0]), grid), base.ZeroOperator((rhs.shape[0], rhs.shape[0]), rhs)]
         tmp = substitute_entity(expression, sources, destinations)
         return propagate_zero(tmp)
 

@@ -63,7 +63,7 @@ class ConvergenceEvaluator:
 
     def transform(self, expression: base.Expression, level):
         if isinstance(expression, multigrid.Cycle):
-            identity = base.Identity((expression.grid.shape[0], expression.grid.shape[0]), self.dimension)
+            identity = base.Identity(expression.grid.shape, expression.grid.grid)
             tmp = base.Addition(identity, base.Scaling(expression.weight, expression.correction))
             stencil = tmp.generate_stencil()
             partition_stencils = expression.partitioning.generate(stencil)

@@ -23,7 +23,7 @@ def propagate_zero(expression: base.Expression) -> base.Expression:
     elif isinstance(result, base.Multiplication):
         if isinstance(result.operand1, base.ZeroOperator):
             if isinstance(result.operand2, base.Grid):
-                return base.ZeroGrid(result.operand2.size,,
+                return base.ZeroGrid(result.operand2.size, result.operand2.step_size)
         elif isinstance(result.operand2, base.ZeroOperator):
             return base.ZeroOperator(expression.shape)
     elif isinstance(result, base.Scaling):
