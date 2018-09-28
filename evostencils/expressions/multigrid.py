@@ -3,9 +3,14 @@ from evostencils.expressions import partitioning as part
 
 
 class Restriction(base.Operator):
-    def __init__(self, grid, coarse_grid, stencil_generator=None):
+    def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
+        self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super(Restriction, self).__init__(f'R_{grid.shape[0]}', (coarse_grid.shape[0], grid.shape[0]), grid, stencil_generator)
+        super(Restriction, self).__init__(f'R_{fine_grid.shape[0]}', (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
+
+    @property
+    def fine_grid(self):
+        return self._fine_grid
 
     @property
     def coarse_grid(self):
@@ -16,9 +21,14 @@ class Restriction(base.Operator):
 
 
 class Interpolation(base.Operator):
-    def __init__(self, grid, coarse_grid, stencil_generator=None):
+    def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
+        self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super(Interpolation, self).__init__(f'P_{coarse_grid.shape[0]}', (grid.shape[0], coarse_grid.shape[0]), grid, stencil_generator)
+        super(Interpolation, self).__init__(f'P_{coarse_grid.shape[0]}', (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
+
+    @property
+    def fine_grid(self):
+        return self._fine_grid
 
     @property
     def coarse_grid(self):
@@ -39,16 +49,21 @@ class CoarseGridSolver(base.Entity):
         return None
 
     @property
+    def grid(self):
+        return self.operator.grid
+
+    @property
     def operator(self):
         return self._operator
 
     def __repr__(self):
-        return f'CoarseGridSolver({repr(self.operator)})'
+        return f'CoarseGridSolver({repr(self.lfa_operator_generator)})'
 
 
 class Cycle(base.Expression):
-    def __init__(self, grid: base.Grid, iterate: base.Expression, correction: base.Expression, partitioning=part.Single, weight=1.0):
-        self._grid = grid
+    def __init__(self, iterate, correction, partitioning=part.Single, weight=1.0):
+        assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
+            "Grids must match"
         self._iterate = iterate
         self._correction = correction
         self._weight = weight
@@ -60,7 +75,7 @@ class Cycle(base.Expression):
 
     @property
     def grid(self):
-        return self._grid
+        return self.iterate.grid
 
     @property
     def iterate(self):
@@ -94,11 +109,11 @@ class Cycle(base.Expression):
     def apply(self, transform: callable, *args):
         correction = transform(self.correction, *args)
         iterate = transform(self.iterate, *args)
-        return Cycle(self.grid, iterate, correction, self.partitioning, self.weight)
+        return Cycle(iterate, correction, self.partitioning, self.weight)
 
 
-def cycle(grid, iterate, correction, partitioning=part.Single, weight=1.0):
-    return Cycle(grid, iterate, correction, partitioning, weight)
+def cycle(iterate, correction, partitioning=part.Single, weight=1.0):
+    return Cycle(iterate, correction, partitioning, weight)
 
 
 def residual(grid, operator, rhs):

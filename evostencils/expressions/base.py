@@ -43,6 +43,10 @@ class UnaryExpression(Expression):
         return self._operand
 
     @property
+    def grid(self):
+        return self.operand.grid
+
+    @property
     def shape(self):
         return self._shape
 
@@ -120,6 +124,10 @@ class Grid(Entity):
     @property
     def size(self):
         return self._size
+
+    @property
+    def grid(self):
+        return self
 
     @property
     def step_size(self):
@@ -228,9 +236,15 @@ class Transpose(UnaryExpression):
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
         assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
+            "Grids must match"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
+
+    @property
+    def grid(self):
+        return self.operand1.grid
 
     def generate_stencil(self):
         return periodic.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
@@ -245,9 +259,15 @@ class Addition(BinaryExpression):
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
         assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
+            "Grids must match"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
+
+    @property
+    def grid(self):
+        return self.operand1.grid
 
     def generate_stencil(self):
         return periodic.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
@@ -265,6 +285,10 @@ class Multiplication(BinaryExpression):
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
+
+    @property
+    def grid(self):
+        return self.operand1.grid
 
     def generate_stencil(self):
         return periodic.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
@@ -290,6 +314,10 @@ class Scaling(Expression):
     @property
     def operand(self):
         return self._operand
+
+    @property
+    def grid(self):
+        return self.operand.grid
 
     @property
     def shape(self):

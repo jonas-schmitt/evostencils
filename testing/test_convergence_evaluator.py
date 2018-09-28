@@ -26,11 +26,12 @@ A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 P = multigrid.get_interpolation(u, u_coarse)
 R = multigrid.get_restriction(u, u_coarse)
 
-evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, len(coarsening_factor), lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
+evaluator = ConvergenceEvaluator(coarsening_factor, len(coarsening_factor), lfa.gallery.poisson_2d,
+                                 lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
-jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.Single, weight=1)
+jacobi = multigrid.cycle(u, correction, partitioning=partitioning.Single, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(jacobi, u, b)
 #print(iteration_matrix)
 #print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
@@ -38,7 +39,7 @@ iteration_matrix = Optimizer.get_iteration_matrix(jacobi, u, b)
 # Block-Jacobi
 smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
-block_jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.Single, weight=1)
+block_jacobi = multigrid.cycle(u, correction, partitioning=partitioning.Single, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(block_jacobi, u, b)
 #print(iteration_matrix)
 #print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
@@ -46,7 +47,7 @@ iteration_matrix = Optimizer.get_iteration_matrix(block_jacobi, u, b)
 # Red-Black-Block-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
-rb_jacobi = multigrid.cycle(u, u, correction, partitioning=partitioning.RedBlack, weight=1)
+rb_jacobi = multigrid.cycle(u, correction, partitioning=partitioning.RedBlack, weight=1)
 iteration_matrix = Optimizer.get_iteration_matrix(rb_jacobi, u, b)
 #print(iteration_matrix)
 #print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
@@ -61,13 +62,13 @@ A_coarse_coarse = multigrid.get_coarse_operator(A_coarse, u_coarse_coarse)
 tmp = base.mul(multigrid.Restriction(u_coarse, u_coarse_coarse), tmp)
 tmp = base.mul(multigrid.CoarseGridSolver(A_coarse_coarse), tmp)
 tmp = base.mul(multigrid.Interpolation(u_coarse, u_coarse_coarse), tmp)
-tmp = multigrid.cycle(u_coarse, zero, tmp)
+tmp = multigrid.cycle(zero, tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
-tmp = multigrid.cycle(u, u, tmp)
+tmp = multigrid.cycle(u, tmp)
 
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
-#print(iteration_matrix)
-print(evaluator.compute_spectral_radius(iteration_matrix))
+print(iteration_matrix)
+#print(evaluator.compute_spectral_radius(iteration_matrix))
 
 L = lfa.gallery.poisson_2d(lfa_grid)
 Lc = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
@@ -86,6 +87,20 @@ cgc = lfa.coarse_grid_correction(
         restriction = restriction)
 
 # Apply one pre- and one post-smoothing step.
-E = cgc
+E = S* cgc * S
 
 print(E.symbol().spectral_radius())
+
+I = lfa.identity(lfa_grid)
+R = lfa.gallery.fw_restriction(lfa_grid, lfa_grid.coarse(coarsening_factor))
+R_c = lfa.gallery.fw_restriction(lfa_grid.coarse(coarsening_factor), lfa_grid.coarse(coarsening_factor).coarse(coarsening_factor))
+P = lfa.gallery.ml_interpolation(lfa_grid, lfa_grid.coarse(coarsening_factor))
+P_c = lfa.gallery.ml_interpolation(lfa_grid.coarse(coarsening_factor), lfa_grid.coarse(coarsening_factor).coarse(coarsening_factor))
+A = lfa.gallery.poisson_2d(lfa_grid)
+A_cc = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor).coarse(coarsening_factor))
+zero = lfa.zero(lfa_grid)
+zero_c = lfa.zero(lfa_grid.coarse(coarsening_factor))
+zero_cc = lfa.zero(lfa_grid.coarse(coarsening_factor).coarse(coarsening_factor))
+mg = (I + 1.0 * (P * (1.0 * (P_c * (A_cc.inverse() * (R_c * (R * (-1.0 * (A * I)))))))))
+print(mg.symbol().spectral_radius())
+

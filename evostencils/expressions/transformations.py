@@ -92,7 +92,7 @@ def set_weights(expression: base.Expression, weights: list) -> tuple:
         correction, tail = set_weights(expression.correction, tail)
         if len(tail) > 0:
             raise RuntimeError("Too many weights have been supplied")
-        return multigrid.Cycle(expression.grid, iterate, correction, partitioning=expression.partitioning, weight=head), tail
+        return multigrid.Cycle(iterate, correction, partitioning=expression.partitioning, weight=head), tail
     elif isinstance(expression, base.Grid):
         return expression, weights
     else:

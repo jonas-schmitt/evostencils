@@ -89,7 +89,7 @@ class RooflineEvaluator:
         problem_size = correction.iterate.shape[0]
         iteration_matrix = correction.iteration_matrix
         evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
-        operator_stencil = correction.operator.generate_stencil()
+        operator_stencil = correction.lfa_operator_generator.generate_stencil()
         if not evaluated:
             # u = u + omega * B * u - omega * B * A * u
 
