@@ -26,8 +26,7 @@ A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 P = multigrid.get_interpolation(u, u_coarse)
 R = multigrid.get_restriction(u, u_coarse)
 
-evaluator = ConvergenceEvaluator(coarsening_factor, len(coarsening_factor), lfa.gallery.poisson_2d,
-                                 lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
+evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
@@ -68,7 +67,7 @@ tmp = multigrid.cycle(u, tmp)
 
 iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
 print(iteration_matrix)
-#print(evaluator.compute_spectral_radius(iteration_matrix))
+print(evaluator.compute_spectral_radius(iteration_matrix))
 
 L = lfa.gallery.poisson_2d(lfa_grid)
 Lc = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
@@ -87,7 +86,7 @@ cgc = lfa.coarse_grid_correction(
         restriction = restriction)
 
 # Apply one pre- and one post-smoothing step.
-E = S* cgc * S
+E = cgc
 
 print(E.symbol().spectral_radius())
 

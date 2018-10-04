@@ -20,12 +20,18 @@ def stencil_to_lfa(stencil: periodic.Stencil, grid):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, coarsening_factor, dimension, operator, interpolation, restriction):
+    def __init__(self, finest_grid, coarsening_factor, dimension, lfa_operator_generator, lfa_interpolation_generator,
+                 lfa_restriction_generator):
+        self._finest_grid = finest_grid
         self._coarsening_factor = coarsening_factor
         self._dimension = dimension
-        self._lfa_operator_generator = operator
-        self._lfa_interpolation_generator = interpolation
-        self._lfa_restriction_generator = restriction
+        self._lfa_operator_generator = lfa_operator_generator
+        self._lfa_interpolation_generator = lfa_interpolation_generator
+        self._lfa_restriction_generator = lfa_restriction_generator
+
+    @property
+    def finest_grid(self):
+        return self._finest_grid
 
     @property
     def coarsening_factor(self):
@@ -47,9 +53,11 @@ class ConvergenceEvaluator:
     def lfa_restriction_generator(self):
         return self._lfa_restriction_generator
 
-    @staticmethod
-    def get_lfa_grid(u: base.Grid):
-        return lfa_lab.Grid(u.dimension, list(u.step_size))
+    def get_lfa_grid(self, u: base.Grid):
+        grid = self.finest_grid
+        while grid.step_size() < u.step_size:
+            grid = grid.coarse(self.coarsening_factor)
+        return grid
 
     def get_lfa_operator_on_grid(self, grid):
         return self.lfa_operator_generator(grid)
@@ -74,14 +82,8 @@ class ConvergenceEvaluator:
                 raise NotImplementedError("Not implemented")
         elif isinstance(expression, base.BinaryExpression):
             if isinstance(expression, base.Multiplication):
-                if isinstance(expression.operand1, multigrid.CoarseGridSolver) or isinstance(expression.operand1, multigrid.Cycle):
-                    child1 = self.transform(expression.operand1)
-                else:
-                    child1 = self.transform(expression.operand1)
-                if isinstance(expression.operand2, multigrid.CoarseGridSolver) or isinstance(expression.operand2, multigrid.Cycle):
-                    child2 = self.transform(expression.operand2)
-                else:
-                    child2 = self.transform(expression.operand2)
+                child1 = self.transform(expression.operand1)
+                child2 = self.transform(expression.operand2)
                 return child1 * child2
             elif isinstance(expression, base.Addition):
                 child1 = self.transform(expression.operand1)
@@ -125,9 +127,7 @@ class ConvergenceEvaluator:
             lfa_grid = self.get_lfa_grid(expression.grid)
             stencil = expression.operator.generate_stencil()
             operator = stencil_to_lfa(stencil, lfa_grid)
-            print(operator.inverse().symbol().spectral_radius())
             return operator.inverse()
-            #return operator
         elif isinstance(expression, base.Operator):
             lfa_grid = self.get_lfa_grid(expression.grid)
             operator = stencil_to_lfa(expression.generate_stencil(), lfa_grid)

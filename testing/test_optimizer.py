@@ -26,7 +26,7 @@ def main():
     fine = lfa.Grid(dimension, [1.0, 1.0])
     fine_operator = lfa.gallery.poisson_2d(fine)
     coarse_operator = lfa.gallery.poisson_2d(fine.coarse(coarsening_factor))
-    convergence_evaluator = ConvergenceEvaluator(coarse_operator, fine, fine_grid_size, coarsening_factor, )
+    convergence_evaluator = ConvergenceEvaluator(coarse_operator, fine, fine_grid_size, coarsening_factor,,
 
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
