@@ -1,5 +1,6 @@
 class Stencil:
-    def __init__(self, entries):
+    def __init__(self, entries, dimension=None):
+        self._dimension = dimension
         self._entries = tuple(entries)
 
     @property
@@ -8,10 +9,10 @@ class Stencil:
 
     @property
     def dimension(self):
-        if len(self.entries) == 0:
-            return None
-        else:
+        if self._dimension is None:
             return len(self.entries[0][0])
+        else:
+            return self._dimension
 
     @property
     def number_of_entries(self):
@@ -142,5 +143,5 @@ def get_unit_stencil(grid) -> Stencil:
     return Stencil(entries)
 
 
-def get_null_stencil(_) -> Stencil:
-    return Stencil(entries=())
+def get_null_stencil(grid) -> Stencil:
+    return Stencil(entries=(), dimension=grid.dimension)

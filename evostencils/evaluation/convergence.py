@@ -69,7 +69,7 @@ class ConvergenceEvaluator:
             stencil = tmp.generate_stencil()
             partition_stencils = expression.partitioning.generate(stencil, expression.grid)
             if len(partition_stencils) == 1:
-                return self.transform(transformations.propagate_zero(expression.generate_expression()))
+                return self.transform(expression.generate_expression())
             elif len(partition_stencils) == 2:
                 u = self.transform(expression.iterate)
                 correction = self.transform(expression.correction)
@@ -135,11 +135,11 @@ class ConvergenceEvaluator:
         raise NotImplementedError("Not implemented")
 
     def compute_spectral_radius(self, expression: base.Expression):
-        #try:
+        try:
             smoother = self.transform(expression)
             symbol = smoother.symbol()
             return symbol.spectral_radius()
-        #except RuntimeError as _:
-        #    return 0.0
+        except RuntimeError as _:
+            return 0.0
 
 

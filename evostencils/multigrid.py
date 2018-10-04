@@ -98,8 +98,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     import functools
     residual = functools.partial(mg.residual, terminals.grid, terminals.operator)
     pset.addPrimitive(residual, [GridType], types.Residual, f'residual_{level}')
-    cycle = functools.partial(mg.cycle, terminals.grid)
-    pset.addPrimitive(cycle, [GridType, types.Residual, part.Partitioning], GridType, f'cycle_{level}')
+    #cycle = functools.partial(mg.cycle, terminals.grid)
+    pset.addPrimitive(mg.cycle, [GridType, types.Residual, part.Partitioning], GridType, f'cycle_{level}')
 
     # Multigrid recipes
     CoarseGridType = types.CoarseGrid
@@ -108,9 +108,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     RestrictionType = types.Restriction
 
     # Create intergrid operators
-    #pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
 
     pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, f'mul_{level}')
     pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, f'mul_{level}')

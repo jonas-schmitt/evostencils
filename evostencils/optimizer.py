@@ -116,12 +116,14 @@ class Optimizer:
             else:
                 return x
         tmp = substitute_entity(expression, sources, destinations, transform_zero_grid)
-        return propagate_zero(tmp)
+        return tmp
+        #return propagate_zero(tmp)
 
     def evaluate(self, individual):
         import math
-        expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
-        expression = transformations.remove_identity_operations(expression)
+        expression = self.compile_expression(individual)
+        #expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+        #expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:
             expression = transformations.set_weights(expression, individual.weights)
         iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)
