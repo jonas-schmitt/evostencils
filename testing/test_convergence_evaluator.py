@@ -18,7 +18,7 @@ lfa_operator = lfa.gallery.poisson_2d(lfa_grid)
 lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
 
 u = base.generate_grid('u', grid_size, step_size)
-b = base.generate_grid('f', grid_size, step_size)
+b = base.generate_rhs('f', grid_size, step_size)
 A = base.generate_operator_on_grid('A', u, gallery.generate_poisson_2d)
 
 u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
@@ -31,25 +31,25 @@ evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gal
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
 jacobi = multigrid.cycle(u, correction, partitioning=partitioning.Single, weight=1)
-iteration_matrix = Optimizer.get_iteration_matrix(jacobi, u, b)
-#print(iteration_matrix)
-#print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
+iteration_matrix = transformations.get_iteration_matrix(jacobi)
+print(iteration_matrix)
+print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 # Block-Jacobi
 smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
 block_jacobi = multigrid.cycle(u, correction, partitioning=partitioning.Single, weight=1)
-iteration_matrix = Optimizer.get_iteration_matrix(block_jacobi, u, b)
-#print(iteration_matrix)
-#print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
+iteration_matrix = transformations.get_iteration_matrix(block_jacobi)
+print(iteration_matrix)
+print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 # Red-Black-Block-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(u, A, b))
 rb_jacobi = multigrid.cycle(u, correction, partitioning=partitioning.RedBlack, weight=1)
-iteration_matrix = Optimizer.get_iteration_matrix(rb_jacobi, u, b)
-#print(iteration_matrix)
-#print(evaluator.transform(iteration_matrix, evaluator.grid).symbol().spectral_radius())
+iteration_matrix = transformations.get_iteration_matrix(rb_jacobi)
+print(iteration_matrix)
+print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 # Two-Grid
 tmp = multigrid.residual(u, A, b)
@@ -68,7 +68,8 @@ tmp = multigrid.cycle(zero, tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(jacobi, tmp)
 
-iteration_matrix = Optimizer.get_iteration_matrix(tmp, u, b)
+print(tmp)
+iteration_matrix = transformations.get_iteration_matrix(tmp)
 print(iteration_matrix)
 print(evaluator.compute_spectral_radius(iteration_matrix))
 

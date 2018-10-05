@@ -1,7 +1,8 @@
 from evostencils.expressions import multigrid
 from evostencils.expressions import base
 
-
+# Not bugfree
+"""
 def propagate_zero(expression: base.Expression) -> base.Expression:
     result = expression.apply(propagate_zero)
     if isinstance(result, multigrid.Cycle):
@@ -72,7 +73,6 @@ def remove_identity_operations(expression: base.Expression) -> base.Expression:
             return operand
     return result
 
-
 def substitute_entity(expression: base.Expression, sources: list, destinations: list, f: lambda x: x) -> base.Expression:
     result = expression.apply(substitute_entity, sources, destinations, f)
     if isinstance(result, base.Entity):
@@ -81,8 +81,58 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
                 return destination
         return f(result)
     return result
+"""
 
 
+def get_iteration_matrix(expression: base.Expression):
+    result = expression.apply(get_iteration_matrix)
+    if isinstance(result, multigrid.Cycle):
+        if isinstance(result.iterate, base.ZeroOperator):
+            return result.correction
+        elif isinstance(result.correction, base.ZeroOperator):
+            return result.iterate
+        else:
+            return result
+    elif isinstance(result, base.Addition):
+        if isinstance(result.operand1, base.ZeroOperator):
+            return result.operand2
+        elif isinstance(result.operand2, base.ZeroOperator):
+            return result.operand1
+        else:
+            return result
+    elif isinstance(result, base.Subtraction):
+        if isinstance(result.operand1, base.ZeroOperator):
+            if isinstance(result.operand2, base.ZeroOperator):
+                return result.operand2
+            else:
+                return base.Scaling(-1, result.operand2)
+        elif isinstance(result.operand2, base.ZeroOperator):
+            return result.operand1
+        else:
+            return result
+    elif isinstance(result, base.Multiplication):
+        if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
+            return base.ZeroOperator(result.shape, result.grid)
+        elif isinstance(result.operand1, base.Identity):
+            return result.operand2
+        elif isinstance(result.operand2, base.Identity):
+            return result.operand1
+        else:
+            return result
+    elif isinstance(result, base.Scaling):
+        if isinstance(result.operand, base.ZeroOperator):
+            return result.operand
+        else:
+            return result
+    elif isinstance(result, base.ZeroGrid) or isinstance(result, base.RightHandSide):
+        return base.ZeroOperator((result.shape[0], result.shape[0]), result)
+    elif isinstance(result, base.Grid):
+        return base.Identity((result.shape[0], result.shape[0]), result)
+    else:
+        return result
+
+# Not bugfree
+"""
 def set_weights(expression: base.Expression, weights: list) -> tuple:
     if isinstance(expression, multigrid.Cycle):
         if len(weights) == 0:
@@ -111,3 +161,4 @@ def obtain_weights(expression: base.Expression) -> list:
     else:
         raise NotImplementedError("Not implemented")
 
+"""

@@ -101,7 +101,7 @@ class Identity(Operator):
         super(Identity, self).__init__('I', shape, grid, constant.get_unit_stencil)
 
     def __repr__(self):
-        return f'Identity({repr(self.shape)}, {repr(self.iterate)})'
+        return f'Identity({repr(self.shape)}, {repr(self.grid)})'
 
 
 class ZeroOperator(Operator):
@@ -109,7 +109,7 @@ class ZeroOperator(Operator):
         super(ZeroOperator, self).__init__('0', shape, grid, constant.get_null_stencil)
 
     def __repr__(self):
-        return f'Zero({repr(self.shape)}, {repr(self.iterate)})'
+        return f'Zero({repr(self.shape)}, {repr(self.grid)})'
 
 
 class Grid(Entity):
@@ -137,17 +137,32 @@ class Grid(Entity):
     def dimension(self):
         return len(self.size)
 
-    @staticmethod
-    def generate_stencil():
-        return None
+    def generate_stencil(self):
+        return constant.get_unit_stencil(self)
 
     def __repr__(self):
         return f'Grid({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
 
 
+class RightHandSide(Grid):
+
+    def generate_stencil(self):
+        return constant.get_null_stencil(self)
+
+    def __repr__(self):
+        return f'RightHandSide({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
+
+
 class ZeroGrid(Grid):
+
+    def generate_stencil(self):
+        return constant.get_null_stencil(self)
+
     def __init__(self, size, step_size):
         super(ZeroGrid, self).__init__('0', size, step_size)
+
+    def __repr__(self):
+        return f'ZeroGrid({repr(self.size)}, {repr(self.step_size)})'
 
 
 # Unary Expressions
@@ -235,7 +250,7 @@ class Transpose(UnaryExpression):
 # Binary Expressions
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
@@ -258,7 +273,7 @@ class Addition(BinaryExpression):
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
@@ -281,7 +296,7 @@ class Subtraction(BinaryExpression):
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
-        assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
+        #assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
@@ -363,6 +378,10 @@ def minus(operand):
 
 def generate_grid(name: str, grid_size: tuple, step_size: tuple) -> Grid:
     return Grid(name, grid_size, step_size)
+
+
+def generate_rhs(name: str, grid_size: tuple, step_size: tuple) -> Grid:
+    return RightHandSide(name, grid_size, step_size)
 
 
 def generate_operator_on_grid(name: str, grid: Grid, stencil_generator: callable) -> Operator:

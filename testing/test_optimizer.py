@@ -18,7 +18,7 @@ def main():
     lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
 
     u = base.generate_grid('u', grid_size, step_size)
-    b = base.generate_grid('f', grid_size, step_size)
+    b = base.generate_rhs('f', grid_size, step_size)
     A = base.generate_operator_on_grid('A', u, generate_poisson_2d)
 
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
@@ -38,10 +38,10 @@ def main():
     print('\n')
     for ind in hof:
         print(f'Individual {i} with fitness {ind.fitness}')
-        expression = transformations.fold_intergrid_operations(optimizer.compile_expression(ind))
-        expression = transformations.set_weights(expression, ind.weights)
+        expression = optimizer.compile_expression(ind)
+        #expression = transformations.set_weights(expression, ind.weights)
         print(f'Update expression: {repr(expression)}')
-        iteration_matrix = optimizer.get_iteration_matrix(expression, optimizer.grid, optimizer.rhs)
+        iteration_matrix = transformations.get_iteration_matrix(expression)
         print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')

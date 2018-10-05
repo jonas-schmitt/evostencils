@@ -102,9 +102,10 @@ class Optimizer:
     def compile_expression(self, expression):
         return gp.compile(expression, self._primitive_set)
 
+    """
     @staticmethod
     def get_iteration_matrix(expression, grid: base.Grid, rhs: base.Grid):
-        from evostencils.expressions.transformations import propagate_zero, substitute_entity
+        from evostencils.expressions.transformations import propagate_zero
         sources = [grid, rhs]
         from evostencils.expressions import multigrid as mg
         coarse = [mg.get_coarse_grid(grid, (2,2)), mg.get_coarse_grid(rhs, (2,2))]
@@ -112,22 +113,22 @@ class Optimizer:
 
         def transform_zero_grid(x):
             if isinstance(x, base.ZeroGrid):
-                return base.ZeroOperator((x.shape[0], x.shape[0]), x)
+                return base.ZeroOperator((x.shape[0], mg.get_coarse_grid(x, (2,2)).shape[0]), x)
             else:
                 return x
         tmp = substitute_entity(expression, sources, destinations, transform_zero_grid)
         return tmp
-        #return propagate_zero(tmp)
+        # return propagate_zero(tmp)
+    """
 
     def evaluate(self, individual):
         import math
         expression = self.compile_expression(individual)
-        #expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
-        #expression = transformations.remove_identity_operations(expression)
+        # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+        # expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:
             expression = transformations.set_weights(expression, individual.weights)
-        iteration_matrix = self.get_iteration_matrix(expression, self.grid, self.rhs)
-        spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+        spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
         if spectral_radius == 0.0:
             return self.infinity,
         else:
@@ -168,10 +169,10 @@ class Optimizer:
 
         pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations,
                            alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
-        for individual in hof:
-            weights, spectral_radius = self.optimize_weights(individual)
-            individual.set_weights(weights)
-            individual.fitness = creator.Fitness(values=self.evaluate(individual))
+        #for individual in hof:
+        #    weights, spectral_radius = self.optimize_weights(individual)
+        #    individual.set_weights(weights)
+        #    individual.fitness = creator.Fitness(values=self.evaluate(individual))
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):

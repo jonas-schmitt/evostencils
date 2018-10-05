@@ -81,17 +81,13 @@ class ConvergenceEvaluator:
             else:
                 raise NotImplementedError("Not implemented")
         elif isinstance(expression, base.BinaryExpression):
+            child1 = self.transform(expression.operand1)
+            child2 = self.transform(expression.operand2)
             if isinstance(expression, base.Multiplication):
-                child1 = self.transform(expression.operand1)
-                child2 = self.transform(expression.operand2)
                 return child1 * child2
             elif isinstance(expression, base.Addition):
-                child1 = self.transform(expression.operand1)
-                child2 = self.transform(expression.operand2)
                 return child1 + child2
             elif isinstance(expression, base.Subtraction):
-                child1 = self.transform(expression.operand1)
-                child2 = self.transform(expression.operand2)
                 return child1 - child2
         elif isinstance(expression, base.Scaling):
             return expression.factor * self.transform(expression.operand)
@@ -135,11 +131,12 @@ class ConvergenceEvaluator:
         raise NotImplementedError("Not implemented")
 
     def compute_spectral_radius(self, expression: base.Expression):
-        try:
-            smoother = self.transform(expression)
-            symbol = smoother.symbol()
+        #try:
+            iteration_matrix = transformations.get_iteration_matrix(expression)
+            lfa_expression = self.transform(iteration_matrix)
+            symbol = lfa_expression.symbol()
             return symbol.spectral_radius()
-        except RuntimeError as _:
-            return 0.0
+        #except RuntimeError as _:
+        #    return 0.0
 
 

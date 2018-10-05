@@ -57,11 +57,12 @@ class CoarseGridSolver(base.Entity):
         return self._operator
 
     def __repr__(self):
-        return f'CoarseGridSolver({repr(self.lfa_operator_generator)})'
+        return f'CoarseGridSolver({repr(self.operator)})'
 
 
 class Cycle(base.Expression):
     def __init__(self, iterate, correction, partitioning=part.Single, weight=1.0):
+        # assert iterate.shape == correction.shape, "Shapes must match"
         assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
             "Grids must match"
         self._iterate = iterate
@@ -116,7 +117,7 @@ def cycle(iterate, correction, partitioning=part.Single, weight=1.0):
     return Cycle(iterate, correction, partitioning, weight)
 
 
-def residual(grid, operator, rhs):
+def residual(operator, grid, rhs):
     return base.Subtraction(rhs, base.Multiplication(operator, grid))
 
 
