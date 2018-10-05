@@ -104,6 +104,10 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     import functools
     residual = functools.partial(mg.residual, terminals.operator)
     pset.addPrimitive(residual, [GridType, RHSType], types.Residual, f'residual_{level}')
+
+    def extend_cycle(cycle: mg.Cycle, operand):
+        return mg.Cycle(cycle.iterate, base.mul(operand, cycle.correction))
+
     pset.addPrimitive(mg.cycle, [GridType, types.Residual, part.Partitioning], GridType, f'cycle_{level}')
 
     # Multigrid recipes
