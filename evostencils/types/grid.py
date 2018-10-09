@@ -18,8 +18,8 @@ class GridTypeMetaClass(type):
                 is_subclass = is_subclass and other.grid_type == "grid"
             elif self.grid_type == "rhs":
                 is_subclass = is_subclass and other.grid_type == "rhs"
-            elif self.grid_type == "residual":
-                is_subclass = is_subclass and other.grid_type == "residual"
+            elif self.grid_type == "correction":
+                is_subclass = is_subclass and other.grid_type == "correction"
             else:
                 return False
             return is_subclass
@@ -34,8 +34,8 @@ def generate_grid_type(size):
     return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "grid"})
 
 
-def generate_residual_type(size):
-    return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "residual"})
+def generate_correction_type(size):
+    return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "correction"})
 
 
 def generate_rhs_type(size):

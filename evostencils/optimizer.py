@@ -34,9 +34,10 @@ class Optimizer:
         self._performance_evaluator = performance_evaluator
         self._epsilon = epsilon
         self._infinity = infinity
-        self._primitive_set = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
+        pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
                                                                interpolation_stencil=None, restriction_stencil=None,
                                                                maximum_number_of_cycles=1)
+        self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
         self._weight_optimizer = WeightOptimizer(self)
@@ -48,7 +49,7 @@ class Optimizer:
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=5)
+        self._toolbox.register("expression", gp.genHalfAndHalf, pset=self._primitive_set, min_=1, max_=2)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
@@ -123,7 +124,8 @@ class Optimizer:
 
     def evaluate(self, individual):
         import math
-        expression = self.compile_expression(individual)
+        state = self.compile_expression(individual)
+        expression = state.expression
         # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         # expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:

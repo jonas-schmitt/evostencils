@@ -6,6 +6,28 @@ from evostencils.types import grid as grid_types
 from deap import gp
 
 
+class ProgramState:
+    def __init__(self, expression, variables):
+        self.expression = expression
+        self.variables = variables
+
+
+class VariableSet:
+    def __init__(self, mapping=None):
+        if mapping is None:
+            self._mapping = {}
+        else:
+            self._mapping = mapping
+
+    def store(self, variable, type_):
+        self._mapping[type_] = variable
+
+    def load(self, type_):
+        result = self._mapping[type_]
+        del self._mapping[type_]
+        return result
+
+
 class Terminals:
     def __init__(self, operator, grid, dimension, coarsening_factor, interpolation_stencil_generator, restriction_stencil_generator):
         self.operator = operator
@@ -36,7 +58,7 @@ class Types:
         self.LowerTriangularOperator = matrix_types.generate_lower_triangular_matrix_type(terminals.lower.shape)
         self.UpperTriangularOperator = matrix_types.generate_upper_triangular_matrix_type(terminals.lower.shape)
         self.Grid = grid_types.generate_grid_type(terminals.grid.size)
-        self.Residual = grid_types.generate_residual_type(terminals.grid.size)
+        self.Correction = grid_types.generate_correction_type(terminals.grid.size)
         self.RHS = grid_types.generate_rhs_type(terminals.grid.size)
         self.DiagonalOperator = matrix_types.generate_diagonal_matrix_type(terminals.diagonal.shape)
         self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.block_diagonal.shape)
@@ -51,26 +73,26 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=None):
     if types is None:
         types = Types(terminals)
-
-    pset.addTerminal(terminals.grid, types.Grid, f'u_{level}')
-    pset.addTerminal(base.ZeroGrid(terminals.grid.size, terminals.grid.step_size), types.Residual, f'zero_residual_{level}')
-    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), types.CoarseGrid, f'zero_grid_{level}')
-    pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), types.CoarseRHS, f'zero_rhs_{level}')
+    pset.addTerminal(ProgramState(terminals.grid, VariableSet({types.Grid: terminals.grid})), types.Grid, f'u_{level}')
+    null_grid = base.ZeroGrid(terminals.grid.size, terminals.grid.step_size)
+    pset.addTerminal(ProgramState(null_grid, VariableSet({types.Grid: null_grid})), types.Correction, f'null_correction_{level}')
+    #pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), types.CoarseRHS, f'zero_rhs_{level}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
-    pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
-    pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
-    pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
-    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
-    pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
-    pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
+    #pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
+    #pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
+    #pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
+    #pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
+    #pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
+    #pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no_{level}')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'rb_{level}')
 
     OperatorType = types.Operator
     GridType = types.Grid
     RHSType = types.RHS
+    CorrectionType = types.Correction
     DiagonalOperatorType = types.DiagonalOperator
     BlockDiagonalOperatorType = types.BlockDiagonalOperator
 
@@ -97,18 +119,25 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
-    pset.addPrimitive(base.mul, [OperatorType, types.Residual], types.Residual, f'mul_{level}')
+    def mul(operator, program_state):
+        return ProgramState(base.mul(operator, program_state.expression), program_state.variables)
 
+    pset.addPrimitive(mul, [OperatorType, types.Correction], types.Correction, f'apply_{level}')
 
     # Correction
-    import functools
-    residual = functools.partial(mg.residual, terminals.operator)
-    pset.addPrimitive(residual, [GridType, RHSType], types.Residual, f'residual_{level}')
+    def residual(program_state, rhs):
+        return ProgramState(mg.residual(terminals.operator, program_state.expression, rhs), program_state.variables)
+    pset.addPrimitive(residual, [GridType, RHSType], CorrectionType, f'residual_{level}')
 
-    def extend_cycle(cycle: mg.Cycle, operand):
-        return mg.Cycle(cycle.iterate, base.mul(operand, cycle.correction))
+    def cycle(program_state, partitioning):
+        new_state = ProgramState(program_state.expression, program_state.variables)
+        iterate = new_state.variables.load(GridType)
+        new_iterate = mg.cycle(iterate, new_state.expression, partitioning)
+        new_state.variables.store(new_iterate, GridType)
+        return new_state
 
-    pset.addPrimitive(mg.cycle, [GridType, types.Residual, part.Partitioning], GridType, f'cycle_{level}')
+    pset.addPrimitive(cycle, [CorrectionType, part.Partitioning], GridType)
+
 
     # Multigrid recipes
     CoarseGridType = types.CoarseGrid
@@ -120,17 +149,17 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     def noop(x):
         return x
     # Create intergrid operators
-    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
 
-    pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseGridType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [RestrictionType, types.Residual], CoarseRHSType, f'mul_{level}')
-    pset.addPrimitive(base.mul, [InterpolationType, CoarseGridType], types.Residual, f'mul_{level}')
-    pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseGridType], CoarseGridType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [RestrictionType, types.Correction], CoarseRHSType, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [InterpolationType, CoarseRHSType], types.Correction, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseRHSType], CoarseRHSType, f'mul_{level}')
 
-    pset.addPrimitive(noop, [CoarseOperatorType], CoarseOperatorType, f'noop_{level}')
+    #pset.addPrimitive(noop, [CoarseOperatorType], CoarseOperatorType, f'noop_{level}')
     pset.addPrimitive(noop, [part.Partitioning], part.Partitioning, f'noop_{level}')
+    pset.addPrimitive(noop, [RHSType], RHSType, f'noop_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
@@ -145,6 +174,6 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
         coarse_grid = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
         terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
-        add_cycle(pset, terminals, i)
+        add_cycle(pset, terminals, base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), i)
 
     return pset

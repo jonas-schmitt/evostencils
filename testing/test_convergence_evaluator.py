@@ -52,13 +52,13 @@ print(iteration_matrix)
 print(evaluator.transform(iteration_matrix).symbol().spectral_radius())
 
 # Two-Grid
-tmp = multigrid.residual(u, A, b)
+tmp = multigrid.residual(A, u, b)
 tmp = base.mul(multigrid.Restriction(u, u_coarse), tmp)
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 f = tmp
-tmp = multigrid.residual(zero, A_coarse, f)
+tmp = multigrid.residual(A_coarse, zero, f)
 tmp = multigrid.cycle(zero, base.mul(base.Inverse(base.Diagonal(A_coarse)), tmp))
-tmp = multigrid.residual(tmp, A_coarse, f)
+tmp = multigrid.residual(A_coarse, tmp, f)
 u_coarse_coarse = multigrid.get_coarse_grid(u_coarse, coarsening_factor)
 A_coarse_coarse = multigrid.get_coarse_operator(A_coarse, u_coarse_coarse)
 tmp = base.mul(multigrid.Restriction(u_coarse, u_coarse_coarse), tmp)
@@ -106,4 +106,3 @@ zero_c = lfa.zero(lfa_grid.coarse(coarsening_factor))
 zero_cc = lfa.zero(lfa_grid.coarse(coarsening_factor).coarse(coarsening_factor))
 mg = (lfa.jacobi(A) + 1.0 * (P * (1.0 * (P_c * (A_cc.inverse() * (R_c * (R * (-1.0 * (A * I)))))))))
 print(mg.symbol().spectral_radius())
-

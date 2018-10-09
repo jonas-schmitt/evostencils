@@ -162,3 +162,10 @@ def obtain_weights(expression: base.Expression) -> list:
         raise NotImplementedError("Not implemented")
 
 """
+
+
+def obtain_iterate(expression: base.Expression):
+    if isinstance(expression, base.BinaryExpression):
+        return obtain_iterate(expression.operand2)
+    elif isinstance(expression, base.Grid):
+        return expression
