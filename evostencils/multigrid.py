@@ -53,17 +53,18 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
         types = Types(terminals)
     pset.addTerminal(terminals.grid, types.Grid, f'u_{level}')
     null_grid = base.ZeroGrid(terminals.grid.size, terminals.grid.step_size)
-    pset.addTerminal(null_grid, types.Correction, f'null_correction_{level}')
-    #pset.addTerminal(base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size), types.CoarseRHS, f'zero_rhs_{level}')
+    pset.addTerminal(mg.cycle(terminals.grid, null_grid), types.Correction, f'null_cycle_{level}')
+    null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
+    pset.addTerminal(mg.cycle(terminals.coarse_grid, null_grid_coarse), types.CoarseRHS, f'zero_rhs_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
     pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
     pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
     pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
-    #pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
-    #pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
-    #pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
+    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
+    pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
+    pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no_{level}')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'rb_{level}')
 
@@ -117,15 +118,15 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
 
     pset.addPrimitive(create_cycle, [GridType, RHSType, part.Partitioning], CorrectionType)
 
-    def extend_cycle(root, operator):
+    def extend_cycle(operator, root, grid_size):
         def recursive_descent(expression: base.Expression):
             if isinstance(expression, mg.Cycle):
-                if expression.grid.size == GridType.size:
+                if expression.correction.grid.size == grid_size:
                     return mg.cycle(expression.iterate, base.mul(operator, expression.correction), expression.partitioning)
                 else:
                     return mg.cycle(expression.iterate, recursive_descent(expression.correction), expression.partitioning, expression.weight)
             elif isinstance(expression, base.Grid):
-                if expression.grid.size == GridType.size:
+                if expression.grid.size == grid_size:
                     return base.mul(operator, expression)
                 else:
                     raise RuntimeError("Something went terribly wrong")
@@ -139,10 +140,14 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
                 raise NotImplementedError("Not implemented")
         return recursive_descent(root)
 
-    pset.addPrimitive(extend_cycle, [CorrectionType, OperatorType], CorrectionType, f"extend_cycle_{level}")
+    def extend(operator, root):
+        return extend_cycle(operator, root, CorrectionType.size)
+
+    pset.addPrimitive(extend, [OperatorType, CorrectionType], CorrectionType, f"extend_{level}")
 
     def reduce_cycle(cycle):
         return cycle
+
     pset.addPrimitive(reduce_cycle, [CorrectionType], GridType, f"reduce_cycle_{level}")
 
 
@@ -153,18 +158,28 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, types=Non
     InterpolationType = types.Interpolation
     RestrictionType = types.Restriction
 
+    def interpolate(operator, root):
+        return extend_cycle(operator, root, CoarseRHSType.size)
+
+    def restrict(operator, root):
+        return extend_cycle(operator, root, CorrectionType.size)
+
+    def coarse_solve(operator, root):
+        return extend_cycle(operator, root, CoarseRHSType.size)
+
+    pset.addPrimitive(restrict, [RestrictionType, types.Correction], CoarseRHSType, f'restrict_{level}')
+    pset.addPrimitive(interpolate, [InterpolationType, CoarseRHSType], types.Correction, f'interpolate_{level}')
+    pset.addPrimitive(coarse_solve, [CoarseOperatorType, CoarseRHSType], CoarseRHSType, f'coarse_solve_{level}')
+
+    # Create intergrid operators
+    pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
+
     def noop(x):
         return x
-    # Create intergrid operators
-    #pset.addPrimitive(base.mul, [CoarseOperatorType, RestrictionType], RestrictionType, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [InterpolationType, CoarseOperatorType], InterpolationType, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [InterpolationType, RestrictionType], OperatorType, f'mul_{level}')
 
-    #pset.addPrimitive(base.mul, [RestrictionType, types.Correction], CoarseRHSType, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [InterpolationType, CoarseRHSType], types.Correction, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [CoarseOperatorType, CoarseRHSType], CoarseRHSType, f'mul_{level}')
-
-    #pset.addPrimitive(noop, [CoarseOperatorType], CoarseOperatorType, f'noop_{level}')
+    pset.addPrimitive(noop, [CoarseOperatorType], CoarseOperatorType, f'noop_{level}')
     pset.addPrimitive(noop, [part.Partitioning], part.Partitioning, f'noop_{level}')
     pset.addPrimitive(noop, [RHSType], RHSType, f'noop_{level}')
 
