@@ -124,8 +124,7 @@ class Optimizer:
 
     def evaluate(self, individual):
         import math
-        state = self.compile_expression(individual)
-        expression = state.expression
+        expression = self.compile_expression(individual)
         # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         # expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:

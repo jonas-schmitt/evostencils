@@ -69,6 +69,7 @@ class Cycle(base.Expression):
         self._correction = correction
         self._weight = weight
         self._partitioning = partitioning
+        self.reduced = False
 
     @property
     def shape(self):
