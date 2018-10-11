@@ -250,7 +250,7 @@ class Transpose(UnaryExpression):
 # Binary Expressions
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
-        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
@@ -273,7 +273,7 @@ class Addition(BinaryExpression):
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
-        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
@@ -296,7 +296,7 @@ class Subtraction(BinaryExpression):
 
 class Multiplication(BinaryExpression):
     def __init__(self, operand1, operand2):
-        #assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
+        assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
