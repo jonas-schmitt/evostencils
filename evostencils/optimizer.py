@@ -37,7 +37,7 @@ class Optimizer:
         self._infinity = infinity
         pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
                                                                interpolation_stencil=None, restriction_stencil=None,
-                                                               maximum_number_of_cycles=1)
+                                                               maximum_number_of_cycles=2)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
@@ -58,9 +58,6 @@ class Optimizer:
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=4)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
-        import operator
-        self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
-        self._toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
 
     @property
     def operator(self) -> base.Operator:
@@ -125,7 +122,10 @@ class Optimizer:
 
     def evaluate(self, individual):
         import math
-        expression = self.compile_expression(individual)
+        if len(individual) >= 100:
+            return self.infinity,
+        expression = self.compile_expression(individual)[0]
+
         # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         # expression = transformations.remove_identity_operations(expression)
         if individual.weights is not None:

@@ -61,11 +61,12 @@ class CoarseGridSolver(base.Entity):
 
 
 class Cycle(base.Expression):
-    def __init__(self, iterate, correction, partitioning=part.Single, weight=1.0, predecessor=None):
+    def __init__(self, iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         #assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
         self._iterate = iterate
+        self._rhs = rhs
         self._correction = correction
         self._weight = weight
         self._partitioning = partitioning
@@ -82,6 +83,10 @@ class Cycle(base.Expression):
     @property
     def iterate(self):
         return self._iterate
+
+    @property
+    def rhs(self):
+        return self._rhs
 
     @property
     def correction(self):
@@ -111,11 +116,12 @@ class Cycle(base.Expression):
     def apply(self, transform: callable, *args):
         correction = transform(self.correction, *args)
         iterate = transform(self.iterate, *args)
-        return Cycle(iterate, correction, self.partitioning, self.weight)
+        rhs = transform(self.rhs, *args)
+        return Cycle(iterate, rhs, correction, self.partitioning, self.weight)
 
 
-def cycle(iterate, correction, partitioning=part.Single, weight=1.0, predecessor=None):
-    return Cycle(iterate, correction, partitioning, weight, predecessor)
+def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
+    return Cycle(iterate, rhs, correction, partitioning, weight, predecessor)
 
 
 def residual(operator, grid, rhs):

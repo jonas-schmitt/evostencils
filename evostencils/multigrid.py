@@ -55,7 +55,7 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=False, types=None):
     if types is None:
         types = Types(terminals)
-    pset.addTerminal(terminals.grid, types.Grid, f'u_{level}')
+    #pset.addTerminal(terminals.grid, types.Grid, f'u_{level}')
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
@@ -101,26 +101,28 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
     def create_cycle_on_lower_level(coarse_grid, cycle, partitioning):
-        result = mg.cycle(cycle.iterate, mg.cycle(coarse_grid, mg.residual(terminals.coarse_operator, coarse_grid, cycle.correction), partitioning),
-                          cycle.partitioning, predecessor=cycle.predecessor)
+        result = mg.cycle(cycle.iterate, cycle.rhs,
+                          mg.cycle(coarse_grid, cycle.correction, mg.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
+                                   partitioning), cycle.partitioning, predecessor=cycle.predecessor)
         result.correction.predecessor = result
-        return result
+        return result.correction
 
-    def create_cycle_on_current_level(grid, rhs, partitioning):
-        return mg.cycle(grid, mg.residual(terminals.operator, grid, rhs), partitioning)
+    def create_cycle_on_current_level(args, partitioning):
+        return mg.cycle(args[0], args[1], mg.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
 
     def extend(operator, cycle):
-        return mg.cycle(cycle.iterate, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight, cycle.predecessor)
+        return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
+                        cycle.predecessor)
 
     def move_level_up(cycle):
         return cycle.predecessor
 
     def reduce(cycle):
-        return cycle
+        return cycle, cycle.rhs
 
-    pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction)], types.Grid, "reduce")
+    pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction)], multiple.generate_type_list(types.Grid, types.RHS), f"reduce_{level}")
 
-    pset.addPrimitive(create_cycle_on_current_level, [types.Grid, types.RHS, part.Partitioning], multiple.generate_type_list(GridType, CorrectionType), f"cycle_on_level_{level}")
+    pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS), part.Partitioning], multiple.generate_type_list(GridType, CorrectionType), f"cycle_on_level_{level}")
     pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction)],
                       multiple.generate_type_list(types.Grid, types.Correction),
                       f"extend_{level}")
@@ -136,80 +138,18 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     # Multigrid recipes
     pset.addPrimitive(extend, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                      f'extend_{level}')
+                      f'restrict_{level}')
     pset.addPrimitive(extend, [types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                       multiple.generate_type_list(types.Grid, types.Correction),
-                      f'extend_{level}')
+                      f'interpolate_{level}')
     pset.addPrimitive(extend, [types.CoarseOperator, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                      f'extend_{level}')
+                      f'solve_{level}')
 
     # Create intergrid operators
     pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
     pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
     pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
-
-    """
-    def create_cycle(grid, rhs, partitioning):
-        def recursive_descent(expression: base.Expression):
-            if isinstance(expression, base.Grid):
-                if expression.grid.size == GridType.size:
-                    return mg.cycle(grid, mg.residual(terminals.operator, grid, expression), partitioning)
-                else:
-                    raise RuntimeError("Something went terribly wrong")
-            elif isinstance(expression, mg.Cycle):
-                return mg.cycle(expression.iterate, recursive_descent(expression.correction), expression.partitioning, expression.weight)
-            elif isinstance(expression, base.BinaryExpression):
-                if expression.grid.size == GridType.size:
-                    return mg.cycle(grid, expression, partitioning)
-                else:
-                    return type(expression)(expression.operand1, recursive_descent(expression.operand2))
-            else:
-                raise NotImplementedError("Not implemented")
-        return recursive_descent(rhs)
-
-    pset.addPrimitive(create_cycle, [GridType, RHSType, part.Partitioning], CorrectionType)
-
-    def extend_cycle(operator, root, grid_size):
-        def recursive_descent(expression: base.Expression):
-            if isinstance(expression, mg.Cycle):
-                if expression.correction.grid.size == grid_size:
-                    return mg.cycle(expression.iterate, base.mul(operator, expression.correction), expression.partitioning)
-                else:
-                    return mg.cycle(expression.iterate, recursive_descent(expression.correction), expression.partitioning, expression.weight)
-            elif isinstance(expression, base.Grid):
-                if expression.grid.size == grid_size:
-                    return base.mul(operator, expression)
-                else:
-                    raise RuntimeError("Something went terribly wrong")
-            elif isinstance(expression, base.UnaryExpression):
-                return type(expression)(recursive_descent(expression.operand))
-            elif isinstance(expression, base.BinaryExpression):
-                return type(expression)(expression.operand1, recursive_descent(expression.operand2))
-            elif isinstance(expression, base.Scaling):
-                return base.Scaling(expression.factor, recursive_descent(expression.operand))
-            else:
-                raise NotImplementedError("Not implemented")
-        return recursive_descent(root)
-
-    def extend(operator, root):
-        return extend_cycle(operator, root, CorrectionType.size)
-
-    pset.addPrimitive(extend, [OperatorType, CorrectionType], CorrectionType, f"extend_{level}")
-
-    def reduce_cycle(cycle):
-        return cycle
-
-    pset.addPrimitive(reduce_cycle, [CorrectionType], GridType, f"reduce_cycle_{level}")
-
-    """
-    def noop(x):
-        return x
-
-    #pset.addPrimitive(noop, [types.CoarseOperator], types.CoarseOperator, f'noop_{level}')
-    #pset.addPrimitive(noop, [part.Partitioning], part.Partitioning, f'noop_{level}')
-    #pset.addPrimitive(noop, [types.CoarseGrid], types.CoarseGrid, f'noop_{level}')
-    #pset.addPrimitive(noop, [types.RHS], types.RHS, f'noop_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
@@ -217,8 +157,8 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     assert maximum_number_of_cycles >= 1, "The maximum number of cycles must be greater zero"
     terminals = Terminals(operator, grid, dimension, coarsening_factor, interpolation_stencil, restriction_stencil)
     types = Types(terminals)
-    pset = gp.PrimitiveSetTyped("main", [], types.Grid)
-    pset.addTerminal(rhs, types.RHS, 'f')
+    pset = gp.PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS))
+    pset.addTerminal((grid, rhs), multiple.generate_type_list(types.Grid, types.RHS), 'u_and_f')
 
     coarsest = False
     if maximum_number_of_cycles == 1:
@@ -226,11 +166,11 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     add_cycle(pset, terminals, 0, coarsest, types)
     for i in range(1, maximum_number_of_cycles):
         coarse_grid = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
-        terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
+        coarse_terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               interpolation_stencil, restriction_stencil)
         coarsest = False
         if i == maximum_number_of_cycles - 1:
             coarsest = True
-        add_cycle(pset, terminals, i, coarsest)
+        add_cycle(pset, coarse_terminals, i, coarsest)
 
     return pset

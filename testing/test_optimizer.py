@@ -32,7 +32,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(250, 15, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
 
     i = 1
     print('\n')
@@ -41,7 +41,7 @@ def main():
         expression = optimizer.compile_expression(ind)
         #expression = transformations.set_weights(expression, ind.weights)
         print(f'Update expression: {repr(expression)}')
-        iteration_matrix = transformations.get_iteration_matrix(expression)
+        iteration_matrix = transformations.get_iteration_matrix(expression[0])
         print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')

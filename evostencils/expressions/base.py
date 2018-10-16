@@ -126,6 +126,10 @@ class Grid(Entity):
         return self._size
 
     @property
+    def predecessor(self):
+        return None
+
+    @property
     def grid(self):
         return self
 
@@ -250,7 +254,7 @@ class Transpose(UnaryExpression):
 # Binary Expressions
 class Addition(BinaryExpression):
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
@@ -273,7 +277,7 @@ class Addition(BinaryExpression):
 
 class Subtraction(BinaryExpression):
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        #assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
             "Grids must match"
         self._operand1 = operand1
