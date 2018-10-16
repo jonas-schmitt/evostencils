@@ -5,7 +5,7 @@ import random
 import evostencils.multigrid as multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.genetic_programming import gen_custom
+from evostencils.genetic_programming import generate_tree_with_minimum_height
 from evostencils.weight_optimizer import WeightOptimizer
 
 
@@ -50,13 +50,13 @@ class Optimizer:
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", gen_custom, pset=self._primitive_set, min_=2, max_=5)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=2, max_height=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
         self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("expr_mut", gen_custom, pset=self._primitive_set, min_=1, max_=4)
+        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=4)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
         import operator
         self._toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter('height'), max_value=15))
