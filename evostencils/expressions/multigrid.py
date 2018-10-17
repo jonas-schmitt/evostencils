@@ -63,7 +63,7 @@ class CoarseGridSolver(base.Entity):
 class Cycle(base.Expression):
     def __init__(self, iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
-        #assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
+        # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
         self._iterate = iterate
         self._rhs = rhs

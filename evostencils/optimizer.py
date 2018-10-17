@@ -122,9 +122,12 @@ class Optimizer:
 
     def evaluate(self, individual):
         import math
-        if len(individual) >= 100:
+        if len(individual) > 150:
             return self.infinity,
-        expression = self.compile_expression(individual)[0]
+        try:
+            expression = self.compile_expression(individual)[0]
+        except MemoryError:
+            return self.infinity,
 
         # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         # expression = transformations.remove_identity_operations(expression)
