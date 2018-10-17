@@ -2,10 +2,10 @@ import numpy as np
 import deap.base
 from deap import gp, creator, tools, algorithms
 import random
-import evostencils.multigrid as multigrid
+from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.genetic_programming import generate_tree_with_minimum_height
+from evostencils.deap_extension import generate_tree_with_minimum_height
 from evostencils.weight_optimizer import WeightOptimizer
 
 
@@ -36,8 +36,8 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
-                                                               interpolation_stencil=None, restriction_stencil=None,
-                                                               maximum_number_of_cycles=2)
+                                               interpolation_stencil=None, restriction_stencil=None,
+                                               maximum_number_of_cycles=2)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
@@ -100,25 +100,6 @@ class Optimizer:
 
     def compile_expression(self, expression):
         return gp.compile(expression, self._primitive_set)
-
-    """
-    @staticmethod
-    def get_iteration_matrix(expression, grid: base.Grid, rhs: base.Grid):
-        from evostencils.expressions.transformations import propagate_zero
-        sources = [grid, rhs]
-        from evostencils.expressions import multigrid as mg
-        coarse = [mg.get_coarse_grid(grid, (2,2)), mg.get_coarse_grid(rhs, (2,2))]
-        destinations = [base.Identity((grid.shape[0], coarse[0].shape[0]), grid), base.ZeroOperator((rhs.shape[0], coarse[1].shape[0]), rhs)]
-
-        def transform_zero_grid(x):
-            if isinstance(x, base.ZeroGrid):
-                return base.ZeroOperator((x.shape[0], mg.get_coarse_grid(x, (2,2)).shape[0]), x)
-            else:
-                return x
-        tmp = substitute_entity(expression, sources, destinations, transform_zero_grid)
-        return tmp
-        # return propagate_zero(tmp)
-    """
 
     def evaluate(self, individual):
         import math

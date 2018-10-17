@@ -1,5 +1,4 @@
 import random
-import sys
 from inspect import isclass
 
 

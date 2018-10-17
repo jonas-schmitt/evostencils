@@ -7,8 +7,6 @@ from evostencils.types import multiple
 from deap import gp
 
 
-
-
 class Terminals:
     def __init__(self, operator, grid, dimension, coarsening_factor, interpolation_stencil_generator, restriction_stencil_generator):
         self.operator = operator

@@ -32,7 +32,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(2000, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(5000, 20, 0.5, 0.3)
 
     i = 1
     print('\n')

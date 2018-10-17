@@ -117,7 +117,7 @@ class Cycle(base.Expression):
         correction = transform(self.correction, *args)
         iterate = transform(self.iterate, *args)
         rhs = transform(self.rhs, *args)
-        return Cycle(iterate, rhs, correction, self.partitioning, self.weight)
+        return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
 
 def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
