@@ -108,7 +108,7 @@ class Cycle(base.Expression):
         return base.Addition(self.iterate, base.Scaling(self.weight, self.correction))
 
     def __repr__(self):
-        return f'Cycle({repr(self.correction)}, {repr(self.iterate)}, {repr(self.partitioning)}, {repr(self.weight)}'
+        return f'Cycle({repr(self.new_rhs)}, {repr(self.iterate)}, {repr(self.partitioning)}, {repr(self.weight)}'
 
     def __str__(self):
         return str(self.generate_expression())

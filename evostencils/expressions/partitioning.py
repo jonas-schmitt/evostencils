@@ -18,6 +18,9 @@ class Single:
         else:
             return [constant.get_unit_stencil(grid)]
 
+    def __repr__(self):
+        return 'Single()'
+
 
 class RedBlack:
     @staticmethod
@@ -26,4 +29,7 @@ class RedBlack:
             return [None]
         else:
             return periodic.red_black_partitioning(stencil, grid)
+
+    def __repr__(self):
+        return 'RedBlack()'
 

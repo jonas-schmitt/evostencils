@@ -55,6 +55,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     if types is None:
         types = Types(terminals)
     # TODO Adapt to FAS
+    null_grid_fine = base.ZeroGrid(terminals.grid.size, terminals.grid.step_size)
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
@@ -99,25 +100,30 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
-    def create_cycle_on_lower_level(cycle, partitioning):
-        result = fas.cycle_fas(cycle.unknown, cycle.rhs,
-                               fas.cycle_fas(cycle.new_unknown, cycle.new_rhs, null_grid_coarse, null_grid_coarse,
-                                             partitioning), cycle.partitioning, predecessor=cycle.predecessor)
-        result.new_unknown.predecessor = result
-        return result.new_unknown
-    # TODO Adapt to FAS
-    """
-    def create_cycle_on_current_level(args, partitioning):
-        return fas.cycle_fas(args[0], args[1], mg.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
+    def coarsen(grid):
+        return base.mul(terminals.restriction, grid)
 
-    def extend(operator, cycle):
-        return mg.cycle(cycle.unknown, cycle.rhs, base.mul(operator, cycle.new_unknown), cycle.partitioning, cycle.weight,
-                        cycle.predecessor)
+    def create_cycle_on_lower_level(cycle: fas.Cycle, partitioning: part.Partitioning):
+        adapted_cycle = fas.cycle(cycle.unknown, cycle.rhs, cycle.coarse_unknown, cycle.coarse_rhs,
+                           fas.cycle(cycle.coarse_unknown, cycle.coarse_rhs, null_grid_coarse, null_grid_coarse, null_grid_coarse, partitioning),
+                           cycle.partitioning, weight=cycle.weight, predecessor=cycle.predecessor)
+        adapted_cycle.correction.predecessor = adapted_cycle
+        return adapted_cycle.correction
+    # TODO Adapt to FAS
+
+    def create_cycle_on_current_level(args, partitioning):
+        return fas.cycle(args[0], args[1], null_grid_fine, null_grid_fine, partitioning, predecessor=args[0].predecessor)
+
+    def extend_unknown(f, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, f(cycle.new_unknown), cycle.new_rhs, cycle.partitioning, cycle.predecessor)
+
+    def extend_rhs(f, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, cycle.new_unknown, f(cycle.new_rhs), cycle.partitioning, cycle.predecessor)
 
     def move_level_up(cycle):
         return cycle.predecessor
 
-    def reduce(cycle):
+    def reduce(f, cycle):
         return cycle, cycle.rhs
 
     pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction)], multiple.generate_type_list(types.Grid, types.RHS), f"reduce_{level}")
