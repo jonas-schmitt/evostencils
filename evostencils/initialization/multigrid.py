@@ -100,16 +100,16 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
 
     def create_cycle_on_lower_level(coarse_grid, cycle, partitioning):
         result = mg.cycle(cycle.iterate, cycle.rhs,
-                          mg.cycle(coarse_grid, cycle.new_rhs, mg.residual(terminals.coarse_operator, coarse_grid, cycle.new_rhs),
+                          mg.cycle(coarse_grid, cycle.correction, mg.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
                                    partitioning), cycle.partitioning, predecessor=cycle.predecessor)
-        result.new_rhs.predecessor = result
-        return result.new_rhs
+        result.correction.predecessor = result
+        return result.correction
 
     def create_cycle_on_current_level(args, partitioning):
         return mg.cycle(args[0], args[1], mg.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
 
     def extend(operator, cycle):
-        return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.new_rhs), cycle.partitioning, cycle.weight,
+        return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
                         cycle.predecessor)
 
     def move_level_up(cycle):
