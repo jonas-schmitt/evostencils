@@ -100,8 +100,22 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
     pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
+    pset.addPrimitive(base.mul, [OperatorType, GridType], GridType, f'mul_{level}')
+    pset.addPrimitive(base.mul, [OperatorType, RHSType], RHSType, f'mul_{level}')
+    pset.addPrimitive(base.add, [GridType, GridType], GridType, f'add_{level}')
+    pset.addPrimitive(base.add, [GridType, RHSType], RHSType, f'add_{level}')
+    pset.addPrimitive(base.add, [RHSType, GridType], RHSType, f'add_{level}')
+    pset.addPrimitive(base.add, [RHSType, RHSType], RHSType, f'add_{level}')
+    pset.addPrimitive(base.sub, [GridType, GridType], GridType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [GridType, RHSType], RHSType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [RHSType, GridType], RHSType, f'sub_{level}')
+    pset.addPrimitive(base.sub, [RHSType, RHSType], RHSType, f'sub_{level}')
+
+
     def coarsen(grid):
         return base.mul(terminals.restriction, grid)
+    pset.addPrimitive(coarsen, [GridType], types.CoarseGrid, f'coarsen_{level}')
+    pset.addPrimitive(coarsen, [RHSType], types.CoarseRHS, f'coarsen_{level}')
 
     def create_cycle_on_lower_level(cycle: fas.Cycle, partitioning: part.Partitioning):
         adapted_cycle = fas.cycle(cycle.unknown, cycle.rhs, cycle.coarse_unknown, cycle.coarse_rhs,
@@ -109,50 +123,40 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                            cycle.partitioning, weight=cycle.weight, predecessor=cycle.predecessor)
         adapted_cycle.correction.predecessor = adapted_cycle
         return adapted_cycle.correction
-    # TODO Adapt to FAS
+
+    pset.addPrimitive(create_cycle_on_lower_level, [multiple.generate_type_list(GridType, types.CoarseGrid, types.CoarseRHS), part.Partitioning],
+                      multiple.generate_type_list(types.CoarseGrid, types.CoarseGrid, types.CoarseRHS), f'create_cycle_on_lower_level_{level}')
+
+
+    def reduce(cycle):
+        return cycle, cycle.rhs
+
+    pset.addPrimitive(reduce, [multiple.generate_type_list(GridType, CorrectionType)], multiple.generate_type_list(GridType, RHSType), f'reduce_{level}')
 
     def create_cycle_on_current_level(args, partitioning):
-        return fas.cycle(args[0], args[1], null_grid_fine, null_grid_fine, partitioning, predecessor=args[0].predecessor)
+        return fas.cycle(args[0], args[1], null_grid_fine, null_grid_fine, null_grid_fine, partitioning, predecessor=args[0].predecessor)
 
-    def extend_unknown(f, cycle):
-        return fas.cycle(cycle.unknown, cycle.rhs, f(cycle.new_unknown), cycle.new_rhs, cycle.partitioning, cycle.predecessor)
+    pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS), part.Partitioning],
+                      multiple.generate_type_list(GridType, GridType, RHSType), f"cycle_on_level_{level}")
 
-    def extend_rhs(f, cycle):
-        return fas.cycle(cycle.unknown, cycle.rhs, cycle.new_unknown, f(cycle.new_rhs), cycle.partitioning, cycle.predecessor)
+    def fold_left_unknown(f, operand, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, f(operand, cycle.new_unknown), cycle.new_rhs, cycle.correction, cycle.partitioning, cycle.predecessor)
+
+    def fold_right_unknown(f, operand, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, f(cycle.new_unknown, operand), cycle.new_rhs, cycle.correction, cycle.partitioning, cycle.predecessor)
+
+    def fold_left_rhs(f, operand, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, cycle.new_unknown, f(operand, cycle.new_rhs), cycle.correction, cycle.partitioning, cycle.predecessor)
+
+    def fold_right_rhs(f, operand, cycle):
+        return fas.cycle(cycle.unknown, cycle.rhs, cycle.new_unknown, f(cycle.new_rhs, operand), cycle.correction, cycle.partitioning, cycle.predecessor)
 
     def move_level_up(cycle):
         return cycle.predecessor
+    pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS)],
+                      multiple.generate_type_list(types.Grid, types.CoarseGrid, types.CoarseRHS, types.CoarseCorrection), f'move_level_up_{level}')
 
-    def reduce(f, cycle):
-        return cycle, cycle.rhs
 
-    pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction)], multiple.generate_type_list(types.Grid, types.RHS), f"reduce_{level}")
-
-    pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS), part.Partitioning], multiple.generate_type_list(GridType, CorrectionType), f"cycle_on_level_{level}")
-    pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction)],
-                      multiple.generate_type_list(types.Grid, types.Correction),
-                      f"extend_{level}")
-    if not coarsest:
-        pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection)], multiple.generate_type_list(types.Grid, types.CoarseCorrection), f"move_up_{level}")
-
-        pset.addPrimitive(create_cycle_on_lower_level,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                           part.Partitioning],
-                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection),
-                          f"new_cycle_on_lower_level_{level}")
-
-    # Multigrid recipes
-    pset.addPrimitive(extend, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction)],
-                      multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                      f'restrict_{level}')
-    pset.addPrimitive(extend, [types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
-                      multiple.generate_type_list(types.Grid, types.Correction),
-                      f'interpolate_{level}')
-    pset.addPrimitive(extend, [types.CoarseOperator, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
-                      multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                      f'solve_{level}')
-
-    # Create intergrid operators
     pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
     pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
     pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
