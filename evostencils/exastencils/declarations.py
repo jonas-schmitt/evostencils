@@ -2,19 +2,22 @@ from evostencils.expressions import base, multigrid as mg
 
 
 class Field:
-    def __init__(self, expression):
-        self._expression = expression
+    def __init__(self, expression, name=None):
+        self.expression = expression
+        self.name = name
 
-    @property
-    def expression(self):
-        return self._expression
+def obtain_coarsest_grid_size(expression: base.Expression) -> tuple:
+
+    if isinstance(expression, mg.Cycle):
 
 
+# Warning: This function modifies the expression passed to it
 def identify_temporary_fields(node: base.Expression) -> list:
     declarations = []
     if isinstance(node, mg.Cycle):
         declarations.extend(identify_temporary_fields(node.iterate))
         declarations.extend(identify_temporary_fields(node.correction))
+        # Reuse the solution field here
         declarations.append(Field(node))
         node.storage = declarations[-1]
     elif isinstance(node, base.BinaryExpression):
@@ -33,3 +36,13 @@ def identify_temporary_fields(node: base.Expression) -> list:
     elif isinstance(node, base.UnaryExpression) or isinstance(node, base.Scaling):
         declarations.extend(identify_temporary_fields(node.operand))
     return declarations
+
+
+def name_fields(field_declarations):
+    for i, field in enumerate(field_declarations):
+        field.name = f'tmp_{i}'
+
+
+def print_declarations(field_declarations):
+    for field in field_declarations:
+        print(f'Field {field.name}@ with Real on Node of global = 0.0\n')
