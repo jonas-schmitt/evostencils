@@ -181,3 +181,4 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
         add_cycle(pset, coarse_terminals, i, coarsest)
 
     return pset
+"""

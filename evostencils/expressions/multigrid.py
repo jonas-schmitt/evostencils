@@ -6,7 +6,7 @@ class Restriction(base.Operator):
     def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super(Restriction, self).__init__(f'R_{fine_grid.shape[0]}', (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
+        super().__init__(f'R_{fine_grid.shape[0]}', (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
 
     @property
     def fine_grid(self):
@@ -24,7 +24,7 @@ class Interpolation(base.Operator):
     def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super(Interpolation, self).__init__(f'P_{coarse_grid.shape[0]}', (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
+        super().__init__(f'P_{coarse_grid.shape[0]}', (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
 
     @property
     def fine_grid(self):
@@ -43,6 +43,7 @@ class CoarseGridSolver(base.Entity):
         self._name = "CGS"
         self._shape = operator.shape
         self._operator = operator
+        super().__init__()
 
     @staticmethod
     def generate_stencil():
@@ -71,6 +72,7 @@ class Cycle(base.Expression):
         self._weight = weight
         self._partitioning = partitioning
         self.predecessor = predecessor
+        super().__init__()
 
     @property
     def shape(self):
@@ -108,7 +110,8 @@ class Cycle(base.Expression):
         return base.Addition(self.iterate, base.Scaling(self.weight, self.correction))
 
     def __repr__(self):
-        return f'Cycle({repr(self.new_rhs)}, {repr(self.iterate)}, {repr(self.partitioning)}, {repr(self.weight)}'
+        return f'Cycle({repr(self.iterate)}, {repr(self.rhs)}, {repr(self.correction)}, ' \
+               f'{repr(self.partitioning)}, {repr(self.weight)}'
 
     def __str__(self):
         return str(self.generate_expression())
@@ -156,4 +159,19 @@ def get_coarse_grid_solver(operator: base.Operator):
 def is_intergrid_operation(expression: base.Expression) -> bool:
     return isinstance(expression, Restriction) or isinstance(expression, Interpolation) \
            or isinstance(expression, CoarseGridSolver)
+
+
+def contains_intergrid_operation(expression: base.Expression) -> bool:
+    if isinstance(expression, base.BinaryExpression):
+        return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
+    elif isinstance(expression, base.UnaryExpression):
+        return contains_intergrid_operation(expression.operand)
+    elif isinstance(expression, base.Scaling):
+        return contains_intergrid_operation(expression.operand)
+    elif isinstance(expression, CoarseGridSolver):
+        return True
+    elif isinstance(expression, base.Operator):
+        return is_intergrid_operation(expression)
+    else:
+        raise RuntimeError("Expression does not only contain operators")
 

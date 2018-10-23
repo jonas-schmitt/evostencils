@@ -74,7 +74,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     CorrectionType = types.Correction
     DiagonalOperatorType = types.DiagonalOperator
     BlockDiagonalOperatorType = types.BlockDiagonalOperator
-
+    """
     pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'add_{level}')
     pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
     pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
@@ -92,7 +92,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
     pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
     pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, f'mul_{level}')
-
+    """
     pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
@@ -100,16 +100,16 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
 
     def create_cycle_on_lower_level(coarse_grid, cycle, partitioning):
         result = mg.cycle(cycle.iterate, cycle.rhs,
-                          mg.cycle(coarse_grid, cycle.new_rhs, mg.residual(terminals.coarse_operator, coarse_grid, cycle.new_rhs),
+                          mg.cycle(coarse_grid, cycle.correction, mg.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
                                    partitioning), cycle.partitioning, predecessor=cycle.predecessor)
-        result.new_rhs.predecessor = result
-        return result.new_rhs
+        result.correction.predecessor = result
+        return result.correction
 
     def create_cycle_on_current_level(args, partitioning):
         return mg.cycle(args[0], args[1], mg.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
 
     def extend(operator, cycle):
-        return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.new_rhs), cycle.partitioning, cycle.weight,
+        return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
                         cycle.predecessor)
 
     def move_level_up(cycle):
@@ -145,9 +145,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                       f'solve_{level}')
 
     # Create intergrid operators
-    pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
-    pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
-    pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,

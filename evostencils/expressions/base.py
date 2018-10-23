@@ -7,6 +7,9 @@ from evostencils.stencils import constant
 
 # Base classes
 class Expression(abc.ABC):
+    def __init__(self):
+        self.storage = None
+
     @property
     @abc.abstractmethod
     def shape(self):
@@ -18,6 +21,7 @@ class Expression(abc.ABC):
 
 
 class Entity(Expression):
+
     @property
     def name(self):
         return self._name
@@ -37,6 +41,7 @@ class UnaryExpression(Expression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = operand.shape
+        super().__init__()
 
     @property
     def operand(self):
@@ -55,6 +60,7 @@ class UnaryExpression(Expression):
 
 
 class BinaryExpression(Expression):
+
     @property
     def operand1(self):
         return self._operand1
@@ -78,6 +84,7 @@ class Operator(Entity):
         self._shape = shape
         self._grid = grid
         self._stencil_generator = stencil_generator
+        super().__init__()
 
     @property
     def grid(self):
@@ -98,7 +105,7 @@ class Operator(Entity):
 
 class Identity(Operator):
     def __init__(self, shape, grid):
-        super(Identity, self).__init__('I', shape, grid, constant.get_unit_stencil)
+        super().__init__('I', shape, grid, constant.get_unit_stencil)
 
     def __repr__(self):
         return f'Identity({repr(self.shape)}, {repr(self.grid)})'
@@ -106,7 +113,7 @@ class Identity(Operator):
 
 class ZeroOperator(Operator):
     def __init__(self, shape, grid):
-        super(ZeroOperator, self).__init__('0', shape, grid, constant.get_null_stencil)
+        super().__init__('0', shape, grid, constant.get_null_stencil)
 
     def __repr__(self):
         return f'ZeroOperator({repr(self.shape)}, {repr(self.grid)})'
@@ -120,6 +127,7 @@ class Grid(Entity):
         self._size = size
         self._step_size = step_size
         self._shape = (reduce(operator.mul, size), 1)
+        super().__init__()
 
     @property
     def size(self):
@@ -206,7 +214,7 @@ class UpperTriangle(UnaryExpression):
 class BlockDiagonal(UnaryExpression):
     def __init__(self, operand, block_size):
         self._block_size = block_size
-        super(BlockDiagonal, self).__init__(operand)
+        super().__init__(operand)
 
     def generate_stencil(self):
         return periodic.block_diagonal(self.operand.generate_stencil(), self.block_size)
@@ -240,6 +248,7 @@ class Transpose(UnaryExpression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = (operand.shape[1], operand.shape[0])
+        super().__init__(operand)
 
     def generate_stencil(self):
         return periodic.transpose(self.operand.generate_stencil())
@@ -253,6 +262,7 @@ class Transpose(UnaryExpression):
 
 # Binary Expressions
 class Addition(BinaryExpression):
+
     def __init__(self, operand1, operand2):
         # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
@@ -260,6 +270,7 @@ class Addition(BinaryExpression):
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
+        super().__init__()
 
     @property
     def grid(self):
@@ -276,6 +287,7 @@ class Addition(BinaryExpression):
 
 
 class Subtraction(BinaryExpression):
+
     def __init__(self, operand1, operand2):
         # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
@@ -283,6 +295,7 @@ class Subtraction(BinaryExpression):
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
+        super().__init__()
 
     @property
     def grid(self):
@@ -299,11 +312,13 @@ class Subtraction(BinaryExpression):
 
 
 class Multiplication(BinaryExpression):
+
     def __init__(self, operand1, operand2):
         assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
+        super().__init__()
 
     @property
     def grid(self):
@@ -321,10 +336,12 @@ class Multiplication(BinaryExpression):
 
 # Scaling
 class Scaling(Expression):
+
     def __init__(self, factor, operand):
         self._factor = factor
         self._operand = operand
         self._shape = operand.shape
+        super().__init__()
 
     @property
     def factor(self):
