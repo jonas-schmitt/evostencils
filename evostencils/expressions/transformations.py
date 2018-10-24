@@ -93,6 +93,9 @@ def get_iteration_matrix(expression: base.Expression):
             return result.iterate
         else:
             return result
+    elif isinstance(result, multigrid.Residual):
+        # Inefficient but sufficient for now
+        return get_iteration_matrix(result.generate_expression())
     elif isinstance(result, base.Addition):
         if isinstance(result.operand1, base.ZeroOperator):
             return result.operand2

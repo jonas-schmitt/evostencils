@@ -1,48 +1,112 @@
 from evostencils.expressions import base, multigrid as mg
 
 
+class CycleStorage:
+    def __init__(self, level, grid):
+        self.level = level
+        self.grid = grid
+        self.solution = Field(f'Solution', level, self)
+        self.rhs = Field(f'RHS', level, self)
+        self.residual = Field(f'Residual', level, self)
+        self.correction = Field(f'Correction', level, self)
+
+
 class Field:
-    def __init__(self, expression, name=None):
-        self.expression = expression
+    def __init__(self, name=None, level=None, cycle_storage=None):
         self.name = name
+        self.level = level
+        self.cycle_storage = cycle_storage
 
-def obtain_coarsest_grid_size(expression: base.Expression) -> tuple:
 
-    if isinstance(expression, mg.Cycle):
+def obtain_maximum_level(cycle: mg.Cycle) -> tuple:
+    def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
+        if isinstance(expression, mg.Cycle):
+            if expression.grid.size < current_size:
+                new_size = expression.grid.size
+                new_level = current_level + 1
+            else:
+                new_size = current_size
+                new_level = current_level
+            level_iterate = recursive_descent(expression.iterate, new_size, new_level)
+            level_correction = recursive_descent(expression.correction, new_size, new_level)
+            return max(level_iterate, level_correction)
+        elif isinstance(expression, mg.Residual):
+            level_iterate = recursive_descent(expression.iterate, current_size, current_level)
+            level_rhs = recursive_descent(expression.rhs, current_size, current_level)
+            return max(level_iterate, level_rhs)
+        elif isinstance(expression, base.BinaryExpression):
+            level_operand1 = recursive_descent(expression.operand1, current_size, current_level)
+            level_operand2 = recursive_descent(expression.operand2, current_size, current_level)
+            return max(level_operand1, level_operand2)
+        elif isinstance(expression, base.UnaryExpression):
+            return recursive_descent(expression.operand, current_size, current_level)
+        elif isinstance(expression, base.Scaling):
+            return recursive_descent(expression.operand, current_size, current_level)
+        elif isinstance(expression, base.Entity):
+            return current_level
+        else:
+            raise RuntimeError("Unexpected expression")
+    return recursive_descent(cycle, cycle.grid.size, 0) + 1
+
+
+def generate_storage(maximum_level, finest_grid, coarsening_factor):
+    tmps = []
+    grid = finest_grid
+    for level in range(maximum_level, -1, -1):
+        tmps.append(CycleStorage(level, grid))
+        grid = mg.get_coarse_grid(grid, coarsening_factor)
+    return tmps
+
+
+def needs_storage(expression: base.Expression):
+    return expression.shape[1] == 1
+
+
+def adjust_storage_index(node, storages, i) -> int:
+    if node.grid.size > storages[i].grid.size:
+        return i-1
+    elif node.grid.size < storages[i].grid.size:
+        return i+1
+    else:
+        return i
 
 
 # Warning: This function modifies the expression passed to it
-def identify_temporary_fields(node: base.Expression) -> list:
-    declarations = []
+def assign_storage_to_cycles(node: base.Expression, storages: [CycleStorage], i: int):
     if isinstance(node, mg.Cycle):
-        declarations.extend(identify_temporary_fields(node.iterate))
-        declarations.extend(identify_temporary_fields(node.correction))
-        # Reuse the solution field here
-        declarations.append(Field(node))
-        node.storage = declarations[-1]
+        i = adjust_storage_index(node, storages, i)
+        node.iterate.storage = storages[i].solution
+        #node.rhs.storage = storages[i].rhs
+        node.correction.storage = storages[i].correction
+        assign_storage_to_cycles(node.iterate, storages, i)
+        assign_storage_to_cycles(node.correction, storages, i)
+    elif isinstance(node, mg.Residual):
+        i = adjust_storage_index(node, storages, i)
+        node.iterate.storage = storages[i].solution
+        node.rhs.storage = storages[i].rhs
+        assign_storage_to_cycles(node.iterate, storages, i)
+        assign_storage_to_cycles(node.rhs, storages, i)
     elif isinstance(node, base.BinaryExpression):
-        if isinstance(node.operand1, base.Grid) or isinstance(node.operand1, mg.Cycle):
-            declarations.append(Field(node))
-            node.storage = declarations[-1]
-        elif mg.contains_intergrid_operation(node.operand1):
-            declarations.append(Field(node))
-            node.storage = declarations[-1]
-            declarations.extend(identify_temporary_fields(node.operand1))
-        elif isinstance(node.operand2, base.Grid) or isinstance(node.operand1, mg.Cycle):
-            declarations.append(Field(node))
-            node.storage = declarations[-1]
-        declarations.extend(identify_temporary_fields(node.operand1))
-        declarations.extend(identify_temporary_fields(node.operand2))
+        operand1 = node.operand1
+        operand2 = node.operand2
+        if needs_storage(operand2):
+            i = adjust_storage_index(operand2, storages, i)
+            if isinstance(operand2, mg.Residual):
+                operand2.storage = storages[i].residual
+            else:
+                operand2.storage = storages[i].correction
+        assign_storage_to_cycles(operand1, storages, i)
+        assign_storage_to_cycles(operand2, storages, i)
     elif isinstance(node, base.UnaryExpression) or isinstance(node, base.Scaling):
-        declarations.extend(identify_temporary_fields(node.operand))
-    return declarations
+        operand = node.operand
+        if needs_storage(operand):
+            i = adjust_storage_index(operand, storages, i)
+            operand.storage = storages[i].correction
 
 
-def name_fields(field_declarations):
-    for i, field in enumerate(field_declarations):
-        field.name = f'tmp_{i}'
-
-
-def print_declarations(field_declarations):
-    for field in field_declarations:
-        print(f'Field {field.name}@ with Real on Node of global = 0.0\n')
+def print_declarations(storages: [CycleStorage]):
+    for storage in storages:
+        print(f'Field {storage.solution.name}@{storage.solution.level} with Real on Node of global = 0.0\n')
+        print(f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = 0.0\n')
+        print(f'Field {storage.residual.name}@{storage.residual.level} with Real on Node of global = 0.0\n')
+        print(f'Field {storage.correction.name}@{storage.residual.level} with Real on Node of global = 0.0\n')

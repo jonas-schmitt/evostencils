@@ -21,19 +21,16 @@ R = multigrid.get_restriction(u, u_coarse)
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 jacobi = multigrid.cycle(u, None, correction, partitioning=partitioning.Single, weight=1)
-declarations = identify_temporary_fields(jacobi)
 
 # Block-Jacobi
 smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 block_jacobi = multigrid.cycle(u, None, correction, partitioning=partitioning.Single, weight=1)
-declarations = identify_temporary_fields(block_jacobi)
 
 # Red-Black-Block-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 rb_jacobi = multigrid.cycle(u, None, correction, partitioning=partitioning.RedBlack, weight=1)
-declarations = identify_temporary_fields(rb_jacobi)
 
 # Two-Grid
 tmp = multigrid.residual(A, u, b)
@@ -41,7 +38,6 @@ tmp = base.mul(multigrid.Restriction(u, u_coarse), tmp)
 tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, None, tmp)
-declarations = identify_temporary_fields(tmp)
 
 # Three-Grid
 tmp = multigrid.residual(A, u, b)
@@ -60,7 +56,8 @@ tmp = multigrid.cycle(zero, None, tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, None, tmp)
 #tmp = multigrid.cycle(jacobi, None, tmp)
-declarations = identify_temporary_fields(tmp)
-name_fields(declarations)
-print_declarations(declarations)
+levels = obtain_maximum_level(tmp)
+temporaries = generate_storage(levels, u, coarsening_factor)
+assign_storage_to_cycles(tmp, temporaries, 0)
+print_declarations(temporaries)
 print(tmp)
