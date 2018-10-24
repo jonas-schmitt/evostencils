@@ -1,6 +1,6 @@
 from evostencils.expressions import base, multigrid, partitioning
 from evostencils.stencils import gallery
-from evostencils.exastencils.declarations import *
+from evostencils.exastencils.generation import *
 
 dimension = 2
 grid_size = (512, 512)
@@ -16,7 +16,7 @@ u_coarse = multigrid.get_coarse_grid(u, coarsening_factor)
 A_coarse = multigrid.get_coarse_operator(A, u_coarse)
 P = multigrid.get_interpolation(u, u_coarse)
 R = multigrid.get_restriction(u, u_coarse)
-
+generator = ProgramGenerator(A, u, b, dimension, coarsening_factor)
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
@@ -56,8 +56,4 @@ tmp = multigrid.cycle(zero, None, tmp)
 tmp = base.mul(multigrid.Interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, None, tmp)
 #tmp = multigrid.cycle(jacobi, None, tmp)
-levels = obtain_maximum_level(tmp)
-temporaries = generate_storage(levels, u, coarsening_factor)
-assign_storage_to_cycles(tmp, temporaries, 0)
-print_declarations(temporaries)
-print(tmp)
+#print_declarations(temporaries)
