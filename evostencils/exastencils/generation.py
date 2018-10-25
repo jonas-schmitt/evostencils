@@ -1,4 +1,5 @@
 from evostencils.expressions import base, multigrid as mg
+from evostencils.stencils import constant
 
 class CycleStorage:
     def __init__(self, level, grid):
@@ -18,11 +19,56 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor):
-        pass
+    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
+                 interpolation_stencil_generator=None, restriction_stencil_generator=None):
+        self._operator = op
+        self._grid = grid
+        self._rhs = rhs
+        self._dimension= dimension
+        self._coarsening_factor = coarsening_factor
+        self._interpolation_stencil_generator = interpolation_stencil_generator
+        self._restriction_stencil_generator = restriction_stencil_generator
+
+    @property
+    def operator(self):
+        return self._operator
+
+    @property
+    def grid(self):
+        return self._grid
+
+    @property
+    def rhs(self):
+        return self._rhs
+
+    @property
+    def dimension(self):
+        return self._dimension
+
+    @property
+    def coarsening_factor(self):
+        return self._coarsening_factor
+
+    @property
+    def interpolation_stencil_generator(self):
+        return self._interpolation_stencil_generator
+
+    @property
+    def restriction_stencil_generator(self):
+        return self._restriction_stencil_generator
+
+    def generate(self, expression: mg.Cycle):
+        max_level = self.obtain_maximum_level(expression)
+        storages = self.generate_storage(max_level)
+        expression.storage = storages[0].solution
+        self.assign_storage_to_cycles(expression, storages, 0)
+        program = str('')
+        program = self.add_field_declarations_to_program_string(program, storages)
+        program = self.add_operator_declarations_to_program_string(program, max_level)
+        return program
 
     @staticmethod
-    def obtain_maximum_level(cycle: mg.Cycle) -> tuple:
+    def obtain_maximum_level(cycle: mg.Cycle) -> int:
         def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
             if isinstance(expression, mg.Cycle):
                 if expression.grid.size < current_size:
@@ -52,13 +98,12 @@ class ProgramGenerator:
                 raise RuntimeError("Unexpected expression")
         return recursive_descent(cycle, cycle.grid.size, 0) + 1
 
-    @staticmethod
-    def generate_storage(maximum_level, finest_grid, coarsening_factor):
+    def generate_storage(self, maximum_level):
         tmps = []
-        grid = finest_grid
+        grid = self.grid
         for level in range(maximum_level, -1, -1):
             tmps.append(CycleStorage(level, grid))
-            grid = mg.get_coarse_grid(grid, coarsening_factor)
+            grid = mg.get_coarse_grid(grid, self.coarsening_factor)
         return tmps
 
     @staticmethod
@@ -114,12 +159,52 @@ class ProgramGenerator:
             program_string += f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = 0.0\n'
             program_string += f'Field {storage.residual.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
             program_string += f'Field {storage.correction.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
+        return program_string
 
     @staticmethod
-    def add_operator_declarations_to_program_string(program_string: str, finest_grid, coarsening_factor,
-                                                    operator_stencil_generator,
-                                                    interpolation_stencil_generator=None,
-                                                    restriction_stencil_generator=None):
-        pass
+    def add_constant_stencil_to_program_string(program_string: str, level: int, operator_name: str, stencil: constant.Stencil):
+        program_string += f"Operator {operator_name}@{level} from Stencil {{\n"
+        for offset, value in stencil.entries:
+            program_string += '['
+            for i, _ in enumerate(offset):
+                program_string += f'i{i}'
+                if i < len(offset) - 1:
+                    program_string += ', '
+            program_string += f'] from ['
+            for i, o in enumerate(offset):
+                if o == 0:
+                    program_string += f'i{i}'
+                else:
+                    program_string += f'(i{i} + ({o}))'
+                if i < len(offset) - 1:
+                    program_string += ', '
+            program_string += f'] with {value}\n'
+        program_string += '}\n'
+        return program_string
 
+    def add_operator_declarations_to_program_string(self, program_string: str, maximum_level: int):
+        grid = self.grid
+        for i in range(maximum_level + 1):
+            stencil = self.operator.stencil_generator(grid)
+            grid = mg.get_coarse_grid(grid, self.coarsening_factor)
+            program_string = self.add_constant_stencil_to_program_string(program_string, i, self.operator.name, stencil)
 
+        if self._interpolation_stencil_generator is None:
+            program_string += "Operator Prolongation from default prolongation on Node with 'linear'"
+        else:
+            grid = self.grid
+            for i in range(maximum_level):
+                stencil = self.interpolation_stencil_generator(grid)
+                # TODO generate string for stencil
+                grid = mg.get_coarse_grid(grid, self.coarsening_factor)
+
+        if self._restriction_stencil_generator is None:
+            program_string += "Operator Restriction from default restriction on Node with 'linear'"
+        else:
+            grid = self.grid
+            for i in range(maximum_level):
+                stencil = self.restriction_stencil_generator(grid)
+                # TODO generate string for stencil
+                grid = mg.get_coarse_grid(grid, self.coarsening_factor)
+
+        return program_string
