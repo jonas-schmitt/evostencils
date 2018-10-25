@@ -154,17 +154,36 @@ class ProgramGenerator:
 
     @staticmethod
     def add_field_declarations_to_program_string(program_string: str, storages: [CycleStorage]):
-        for storage in storages:
+        for i, storage in enumerate(storages):
             program_string += f'Field {storage.solution.name}@{storage.solution.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = 0.0\n'
+            # TODO handle boundary condition
+            if i == 0:
+                program_string += f'Field {storage.solution.name}@{storage.solution.level} on boundary = ' \
+                                  f'( cos ( ( PI * vf_boundaryPosition_0@{storage.solution.level}@[0, 0] ) ) - ' \
+                                  f'sin ( ( ( 2.0 * PI ) * vf_boundaryPosition_1@{storage.solution.level}@[0, 0] ) ) )\n'
+            else:
+                program_string += f'Field {storage.solution.name}@{storage.solution.level} on boundary = 0.0\n'
+
+            # TODO handle rhs
+            program_string += f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = ' \
+                              f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@{storage.rhs.level}@[0, 0] ) ) ) - ' \
+                              f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
+                              f'vf_nodePosition_1@{storage.rhs.level}@[0, 0] ) ) ) )\n'
+            program_string += f'Field {storage.rhs.name}@{storage.rhs.level} on boundary = 0.0\n'
+
             program_string += f'Field {storage.residual.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.correction.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
+            program_string += f'Field {storage.residual.name}@{storage.residual.level} on boundary = 0.0\n'
+
+            program_string += f'Field {storage.correction.name}@{storage.correction.level} with Real on Node of global = 0.0\n'
+            program_string += f'Field {storage.correction.name}@{storage.correction.level} on boundary = 0.0\n'
         return program_string
 
     @staticmethod
     def add_constant_stencil_to_program_string(program_string: str, level: int, operator_name: str, stencil: constant.Stencil):
         program_string += f"Operator {operator_name}@{level} from Stencil {{\n"
+        indent = '\t'
         for offset, value in stencil.entries:
+            program_string += indent
             program_string += '['
             for i, _ in enumerate(offset):
                 program_string += f'i{i}'
@@ -190,7 +209,7 @@ class ProgramGenerator:
             program_string = self.add_constant_stencil_to_program_string(program_string, i, self.operator.name, stencil)
 
         if self._interpolation_stencil_generator is None:
-            program_string += "Operator Prolongation from default prolongation on Node with 'linear'"
+            program_string += "Operator Prolongation from default prolongation on Node with 'linear'\n"
         else:
             grid = self.grid
             for i in range(maximum_level):
@@ -199,7 +218,7 @@ class ProgramGenerator:
                 grid = mg.get_coarse_grid(grid, self.coarsening_factor)
 
         if self._restriction_stencil_generator is None:
-            program_string += "Operator Restriction from default restriction on Node with 'linear'"
+            program_string += "Operator Restriction from default restriction on Node with 'linear'\n"
         else:
             grid = self.grid
             for i in range(maximum_level):
