@@ -7,7 +7,9 @@ class CycleStorage:
         self.level = level
         self.grid = grid
         self.solution = Field(f'Solution', level, self)
+        self.solution_tmp = Field(f'Solution_tmp', level, self)
         self.rhs = Field(f'RHS', level, self)
+        self.rhs_tmp = Field(f'RHS_tmp', level, self)
         self.residual = Field(f'Residual', level, self)
         self.correction = Field(f'Correction', level, self)
 
@@ -131,15 +133,15 @@ class ProgramGenerator:
     def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution
+            node.iterate.storage = storages[i].solution_tmp
             #node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution
-            node.rhs.storage = storages[i].rhs
+            node.iterate.storage = storages[i].solution_tmp
+            node.rhs.storage = storages[i].rhs_tmp
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
         elif isinstance(node, base.BinaryExpression):
@@ -158,6 +160,12 @@ class ProgramGenerator:
             if ProgramGenerator.needs_storage(operand):
                 i = ProgramGenerator.adjust_storage_index(operand, storages, i)
                 operand.storage = storages[i].correction
+        elif isinstance(node, base.RightHandSide):
+            i = ProgramGenerator.adjust_storage_index(node, storages, i)
+            node.storage = storages[i].rhs
+        elif isinstance(node, base.Grid) or isinstance(node, base.ZeroGrid):
+            i = ProgramGenerator.adjust_storage_index(node, storages, i)
+            node.storage = storages[i].solution
 
     @staticmethod
     def add_field_declarations_to_program_string(program_string: str, storages: [CycleStorage]):
@@ -171,12 +179,17 @@ class ProgramGenerator:
             else:
                 program_string += f'Field {storage.solution.name}@{storage.solution.level} on boundary = 0.0\n'
 
+            program_string += f'Field {storage.solution_tmp.name}@{storage.solution_tmp.level} with Real on Node of global = 0.0\n'
+            program_string += f'Field {storage.solution_tmp.name}@{storage.solution_tmp.level} on boundary = 0.0\n'
             # TODO handle rhs
             program_string += f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = ' \
                               f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@{storage.rhs.level}@[0, 0] ) ) ) - ' \
                               f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
                               f'vf_nodePosition_1@{storage.rhs.level}@[0, 0] ) ) ) )\n'
             program_string += f'Field {storage.rhs.name}@{storage.rhs.level} on boundary = 0.0\n'
+
+            program_string += f'Field {storage.rhs_tmp.name}@{storage.rhs_tmp.level} with Real on Node of global = 0.0\n'
+            program_string += f'Field {storage.rhs_tmp.name}@{storage.rhs_tmp.level} on boundary = 0.0\n'
 
             program_string += f'Field {storage.residual.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
             program_string += f'Field {storage.residual.name}@{storage.residual.level} on boundary = 0.0\n'
