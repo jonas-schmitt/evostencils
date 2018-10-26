@@ -1,6 +1,7 @@
 from evostencils.expressions import base, multigrid as mg
 from evostencils.stencils import constant
 
+
 class CycleStorage:
     def __init__(self, level, grid):
         self.level = level
@@ -16,6 +17,9 @@ class Field:
         self.name = name
         self.level = level
         self.cycle_storage = cycle_storage
+
+    def to_exa3(self):
+        return f'{self.name}@{self.level}'
 
 
 class ProgramGenerator:
@@ -61,10 +65,13 @@ class ProgramGenerator:
         max_level = self.obtain_maximum_level(expression)
         storages = self.generate_storage(max_level)
         expression.storage = storages[0].solution
-        self.assign_storage_to_cycles(expression, storages, 0)
+        self.assign_storage_to_subexpressions(expression, storages, 0)
         program = str('')
         program = self.add_field_declarations_to_program_string(program, storages)
         program = self.add_operator_declarations_to_program_string(program, max_level)
+        program += f'Function Cycle@{max_level} {{\n'
+        program += self.generate_multigrid(expression, storages)
+        program += f'\n}}\n'
         return program
 
     @staticmethod
@@ -121,20 +128,20 @@ class ProgramGenerator:
 
     # Warning: This function modifies the expression passed to it
     @staticmethod
-    def assign_storage_to_cycles(node: base.Expression, storages: [CycleStorage], i: int):
+    def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution
             #node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
-            ProgramGenerator.assign_storage_to_cycles(node.iterate, storages, i)
-            ProgramGenerator.assign_storage_to_cycles(node.correction, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution
             node.rhs.storage = storages[i].rhs
-            ProgramGenerator.assign_storage_to_cycles(node.iterate, storages, i)
-            ProgramGenerator.assign_storage_to_cycles(node.rhs, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
         elif isinstance(node, base.BinaryExpression):
             operand1 = node.operand1
             operand2 = node.operand2
@@ -144,8 +151,8 @@ class ProgramGenerator:
                     operand2.storage = storages[i].residual
                 else:
                     operand2.storage = storages[i].correction
-            ProgramGenerator.assign_storage_to_cycles(operand1, storages, i)
-            ProgramGenerator.assign_storage_to_cycles(operand2, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(operand1, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(operand2, storages, i)
         elif isinstance(node, base.UnaryExpression) or isinstance(node, base.Scaling):
             operand = node.operand
             if ProgramGenerator.needs_storage(operand):
@@ -227,3 +234,76 @@ class ProgramGenerator:
                 grid = mg.get_coarse_grid(grid, self.coarsening_factor)
 
         return program_string
+
+    @staticmethod
+    def determine_operator_level(operator, storages) -> int:
+        for storage in storages:
+            if operator.grid.size == storage.grid.size:
+                return storage.level
+        raise RuntimeError("No fitting level")
+
+    def generate_multigrid(self, expression: base.Expression, storages) -> str:
+        program = ''
+        if isinstance(expression, mg.Cycle):
+            program = self.generate_multigrid(expression.iterate, storages) + self.generate_multigrid(expression.correction,
+                                                                                                  storages)
+            field = expression.storage
+            program += f'{field.to_exa3()} = ' \
+                       f'{expression.iterate.storage.to_exa3()} + ' \
+                       f'{expression.correction.storage.to_exa3()}'
+        elif isinstance(expression, mg.Residual):
+            program = self.generate_multigrid(expression.rhs, storages) + self.generate_multigrid(expression.iterate, storages)
+            program += f'{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
+                       f'{self.generate_multigrid(expression.operator, storages)} * ' \
+                       f'{expression.iterate.storage.to_exa3()}\n'
+        elif isinstance(expression, base.Multiplication):
+            if isinstance(expression, base.Multiplication):
+                operator_str = "*"
+            elif isinstance(expression, base.Addition):
+                operator_str = "+"
+            elif isinstance(expression, base.Subtraction):
+                operator_str = "-"
+
+            if expression.storage is None:
+                return f'{self.generate_multigrid(expression.operand1, storages)} {operator_str} {expression.operand2}'
+            else:
+                operand1 = expression.operand1
+                operand2 = expression.operand2
+                program = ""
+                if expression.operand1.storage is None:
+                    tmp1 = self.generate_multigrid(operand1, storages)
+                else:
+                    program += self.generate_multigrid(operand1, storages)
+                    tmp1 = f'{operand1.storage.to_exa3()}'
+
+                if expression.operand2.storage is None:
+                    tmp2 = self.generate_multigrid(operand2, storages)
+                else:
+                    program += self.generate_multigrid(operand2, storages)
+                    tmp2 = f'{operand2.storage.to_exa3()}'
+                program += f'{expression.storage.to_exa3()} = {tmp1} {operator_str} {tmp2}\n'
+        elif isinstance(expression, base.Scaling):
+            program = ""
+            operand = expression.operand
+            field = expression.storage
+            if field is None:
+                tmp = self.generate_multigrid(expression.operand, storages)
+            else:
+                program += self.generate_multigrid(expression.operand, storages)
+                tmp = f'{operand.storage.to_exa()}'
+            program += f'{expression.factor} * {tmp}'
+        elif isinstance(expression, base.Inverse):
+            program = f'inv({self.generate_multigrid(expression.operand, storages)})'
+        elif isinstance(expression, base.Diagonal):
+            program = f'diag({self.generate_multigrid(expression.operand, storages)})'
+        elif isinstance(expression, base.Operator):
+            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
+        elif isinstance(expression, base.Grid):
+            pass
+            #program = f'{expression.storage.to_exa3()}'
+        else:
+            raise NotImplementedError("Case not implemented")
+        return f'{program}'
+
+
+
