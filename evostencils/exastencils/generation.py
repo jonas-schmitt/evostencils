@@ -73,7 +73,7 @@ class ProgramGenerator:
         program = self.add_operator_declarations_to_program_string(program, max_level)
         program += f'Function Cycle@{max_level} {{\n'
         program += self.generate_multigrid(expression, storages)
-        program += f'\n}}\n'
+        program += f'}}\n'
         return program
 
     @staticmethod
@@ -263,7 +263,7 @@ class ProgramGenerator:
             field = expression.storage
             program += f'{field.to_exa3()} = ' \
                        f'{expression.iterate.storage.to_exa3()} + ' \
-                       f'{expression.correction.storage.to_exa3()}'
+                       f'{expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
             program = self.generate_multigrid(expression.rhs, storages) + self.generate_multigrid(expression.iterate, storages)
             program += f'{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
@@ -309,6 +309,12 @@ class ProgramGenerator:
             program = f'inv({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
+        elif isinstance(expression, mg.Restriction):
+            program = f'Restriction@{self.determine_operator_level(expression, storages)}'
+        elif isinstance(expression, mg.Interpolation):
+            program = f'Interpolation@{self.determine_operator_level(expression, storages)}'
+        elif isinstance(expression, mg.CoarseGridSolver):
+            program = f'Cycle@0()'
         elif isinstance(expression, base.Operator):
             program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
         elif isinstance(expression, base.Grid):
