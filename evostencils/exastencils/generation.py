@@ -19,6 +19,7 @@ class Field:
         self.name = name
         self.level = level
         self.cycle_storage = cycle_storage
+        self.valid = False
 
     def to_exa3(self):
         return f'{self.name}@{self.level}'
@@ -26,14 +27,14 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
-                 interpolation_stencil_generator=None, restriction_stencil_generator=None):
+                 interpolation, restriction):
         self._operator = op
         self._grid = grid
         self._rhs = rhs
         self._dimension= dimension
         self._coarsening_factor = coarsening_factor
-        self._interpolation_stencil_generator = interpolation_stencil_generator
-        self._restriction_stencil_generator = restriction_stencil_generator
+        self._interpolation = interpolation
+        self._restriction = restriction
 
     @property
     def operator(self):
@@ -56,12 +57,20 @@ class ProgramGenerator:
         return self._coarsening_factor
 
     @property
+    def interpolation(self):
+        return self._interpolation
+
+    @property
+    def restriction(self):
+        return self._restriction
+
+    @property
     def interpolation_stencil_generator(self):
-        return self._interpolation_stencil_generator
+        return self._interpolation.stencil_generator
 
     @property
     def restriction_stencil_generator(self):
-        return self._restriction_stencil_generator
+        return self._restriction.stencil_generator
 
     def generate(self, expression: mg.Cycle):
         max_level = self.obtain_maximum_level(expression)
@@ -70,7 +79,9 @@ class ProgramGenerator:
         self.assign_storage_to_subexpressions(expression, storages, 0)
         program = str('')
         program = self.add_field_declarations_to_program_string(program, storages)
+        program += '\n'
         program = self.add_operator_declarations_to_program_string(program, max_level)
+        program += '\n'
         program += f'Function Cycle@{max_level} {{\n'
         program += self.generate_multigrid(expression, storages)
         program += f'}}\n'
@@ -134,7 +145,7 @@ class ProgramGenerator:
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution_tmp
-            #node.rhs.storage = storages[i].rhs
+            node.rhs.storage = storages[i].rhs_tmp
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
@@ -228,8 +239,8 @@ class ProgramGenerator:
             grid = mg.get_coarse_grid(grid, self.coarsening_factor)
             program_string = self.add_constant_stencil_to_program_string(program_string, i, self.operator.name, stencil)
 
-        if self._interpolation_stencil_generator is None:
-            program_string += "Operator Prolongation from default prolongation on Node with 'linear'\n"
+        if self.interpolation_stencil_generator is None:
+            program_string += f"Operator {self.interpolation.name} from default prolongation on Node with 'linear'\n"
         else:
             grid = self.grid
             for i in range(maximum_level):
@@ -237,8 +248,8 @@ class ProgramGenerator:
                 # TODO generate string for stencil
                 grid = mg.get_coarse_grid(grid, self.coarsening_factor)
 
-        if self._restriction_stencil_generator is None:
-            program_string += "Operator Restriction from default restriction on Node with 'linear'\n"
+        if self.restriction_stencil_generator is None:
+            program_string += f"Operator {self.restriction.name} from default restriction on Node with 'linear'\n"
         else:
             grid = self.grid
             for i in range(maximum_level):
@@ -257,16 +268,21 @@ class ProgramGenerator:
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
         program = ''
+        if expression.storage is not None and expression.storage.valid:
+            expression.storage.valid = False
+
         if isinstance(expression, mg.Cycle):
-            program = self.generate_multigrid(expression.iterate, storages) + self.generate_multigrid(expression.correction,
-                                                                                                  storages)
+            program = self.generate_multigrid(expression.iterate, storages)
+            if not expression.rhs.storage.valid:
+                program += self.generate_multigrid(expression.rhs, storages)
+                expression.rhs.storage.valid = True
+            program += self.generate_multigrid(expression.correction, storages)
             field = expression.storage
-            program += f'{field.to_exa3()} = ' \
+            program += f'\t{field.to_exa3()} = ' \
                        f'{expression.iterate.storage.to_exa3()} + ' \
                        f'{expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
-            program = self.generate_multigrid(expression.rhs, storages) + self.generate_multigrid(expression.iterate, storages)
-            program += f'{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
+            program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages)} * ' \
                        f'{expression.iterate.storage.to_exa3()}\n'
         elif isinstance(expression, base.Multiplication):
@@ -294,7 +310,7 @@ class ProgramGenerator:
                 else:
                     program += self.generate_multigrid(operand2, storages)
                     tmp2 = f'{operand2.storage.to_exa3()}'
-                program += f'{expression.storage.to_exa3()} = {tmp1} {operator_str} {tmp2}\n'
+                program += f'\t{expression.storage.to_exa3()} = {tmp1} {operator_str} {tmp2}\n'
         elif isinstance(expression, base.Scaling):
             program = ""
             operand = expression.operand
@@ -310,9 +326,9 @@ class ProgramGenerator:
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
-            program = f'Restriction@{self.determine_operator_level(expression, storages)}'
+            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
         elif isinstance(expression, mg.Interpolation):
-            program = f'Interpolation@{self.determine_operator_level(expression, storages)}'
+            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
         elif isinstance(expression, mg.CoarseGridSolver):
             program = f'Cycle@0()'
         elif isinstance(expression, base.Operator):

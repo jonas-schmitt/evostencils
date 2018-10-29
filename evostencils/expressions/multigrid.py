@@ -3,10 +3,10 @@ from evostencils.expressions import partitioning as part
 
 
 class Restriction(base.Operator):
-    def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
+    def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super().__init__(f'R_{fine_grid.shape[0]}', (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
+        super().__init__(name, (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
 
     @property
     def fine_grid(self):
@@ -17,14 +17,14 @@ class Restriction(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Restriction({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Restriction({repr(self.name)}, {repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class Interpolation(base.Operator):
-    def __init__(self, fine_grid, coarse_grid, stencil_generator=None):
+    def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super().__init__(f'P_{coarse_grid.shape[0]}', (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
+        super().__init__(name, (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
 
     @property
     def fine_grid(self):
@@ -35,7 +35,7 @@ class Interpolation(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Interpolation({repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Interpolation({repr(name)}, {repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class CoarseGridSolver(base.Entity):
@@ -178,11 +178,11 @@ def residual(operator, iterate, rhs):
 
 
 def get_interpolation(grid: base.Grid, coarse_grid: base.Grid, stencil_generator=None):
-    return Interpolation(grid, coarse_grid, stencil_generator)
+    return Interpolation('P', grid, coarse_grid, stencil_generator)
 
 
 def get_restriction(grid: base.Grid, coarse_grid: base.Grid, stencil_generator=None):
-    return Restriction(grid, coarse_grid, stencil_generator)
+    return Restriction('R', grid, coarse_grid, stencil_generator)
 
 
 def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
