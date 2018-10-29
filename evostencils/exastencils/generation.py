@@ -85,6 +85,8 @@ class ProgramGenerator:
         program += f'Function Cycle@{max_level} {{\n'
         program += self.generate_multigrid(expression, storages)
         program += f'}}\n'
+        program += '\n'
+        program += "ApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
     @staticmethod
@@ -266,6 +268,23 @@ class ProgramGenerator:
                 return storage.level
         raise RuntimeError("No fitting level")
 
+    def generate_coarse_grid_solver(self, expression: base.Expression, storages: [CycleStorage]):
+        # TODO replace hard coded RB-GS by generic implementation
+        level = expression.storage.level
+        i = storages[0].level - level
+        n = 100
+        program = f'\t{storages[i].solution_tmp.to_exa3()} = {storages[i].solution.to_exa3()}\n'
+        program += f'\trepeat {n} times {{\n'
+        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@{level})) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@{level} * ' \
+                   f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
+        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@{level})) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@{level} * ' \
+                   f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
+        program += '\n\t}\n'
+        program += f'\t{expression.storage.to_exa3()} = {storages[i].solution_tmp.to_exa3()}\n'
+        return program
+
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
         program = ''
         if expression.storage is not None and expression.storage.valid:
@@ -285,7 +304,7 @@ class ProgramGenerator:
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages)} * ' \
                        f'{expression.iterate.storage.to_exa3()}\n'
-        elif isinstance(expression, base.Multiplication):
+        elif isinstance(expression, base.BinaryExpression):
             if isinstance(expression, base.Multiplication):
                 operator_str = "*"
             elif isinstance(expression, base.Addition):
@@ -298,9 +317,12 @@ class ProgramGenerator:
             else:
                 operand1 = expression.operand1
                 operand2 = expression.operand2
-                program = ""
                 if expression.operand1.storage is None:
-                    tmp1 = self.generate_multigrid(operand1, storages)
+                    if isinstance(operand1, mg.CoarseGridSolver):
+                        program += self.generate_multigrid(operand2, storages) + self.generate_coarse_grid_solver(expression, storages)
+                        return program
+                    else:
+                        tmp1 = self.generate_multigrid(operand1, storages)
                 else:
                     program += self.generate_multigrid(operand1, storages)
                     tmp1 = f'{operand1.storage.to_exa3()}'
@@ -329,8 +351,6 @@ class ProgramGenerator:
             program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
         elif isinstance(expression, mg.Interpolation):
             program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
-        elif isinstance(expression, mg.CoarseGridSolver):
-            program = f'Cycle@0()'
         elif isinstance(expression, base.Operator):
             program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
         elif isinstance(expression, base.Grid):
