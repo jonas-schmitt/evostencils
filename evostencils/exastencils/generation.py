@@ -77,8 +77,8 @@ class ProgramGenerator:
         storages = self.generate_storage(max_level)
         expression.storage = storages[0].solution
         self.assign_storage_to_subexpressions(expression, storages, 0)
-        program = str('')
-        program = self.add_field_declarations_to_program_string(program, storages)
+        program = f"Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
+        program += self.add_field_declarations_to_program_string(program, storages)
         program += '\n'
         program = self.add_operator_declarations_to_program_string(program, max_level)
         program += '\n'
@@ -345,7 +345,7 @@ class ProgramGenerator:
                 tmp = f'{operand.storage.to_exa()}'
             program += f'{expression.factor} * {tmp}'
         elif isinstance(expression, base.Inverse):
-            program = f'inv({self.generate_multigrid(expression.operand, storages)})'
+            program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
@@ -388,7 +388,7 @@ class ProgramGenerator:
         program += f"\tVar gen_prevRes: Real = gen_curRes\n"
         program += f'\tprint("Starting residual:", gen_initRes)\n'
         program += f"\tVar gen_curIt : Integer = 0\n"
-        program += f"\trepeat until(((gen_curIt >= 100) | | (gen_curRes <= (1.0E-10 * gen_initRes))) | | (gen_curRes <= 0.0)) {{\n"
+        program += f"\trepeat until(((gen_curIt >= 100) || (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
                    f"\t\tCycle@{max_level}()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
