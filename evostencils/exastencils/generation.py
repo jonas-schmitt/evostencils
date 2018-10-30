@@ -86,7 +86,8 @@ class ProgramGenerator:
         program += self.generate_multigrid(expression, storages)
         program += f'}}\n'
         program += '\n'
-        program += "ApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
+        program += self.generate_solver_function("gen_solve", storages)
+        program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
     @staticmethod
@@ -360,5 +361,40 @@ class ProgramGenerator:
             raise NotImplementedError("Case not implemented")
         return f'{program}'
 
+    @staticmethod
+    def generate_l2_norm_residual(function_name: str, storages: [CycleStorage]) -> str:
+        max_level = storages[0].level
+        residual = storages[0].residual.to_exa3()
+        program = ""
+        program += f"Function {function_name}@{max_level} : Real {{\n"
+        program += f"\tVar gen_resNorm : Real = 0.0\n"
+        program += f"\tgen_resNorm += dot ( {residual}, {residual} )\n"
+        program += f"\treturn sqrt ( gen_resNorm )\n"
+        program += f"}}\n"
+        return program
 
-
+    def generate_solver_function(self, function_name: str, storages: [CycleStorage]) -> str:
+        max_level = storages[0].level
+        operator = f"{self.operator.name}@{max_level}"
+        solution = storages[0].solution.to_exa3()
+        rhs = storages[0].rhs.to_exa3()
+        residual = storages[0].residual.to_exa3()
+        compute_residual_norm = "gen_resNorm"
+        program = self.generate_l2_norm_residual(compute_residual_norm, storages)
+        program += f"\nFunction {function_name}@{max_level} {{\n"
+        program += f"\t{residual} = ({rhs} - ({operator} * {solution}))\n"
+        program += f"\tVar gen_initRes: Real = {compute_residual_norm}@{max_level}()\n"
+        program += f"\tVar gen_curRes: Real = gen_initRes\n"
+        program += f"\tVar gen_prevRes: Real = gen_curRes\n"
+        program += f'\tprint("Starting residual:", gen_initRes)\n'
+        program += f"\tVar gen_curIt : Integer = 0\n"
+        program += f"\trepeat until(((gen_curIt >= 100) | | (gen_curRes <= (1.0E-10 * gen_initRes))) | | (gen_curRes <= 0.0)) {{\n"
+        program += f"\t\tgen_curIt += 1\n" \
+                   f"\t\tCycle@{max_level}()\n"
+        program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
+        program += f"\t\tgen_prevRes = gen_curRes\n"
+        program += f"\t\tgen_curRes = {compute_residual_norm}@{max_level}()\n"
+        program += f'\t\tprint("Residual after", gen_curIt, "iterations is", gen_curRes, "--- convergence factor is", (gen_curRes / gen_prevRes))'
+        program += "\t}\n"
+        program += "}\n"
+        return program

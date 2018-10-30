@@ -21,6 +21,7 @@ generator = ProgramGenerator(A, u, b, dimension, coarsening_factor, P, R)
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
+print("Generating Jacobi\n")
 print(generator.generate(jacobi))
 
 # Block-Jacobi
@@ -69,5 +70,6 @@ tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, b, tmp)
 #tmp = multigrid.cycle(jacobi, None, tmp)
 """
+print("Generating Multigrid\n")
 print(generator.generate(tmp))
 #print_declarations(temporaries)
