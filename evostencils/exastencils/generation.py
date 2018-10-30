@@ -22,7 +22,10 @@ class Field:
         self.valid = False
 
     def to_exa3(self):
-        return f'{self.name}@{self.level}'
+        if self.level > 0:
+            return f'{self.name}@(finest - {self.level})'
+        else:
+            return f'{self.name}@finest'
 
 
 class ProgramGenerator:
@@ -73,25 +76,25 @@ class ProgramGenerator:
         return self._restriction.stencil_generator
 
     def generate(self, expression: mg.Cycle):
-        max_level = self.obtain_maximum_level(expression)
-        storages = self.generate_storage(max_level)
+        coarsest_level = self.obtain_coarsest_level(expression)
+        storages = self.generate_storage(coarsest_level)
         expression.storage = storages[0].solution
         self.assign_storage_to_subexpressions(expression, storages, 0)
-        program = f"Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
+        program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
         program += self.add_field_declarations_to_program_string(program, storages)
         program += '\n'
-        program = self.add_operator_declarations_to_program_string(program, max_level)
+        program = self.add_operator_declarations_to_program_string(program, coarsest_level)
         program += '\n'
-        program += f'Function Cycle@{max_level} {{\n'
+        program += f'Function Cycle@finest {{\n'
         program += self.generate_multigrid(expression, storages)
         program += f'}}\n'
         program += '\n'
-        program += self.generate_solver_function("gen_solve", storages)
+        program += self.generate_solver_function("Solve", storages)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
     @staticmethod
-    def obtain_maximum_level(cycle: mg.Cycle) -> int:
+    def obtain_coarsest_level(cycle: mg.Cycle) -> int:
         def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
             if isinstance(expression, mg.Cycle):
                 if expression.grid.size < current_size:
@@ -124,7 +127,7 @@ class ProgramGenerator:
     def generate_storage(self, maximum_level):
         tmps = []
         grid = self.grid
-        for level in range(maximum_level, -1, -1):
+        for level in range(0, maximum_level + 1):
             tmps.append(CycleStorage(level, grid))
             grid = mg.get_coarse_grid(grid, self.coarsening_factor)
         return tmps
@@ -183,38 +186,45 @@ class ProgramGenerator:
 
     @staticmethod
     def add_field_declarations_to_program_string(program_string: str, storages: [CycleStorage]):
+
         for i, storage in enumerate(storages):
-            program_string += f'Field {storage.solution.name}@{storage.solution.level} with Real on Node of global = 0.0\n'
+            solution = storage.solution.to_exa3()
+            solution_tmp = storage.solution_tmp.to_exa3()
+            rhs = storage.rhs.to_exa3()
+            rhs_tmp = storage.rhs_tmp.to_exa3()
+            residual = storage.residual.to_exa3()
+            correction = storage.correction.to_exa3()
+            program_string += f'Field {solution} with Real on Node of global = 0.0\n'
             # TODO handle boundary condition
             if i == 0:
-                program_string += f'Field {storage.solution.name}@{storage.solution.level} on boundary = ' \
-                                  f'( cos ( ( PI * vf_boundaryPosition_0@{storage.solution.level}@[0, 0] ) ) - ' \
+                program_string += f'Field {solution} on boundary = ' \
+                                  f'( cos ( ( PI * vf_boundaryPosition_0@(finest - {storage.solution.level})@[0, 0] ) ) - ' \
                                   f'sin ( ( ( 2.0 * PI ) * vf_boundaryPosition_1@{storage.solution.level}@[0, 0] ) ) )\n'
             else:
-                program_string += f'Field {storage.solution.name}@{storage.solution.level} on boundary = 0.0\n'
+                program_string += f'Field {solution} on boundary = 0.0\n'
 
-            program_string += f'Field {storage.solution_tmp.name}@{storage.solution_tmp.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.solution_tmp.name}@{storage.solution_tmp.level} on boundary = 0.0\n'
+            program_string += f'Field {solution_tmp} with Real on Node of global = 0.0\n'
+            program_string += f'Field {solution_tmp} on boundary = 0.0\n'
             # TODO handle rhs
-            program_string += f'Field {storage.rhs.name}@{storage.rhs.level} with Real on Node of global = ' \
-                              f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@{storage.rhs.level}@[0, 0] ) ) ) - ' \
+            program_string += f'Field {rhs} with Real on Node of global = ' \
+                              f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@(finest - {storage.rhs.level})@[0, 0] ) ) ) - ' \
                               f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
-                              f'vf_nodePosition_1@{storage.rhs.level}@[0, 0] ) ) ) )\n'
-            program_string += f'Field {storage.rhs.name}@{storage.rhs.level} on boundary = 0.0\n'
+                              f'vf_nodePosition_1@(finest - {storage.rhs.level})@[0, 0] ) ) ) )\n'
+            program_string += f'Field {rhs} on boundary = 0.0\n'
 
-            program_string += f'Field {storage.rhs_tmp.name}@{storage.rhs_tmp.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.rhs_tmp.name}@{storage.rhs_tmp.level} on boundary = 0.0\n'
+            program_string += f'Field {rhs_tmp} with Real on Node of global = 0.0\n'
+            program_string += f'Field {rhs_tmp} on boundary = 0.0\n'
 
-            program_string += f'Field {storage.residual.name}@{storage.residual.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.residual.name}@{storage.residual.level} on boundary = 0.0\n'
+            program_string += f'Field {residual} with Real on Node of global = 0.0\n'
+            program_string += f'Field {residual} on boundary = 0.0\n'
 
-            program_string += f'Field {storage.correction.name}@{storage.correction.level} with Real on Node of global = 0.0\n'
-            program_string += f'Field {storage.correction.name}@{storage.correction.level} on boundary = 0.0\n'
+            program_string += f'Field {correction} with Real on Node of global = 0.0\n'
+            program_string += f'Field {correction} on boundary = 0.0\n'
         return program_string
 
     @staticmethod
     def add_constant_stencil_to_program_string(program_string: str, level: int, operator_name: str, stencil: constant.Stencil):
-        program_string += f"Operator {operator_name}@{level} from Stencil {{\n"
+        program_string += f"Operator {operator_name}@(finest - {level}) from Stencil {{\n"
         indent = '\t'
         for offset, value in stencil.entries:
             program_string += indent
@@ -272,15 +282,15 @@ class ProgramGenerator:
     def generate_coarse_grid_solver(self, expression: base.Expression, storages: [CycleStorage]):
         # TODO replace hard coded RB-GS by generic implementation
         level = expression.storage.level
-        i = storages[0].level - level
+        i = storages[-1].level
         n = 100
         program = f'\t{storages[i].solution_tmp.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         program += f'\trepeat {n} times {{\n'
-        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@{level})) * ' \
-                   f'({expression.storage.to_exa3()} - ({self.operator.name}@{level} * ' \
+        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
                    f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
-        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@{level})) * ' \
-                   f'({expression.storage.to_exa3()} - ({self.operator.name}@{level} * ' \
+        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
                    f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
         program += '\n\t}\n'
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution_tmp.to_exa3()}\n'
@@ -349,11 +359,11 @@ class ProgramGenerator:
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
-            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
+            program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, mg.Interpolation):
-            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
+            program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, base.Operator):
-            program = f'{expression.name}@{self.determine_operator_level(expression, storages)}'
+            program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, base.Grid):
             pass
             #program = f'{expression.storage.to_exa3()}'
@@ -363,10 +373,9 @@ class ProgramGenerator:
 
     @staticmethod
     def generate_l2_norm_residual(function_name: str, storages: [CycleStorage]) -> str:
-        max_level = storages[0].level
         residual = storages[0].residual.to_exa3()
         program = ""
-        program += f"Function {function_name}@{max_level} : Real {{\n"
+        program += f"Function {function_name}@finest : Real {{\n"
         program += f"\tVar gen_resNorm : Real = 0.0\n"
         program += f"\tgen_resNorm += dot ( {residual}, {residual} )\n"
         program += f"\treturn sqrt ( gen_resNorm )\n"
@@ -374,26 +383,25 @@ class ProgramGenerator:
         return program
 
     def generate_solver_function(self, function_name: str, storages: [CycleStorage]) -> str:
-        max_level = storages[0].level
-        operator = f"{self.operator.name}@{max_level}"
+        operator = f"{self.operator.name}@finest"
         solution = storages[0].solution.to_exa3()
         rhs = storages[0].rhs.to_exa3()
         residual = storages[0].residual.to_exa3()
         compute_residual_norm = "gen_resNorm"
         program = self.generate_l2_norm_residual(compute_residual_norm, storages)
-        program += f"\nFunction {function_name}@{max_level} {{\n"
+        program += f"\nFunction {function_name}@finest {{\n"
         program += f"\t{residual} = ({rhs} - ({operator} * {solution}))\n"
-        program += f"\tVar gen_initRes: Real = {compute_residual_norm}@{max_level}()\n"
+        program += f"\tVar gen_initRes: Real = {compute_residual_norm}@finest()\n"
         program += f"\tVar gen_curRes: Real = gen_initRes\n"
         program += f"\tVar gen_prevRes: Real = gen_curRes\n"
         program += f'\tprint("Starting residual:", gen_initRes)\n'
         program += f"\tVar gen_curIt : Integer = 0\n"
         program += f"\trepeat until(((gen_curIt >= 100) || (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
-                   f"\t\tCycle@{max_level}()\n"
+                   f"\t\tCycle@finest()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
         program += f"\t\tgen_prevRes = gen_curRes\n"
-        program += f"\t\tgen_curRes = {compute_residual_norm}@{max_level}()\n"
+        program += f"\t\tgen_curRes = {compute_residual_norm}@finest()\n"
         program += f'\t\tprint("Residual after", gen_curIt, "iterations is", gen_curRes, "--- convergence factor is", (gen_curRes / gen_prevRes))'
         program += "\t}\n"
         program += "}\n"
