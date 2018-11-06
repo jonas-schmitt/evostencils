@@ -94,8 +94,22 @@ def get_iteration_matrix(expression: base.Expression):
         else:
             return result
     elif isinstance(result, multigrid.Residual):
+        operand1 = result.rhs
+        if isinstance(result.iterate, base.ZeroOperator):
+            operand2 = result.iterate
+        else:
+            operand2 = base.mul(result.operator, result.iterate)
         # Inefficient but sufficient for now
-        return get_iteration_matrix(result.generate_expression())
+        if isinstance(operand1, base.ZeroOperator):
+            if isinstance(operand2, base.ZeroOperator):
+                return operand2
+            else:
+                return base.Scaling(-1, operand2)
+        elif isinstance(operand2, base.ZeroOperator):
+            return operand1
+        else:
+            return base.Subtraction(operand1, operand2)
+
     elif isinstance(result, base.Addition):
         if isinstance(result.operand1, base.ZeroOperator):
             return result.operand2

@@ -17,7 +17,7 @@ class Restriction(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Restriction({repr(self.name)}, {repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Restriction({repr(self.name)}, {repr(self.fine_grid)}, {repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class Interpolation(base.Operator):
@@ -35,7 +35,7 @@ class Interpolation(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Interpolation({repr(name)}, {repr(self._grid)}, {repr(self._coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Interpolation({repr(self.name)}, {repr(self.fine_grid)}, {repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class CoarseGridSolver(base.Entity):
