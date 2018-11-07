@@ -1,5 +1,5 @@
 from evostencils.optimizer import Optimizer
-from evostencils.expressions import base, transformations
+from evostencils.expressions import base, multigrid, transformations
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 #from evostencils.evaluation.roofline import *
@@ -20,19 +20,21 @@ def main():
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
     A = base.generate_operator_on_grid('A', u, generate_poisson_2d)
+    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor))
+    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor))
 
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e10
     epsilon = 1e-9
 
-    #bytes_per_word = 8
-    #peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
-    #peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    #performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
+    # bytes_per_word = 8
+    # peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
+    # peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
+    # performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
 
-    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, convergence_evaluator=convergence_evaluator,
+    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(50, 20, 0.5, 0.3)
 
     i = 1
     print('\n')

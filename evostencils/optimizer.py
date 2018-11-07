@@ -24,19 +24,21 @@ class AST(gp.PrimitiveTree):
 
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
-                 convergence_evaluator=None, performance_evaluator=None, epsilon=1e-9, infinity=1e10):
+                 interpolation, restriction, convergence_evaluator=None, performance_evaluator=None,
+                 epsilon=1e-9, infinity=1e10):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
         self._rhs = rhs
         self._dimension = dimension
         self._coarsening_factor = coarsening_factor
+        self._interpolation = interpolation
+        self._restriction = restriction
         self._convergence_evaluator = convergence_evaluator
         self._performance_evaluator = performance_evaluator
         self._epsilon = epsilon
         self._infinity = infinity
-        pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor,
-                                               interpolation_stencil=None, restriction_stencil=None,
+        pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
                                                maximum_number_of_cycles=2)
         self._primitive_set = pset
         self._init_creator()
@@ -78,6 +80,14 @@ class Optimizer:
     @property
     def coarsening_factor(self):
         return self._coarsening_factor
+
+    @property
+    def interpolation(self):
+        return self._interpolation
+
+    @property
+    def restriction(self):
+        return self._restriction
 
     @property
     def convergence_evaluator(self):
