@@ -2,7 +2,8 @@ from evostencils.optimizer import Optimizer
 from evostencils.expressions import base, multigrid, transformations
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
-#from evostencils.evaluation.roofline import *
+# from evostencils.evaluation.roofline import *
+from evostencils.exastencils.generation import  ProgramGenerator
 import lfa_lab as lfa
 
 
@@ -34,17 +35,21 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(50, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(500, 15, 0.5, 0.3)
 
+    generator = ProgramGenerator(A, u, b, dimension, coarsening_factor, P, R)
     i = 1
     print('\n')
     for ind in hof:
         print(f'Individual {i} with fitness {ind.fitness}')
         expression = optimizer.compile_expression(ind)
+        program = generator.generate(expression[0])
+        if i == 1:
+            print(program)
         #expression = transformations.set_weights(expression, ind.weights)
-        print(f'Update expression: {repr(expression)}')
+        #print(f'Update expression: {repr(expression)}')
         iteration_matrix = transformations.get_iteration_matrix(expression[0])
-        print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
+        #print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')
         except:

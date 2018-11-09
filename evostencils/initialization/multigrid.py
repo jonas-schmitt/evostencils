@@ -42,6 +42,7 @@ class Types:
         self.Interpolation = matrix_types.generate_matrix_type(terminals.interpolation.shape)
         self.Restriction = matrix_types.generate_matrix_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_matrix_type(terminals.coarse_operator.shape)
+        self.CoarseGridSolver = matrix_types.generate_solver_type(terminals.coarse_operator.shape)
         self.CoarseGrid = grid_types.generate_grid_type(terminals.coarse_grid.size)
         self.CoarseRHS = grid_types.generate_rhs_type(terminals.coarse_grid.size)
         self.CoarseCorrection = grid_types.generate_correction_type(terminals.coarse_grid.size)
@@ -55,12 +56,12 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
-    pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
+    # pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
     # pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
     # pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
     # pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
-    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseOperator, f'S_{level}')
+    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -134,14 +135,14 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(extend, [types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                       multiple.generate_type_list(types.Grid, types.Correction),
                       f'interpolate_{level}')
-    pset.addPrimitive(extend, [types.CoarseOperator, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
+    pset.addPrimitive(extend, [types.CoarseGridSolver, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection),
                       f'solve_{level}')
 
     # Create intergrid operators
-    pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
-    pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
-    pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
+    #pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,

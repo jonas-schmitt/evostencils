@@ -7,6 +7,7 @@ import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
 from evostencils.deap_extension import generate_tree_with_minimum_height
 from evostencils.weight_optimizer import WeightOptimizer
+from evostencils.exastencils.generation import ProgramGenerator
 
 
 class AST(gp.PrimitiveTree):
@@ -44,6 +45,7 @@ class Optimizer:
         self._init_creator()
         self._init_toolbox()
         self._weight_optimizer = WeightOptimizer(self)
+        self._program_generator = ProgramGenerator(self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
 
     @staticmethod
     def _init_creator():
@@ -128,6 +130,8 @@ class Optimizer:
         if spectral_radius == 0.0:
             return self.infinity,
         else:
+            # For testing
+            # _ = self._program_generator.generate(expression)
             if self._performance_evaluator is not None:
                 runtime = self.performance_evaluator.estimate_runtime(expression)
                 if spectral_radius < 1.0:

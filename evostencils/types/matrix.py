@@ -80,3 +80,31 @@ def generate_upper_triangular_matrix_type(shape):
 
 def generate_zero_matrix_type(shape):
     return generate_matrix_type(shape, diag=False, block_diagonal=False, lower_triangle=False, upper_triangle=False)
+
+
+class SolverTypeMetaClass(type):
+    def __new__(mcs, class_name, bases, dct):
+        return super(SolverTypeMetaClass, mcs).__new__(mcs, class_name, bases, dct)
+
+    def __eq__(self, other):
+        if hasattr(other, 'shape') and hasattr(other, 'is_solver'):
+            return self.shape == other.shape and self.is_solver == other.is_solver
+        else:
+            return False
+
+    def __subclasscheck__(self, other):
+        if hasattr(other, 'shape') and hasattr(other, 'is_solver'):
+            return self.shape == other.shape and self.is_solver == other.is_solver
+        else:
+            return False
+
+    # TODO be careful. Could collide with other types!
+    def __hash__(self):
+        return hash((*self.shape, self.is_solver))
+
+
+def generate_solver_type(shape):
+    return SolverTypeMetaClass("SolverType", (), {
+        "shape": shape,
+        "is_solver": True
+    })

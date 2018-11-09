@@ -324,7 +324,9 @@ class ProgramGenerator:
                 operator_str = "-"
 
             if expression.storage is None:
-                return f'{self.generate_multigrid(expression.operand1, storages)} {operator_str} {expression.operand2}'
+                return f'{self.generate_multigrid(expression.operand1, storages)} ' \
+                       f'{operator_str} ' \
+                       f'{self.generate_multigrid(expression.operand2, storages)}'
             else:
                 operand1 = expression.operand1
                 operand2 = expression.operand2
@@ -359,15 +361,18 @@ class ProgramGenerator:
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
-            program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
+            level_offset = self.determine_operator_level(expression, storages) - 1
+            program = f'{expression.name}@(finest - {level_offset})'
         elif isinstance(expression, mg.Interpolation):
-            program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
+            level_offset = self.determine_operator_level(expression, storages) + 1
+            program = f'{expression.name}@(finest - {level_offset})'
         elif isinstance(expression, base.Operator):
             program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, base.Grid):
             pass
             #program = f'{expression.storage.to_exa3()}'
         else:
+            print(type(expression))
             raise NotImplementedError("Case not implemented")
         return f'{program}'
 
