@@ -11,7 +11,7 @@ def main():
     # Create a 2D grid with step-size (1/32, 1/32).
     dimension = 2
     grid_size = (512, 512)
-    step_size = (1.0, 1.0)
+    step_size = (0.00390625, 0.00390625)
     coarsening_factor = (2, 2)
 
     lfa_grid = lfa.Grid(dimension, step_size)
@@ -25,8 +25,8 @@ def main():
     R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor))
 
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
-    infinity = 1e10
-    epsilon = 1e-9
+    infinity = 1e100
+    epsilon = 1e-10
 
     # bytes_per_word = 8
     # peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
@@ -35,7 +35,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(500, 15, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
 
     generator = ProgramGenerator(A, u, b, dimension, coarsening_factor, P, R)
     i = 1
@@ -45,11 +45,11 @@ def main():
         expression = optimizer.compile_expression(ind)
         program = generator.generate(expression[0])
         if i == 1:
-            print(program)
-        #expression = transformations.set_weights(expression, ind.weights)
-        #print(f'Update expression: {repr(expression)}')
-        iteration_matrix = transformations.get_iteration_matrix(expression[0])
-        #print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
+            generator.write_program_to_file("2D_FD_Poisson", program)
+        # expression = transformations.set_weights(expression, ind.weights)
+        # print(f'Update expression: {repr(expression)}')
+        # iteration_matrix = transformations.get_iteration_matrix(expression[0])
+        # print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')
         except:

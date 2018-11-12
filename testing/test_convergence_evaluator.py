@@ -16,6 +16,7 @@ coarsening_factor = (2, 2)
 lfa_grid = lfa.Grid(dimension, step_size)
 lfa_operator = lfa.gallery.poisson_2d(lfa_grid)
 lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
+convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
 
 u = base.generate_grid('u', grid_size, step_size)
 b = base.generate_rhs('f', grid_size, step_size)

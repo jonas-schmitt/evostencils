@@ -89,7 +89,7 @@ class ProgramGenerator:
         program += self.generate_multigrid(expression, storages)
         program += f'}}\n'
         program += '\n'
-        program += self.generate_solver_function("Solve", storages)
+        program += self.generate_solver_function("gen_solve", storages)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
@@ -310,7 +310,7 @@ class ProgramGenerator:
             field = expression.storage
             program += f'\t{field.to_exa3()} = ' \
                        f'{expression.iterate.storage.to_exa3()} + ' \
-                       f'{expression.correction.storage.to_exa3()}\n'
+                       f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages)} * ' \
@@ -387,7 +387,8 @@ class ProgramGenerator:
         program += f"}}\n"
         return program
 
-    def generate_solver_function(self, function_name: str, storages: [CycleStorage]) -> str:
+    def generate_solver_function(self, function_name: str, storages: [CycleStorage], maximum_number_of_iterations=1000) -> str:
+        assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@finest"
         solution = storages[0].solution.to_exa3()
         rhs = storages[0].rhs.to_exa3()
@@ -401,7 +402,7 @@ class ProgramGenerator:
         program += f"\tVar gen_prevRes: Real = gen_curRes\n"
         program += f'\tprint("Starting residual:", gen_initRes)\n'
         program += f"\tVar gen_curIt : Integer = 0\n"
-        program += f"\trepeat until(((gen_curIt >= 100) || (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
+        program += f"\trepeat until(((gen_curIt >= {maximum_number_of_iterations}) || (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
                    f"\t\tCycle@finest()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
@@ -411,3 +412,24 @@ class ProgramGenerator:
         program += "\t}\n"
         program += "}\n"
         return program
+
+    @staticmethod
+    def write_program_to_file(name: str, program: str):
+        with open(f'{name}.exa3', "w") as file:
+            print(program, file=file)
+
+    @staticmethod
+    def generate_settings_file(name: str):
+        tmp = f'user\t="Guest"\n\n'
+        tmp = f'basePathPrefix\t="./"\n\n'
+        tmp = f'l3file\t="{name}.exa3"\n\n'
+        tmp = f'debugL3File\t="Debug/{name}_debug.exa3"\n'
+        tmp = f'debugL4File\t="Debug/{name}_debug.exa4"\n\n'
+        tmp = f'htmlLogFile\t="Debug/{name}_log.html"\n\n'
+        tmp = f'outputPath\t="generated/{name}"\n\n'
+        tmp = f'produceHtmlLog\t=true\n'
+        tmp = f'timeStrategies\t=true\n\n'
+        tmp = f'buildfileGenerators=\t={{"MakefileGenerator"}}\n'
+        with open(f'{name}.settings', "w") as file:
+            print(tmp, file=file)
+
