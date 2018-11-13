@@ -26,7 +26,7 @@ generator = ProgramGenerator(A, u, b, dimension, coarsening_factor, P, R)
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
-jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
+jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=0.6)
 #print("Generating Jacobi\n")
 
 # Block-Jacobi
@@ -46,8 +46,9 @@ tmp = base.mul(multigrid.get_restriction(u, u_coarse), tmp)
 tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(jacobi, b, tmp)
-tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)))
+tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.6)
 iteration_matrix = transformations.get_iteration_matrix(tmp)
+print(iteration_matrix)
 print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
 
 

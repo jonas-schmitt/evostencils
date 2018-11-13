@@ -150,15 +150,15 @@ class ProgramGenerator:
     def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution_tmp
-            node.rhs.storage = storages[i].rhs_tmp
+            node.iterate.storage = storages[i].solution
+            node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution_tmp
-            node.rhs.storage = storages[i].rhs_tmp
+            node.iterate.storage = storages[i].solution
+            node.rhs.storage = storages[i].rhs
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
         elif isinstance(node, base.BinaryExpression):
@@ -203,17 +203,21 @@ class ProgramGenerator:
             else:
                 program_string += f'Field {solution} on boundary = 0.0\n'
 
-            program_string += f'Field {solution_tmp} with Real on Node of global = 0.0\n'
-            program_string += f'Field {solution_tmp} on boundary = 0.0\n'
+            # program_string += f'Field {solution_tmp} with Real on Node of global = 0.0\n'
+            # program_string += f'Field {solution_tmp} on boundary = 0.0\n'
             # TODO handle rhs
-            program_string += f'Field {rhs} with Real on Node of global = ' \
-                              f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@(finest - {storage.rhs.level})@[0, 0] ) ) ) - ' \
-                              f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
-                              f'vf_nodePosition_1@(finest - {storage.rhs.level})@[0, 0] ) ) ) )\n'
+            if i == 0:
+                program_string += f'Field {rhs} with Real on Node of global = ' \
+                                f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@(finest - {storage.rhs.level})@[0, 0] ) ) ) - ' \
+                                f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
+                                f'vf_nodePosition_1@(finest - {storage.rhs.level})@[0, 0] ) ) ) )\n'
+            else:
+                program_string += f'Field {rhs} with Real on Node of global = 0\n'
+
             program_string += f'Field {rhs} on boundary = 0.0\n'
 
-            program_string += f'Field {rhs_tmp} with Real on Node of global = 0.0\n'
-            program_string += f'Field {rhs_tmp} on boundary = 0.0\n'
+            # program_string += f'Field {rhs_tmp} with Real on Node of global = 0.0\n'
+            # program_string += f'Field {rhs_tmp} on boundary = 0.0\n'
 
             program_string += f'Field {residual} with Real on Node of global = 0.0\n'
             program_string += f'Field {residual} on boundary = 0.0\n'
@@ -283,17 +287,17 @@ class ProgramGenerator:
         # TODO replace hard coded RB-GS by generic implementation
         level = expression.storage.level
         i = storages[-1].level
-        n = 100
-        program = f'\t{storages[i].solution_tmp.to_exa3()} = {storages[i].solution.to_exa3()}\n'
+        n = 1000
+        program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
-        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+        program += f'\t\t{storages[i].solution.to_exa3()} += ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
-                   f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
-        program += f'\t\t{storages[i].solution_tmp.to_exa3()} = ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+                   f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
+        program += f'\t\t{storages[i].solution.to_exa3()} += ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
-                   f'{storages[i].solution_tmp.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
+                   f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
         program += '\n\t}\n'
-        program += f'\t{expression.storage.to_exa3()} = {storages[i].solution_tmp.to_exa3()}\n'
+        program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         return program
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
@@ -302,6 +306,8 @@ class ProgramGenerator:
             expression.storage.valid = False
 
         if isinstance(expression, mg.Cycle):
+            if isinstance(expression.iterate, base.ZeroGrid):
+                program += f'\t{expression.iterate.storage.to_exa3()} = 0'
             program = self.generate_multigrid(expression.iterate, storages)
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages)
