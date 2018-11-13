@@ -39,13 +39,13 @@ class Optimizer:
         self._performance_evaluator = performance_evaluator
         self._epsilon = epsilon
         self._infinity = infinity
-        pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
+        pset = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
                                                maximum_number_of_cycles=3)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
         self._weight_optimizer = WeightOptimizer(self)
-        self._program_generator = ProgramGenerator(self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
+        self._program_generator = ProgramGenerator('2D_FD_Poisson', '/ja42rica/local/ScalaExaStencil', self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
 
     @staticmethod
     def _init_creator():
@@ -124,6 +124,7 @@ class Optimizer:
 
         # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
         # expression = transformations.remove_identity_operations(expression)
+
         if individual.weights is not None:
             expression = transformations.set_weights(expression, individual.weights)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
@@ -131,7 +132,15 @@ class Optimizer:
             return self.infinity,
         else:
             # For testing
-            # _ = self._program_generator.generate(expression)
+            if spectral_radius < 0.9:
+                program = self._program_generator.generate(expression)
+                self._program_generator.write_program_to_file(program)
+                time = self._program_generator.execute()
+                return time,
+            else:
+                return spectral_radius * 1e3,
+
+            """ 
             if self._performance_evaluator is not None:
                 runtime = self.performance_evaluator.estimate_runtime(expression)
                 if spectral_radius < 1.0:
@@ -140,6 +149,7 @@ class Optimizer:
                     return self.infinity * spectral_radius * runtime,
             else:
                 return spectral_radius,
+            """
 
     def simple_gp(self, population, generations, crossover_probability, mutation_probability):
         random.seed()
@@ -176,7 +186,7 @@ class Optimizer:
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
-        return self.harm_gp(population, generations, crossover_probability, mutation_probability)
+        return self.simple_gp(population, generations, crossover_probability, mutation_probability)
 
     def optimize_weights(self, individual):
         expression = transformations.fold_intergrid_operations(self.compile_expression(individual))

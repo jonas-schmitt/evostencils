@@ -1,5 +1,7 @@
 from evostencils.expressions import base, multigrid as mg
 from evostencils.stencils import constant
+import os
+import subprocess
 
 
 class CycleStorage:
@@ -29,15 +31,31 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
-                 interpolation, restriction):
+    def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Grid, rhs: base.Grid,
+                 dimension, coarsening_factor, interpolation, restriction, output_path="./generated"):
+        self.problem_name = problem_name
+        self._exastencils_path = exastencils_path
+        self._output_path = output_path
         self._operator = op
         self._grid = grid
         self._rhs = rhs
-        self._dimension= dimension
+        self._dimension = dimension
         self._coarsening_factor = coarsening_factor
         self._interpolation = interpolation
         self._restriction = restriction
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        subprocess.run(['cp', '-r', 'lib', f'{output_path}'])
+        self.generate_settings_file()
+        self.generate_knowledge_file()
+
+    @property
+    def exastencils_path(self):
+        return self._exastencils_path
+
+    @property
+    def output_path(self):
+        return self._output_path
 
     @property
     def operator(self):
@@ -75,6 +93,31 @@ class ProgramGenerator:
     def restriction_stencil_generator(self):
         return self._restriction.stencil_generator
 
+    def generate_settings_file(self):
+        tmp = f'user\t= "Guest"\n\n'
+        tmp += f'basePathPrefix\t= "{self.output_path}"\n\n'
+        tmp += f'l3file\t= "{self.problem_name}.exa3"\n\n'
+        tmp += f'debugL3File\t= "Debug/{self.problem_name}_debug.exa3"\n'
+        tmp += f'debugL4File\t= "Debug/{self.problem_name}_debug.exa4"\n\n'
+        tmp += f'htmlLogFile\t= "Debug/{self.problem_name}_log.html"\n\n'
+        tmp += f'outputPath\t= "generated/{self.problem_name}"\n\n'
+        tmp += f'produceHtmlLog\t= true\n'
+        tmp += f'timeStrategies\t= true\n\n'
+        tmp += f'buildfileGenerators\t= {{"MakefileGenerator"}}\n'
+        with open(f'{self.output_path}/{self.problem_name}.settings', "w") as file:
+            print(tmp, file=file)
+
+    def generate_knowledge_file(self, min_level=0, max_level=8, discretization_type="FiniteDifferences",
+                                domain="domain_onePatch", parallelization="parallelization_pureOmp"):
+        tmp = f'dimensionality\t= {self.dimension}\n\n'
+        tmp += f'minLevel\t= {min_level}\n'
+        tmp += f'maxLevel\t= {max_level}\n\n'
+        tmp += f'discr_type\t= "{discretization_type}"\n\n'
+        tmp += f'import "lib/{domain}.knowledge"\n'
+        tmp += f'import "lib/{parallelization}.knowledge"\n'
+        with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
+            print(tmp, file=file)
+
     def generate(self, expression: mg.Cycle):
         coarsest_level = self.obtain_coarsest_level(expression)
         storages = self.generate_storage(coarsest_level)
@@ -92,6 +135,27 @@ class ProgramGenerator:
         program += self.generate_solver_function("gen_solve", storages)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
+
+    def write_program_to_file(self, program: str):
+        with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
+            print(program, file=file)
+
+    def execute(self, platform='linux'):
+        import subprocess
+        subprocess.run(['java', '-cp',
+                        f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
+                        f'{self.output_path}/{self.problem_name}.settings',
+                        f'{self.output_path}/{self.problem_name}.knowledge',
+                        f'{self.exastencils_path}/Examples/lib/{platform}.platform', '/dev/null'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        import time
+        start = time.time()
+        subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        end = time.time()
+        return end - start
 
     @staticmethod
     def obtain_coarsest_level(cycle: mg.Cycle) -> int:
@@ -227,7 +291,8 @@ class ProgramGenerator:
         return program_string
 
     @staticmethod
-    def add_constant_stencil_to_program_string(program_string: str, level: int, operator_name: str, stencil: constant.Stencil):
+    def add_constant_stencil_to_program_string(program_string: str, level: int, operator_name: str,
+                                               stencil: constant.Stencil):
         program_string += f"Operator {operator_name}@(finest - {level}) from Stencil {{\n"
         indent = '\t'
         for offset, value in stencil.entries:
@@ -290,10 +355,12 @@ class ProgramGenerator:
         n = 1000
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
-        program += f'\t\t{storages[i].solution.to_exa3()} += ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+        program += f'\t\t{storages[i].solution.to_exa3()} ' \
+                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
                    f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
-        program += f'\t\t{storages[i].solution.to_exa3()} += ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
+        program += f'\t\t{storages[i].solution.to_exa3()} ' \
+                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
                    f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
         program += '\n\t}\n'
@@ -338,7 +405,8 @@ class ProgramGenerator:
                 operand2 = expression.operand2
                 if expression.operand1.storage is None:
                     if isinstance(operand1, mg.CoarseGridSolver):
-                        program += self.generate_multigrid(operand2, storages) + self.generate_coarse_grid_solver(expression, storages)
+                        program += self.generate_multigrid(operand2, storages) \
+                                   + self.generate_coarse_grid_solver(expression, storages)
                         return program
                     else:
                         tmp1 = self.generate_multigrid(operand1, storages)
@@ -393,7 +461,8 @@ class ProgramGenerator:
         program += f"}}\n"
         return program
 
-    def generate_solver_function(self, function_name: str, storages: [CycleStorage], maximum_number_of_iterations=1000) -> str:
+    def generate_solver_function(self, function_name: str, storages: [CycleStorage],
+                                 maximum_number_of_iterations=1000) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@finest"
         solution = storages[0].solution.to_exa3()
@@ -408,34 +477,17 @@ class ProgramGenerator:
         program += f"\tVar gen_prevRes: Real = gen_curRes\n"
         program += f'\tprint("Starting residual:", gen_initRes)\n'
         program += f"\tVar gen_curIt : Integer = 0\n"
-        program += f"\trepeat until(((gen_curIt >= {maximum_number_of_iterations}) || (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
+        program += f"\trepeat until(((gen_curIt >= {maximum_number_of_iterations}) " \
+                   f"|| (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
                    f"\t\tCycle@finest()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
         program += f"\t\tgen_prevRes = gen_curRes\n"
         program += f"\t\tgen_curRes = {compute_residual_norm}@finest()\n"
-        program += f'\t\tprint("Residual after", gen_curIt, "iterations is", gen_curRes, "--- convergence factor is", (gen_curRes / gen_prevRes))'
+        program += f'\t\tprint("Residual after", gen_curIt, "iterations is", gen_curRes, ' \
+                   f'"--- convergence factor is", (gen_curRes / gen_prevRes))'
         program += "\t}\n"
         program += "}\n"
         return program
 
-    @staticmethod
-    def write_program_to_file(name: str, program: str):
-        with open(f'{name}.exa3', "w") as file:
-            print(program, file=file)
-
-    @staticmethod
-    def generate_settings_file(name: str):
-        tmp = f'user\t="Guest"\n\n'
-        tmp = f'basePathPrefix\t="./"\n\n'
-        tmp = f'l3file\t="{name}.exa3"\n\n'
-        tmp = f'debugL3File\t="Debug/{name}_debug.exa3"\n'
-        tmp = f'debugL4File\t="Debug/{name}_debug.exa4"\n\n'
-        tmp = f'htmlLogFile\t="Debug/{name}_log.html"\n\n'
-        tmp = f'outputPath\t="generated/{name}"\n\n'
-        tmp = f'produceHtmlLog\t=true\n'
-        tmp = f'timeStrategies\t=true\n\n'
-        tmp = f'buildfileGenerators=\t={{"MakefileGenerator"}}\n'
-        with open(f'{name}.settings', "w") as file:
-            print(tmp, file=file)
 

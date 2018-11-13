@@ -35,9 +35,9 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.simple_gp(500, 15, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(200, 20, 0.5, 0.3)
 
-    generator = ProgramGenerator(A, u, b, dimension, coarsening_factor, P, R)
+    generator = optimizer._program_generator
     i = 1
     print('\n')
     for ind in hof:
@@ -45,7 +45,7 @@ def main():
         expression = optimizer.compile_expression(ind)
         program = generator.generate(expression[0])
         if i == 1:
-            generator.write_program_to_file("2D_FD_Poisson", program)
+            generator.write_program_to_file(program)
         # expression = transformations.set_weights(expression, ind.weights)
         # print(f'Update expression: {repr(expression)}')
         # iteration_matrix = transformations.get_iteration_matrix(expression[0])
