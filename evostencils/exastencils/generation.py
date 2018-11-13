@@ -7,9 +7,9 @@ class CycleStorage:
         self.level = level
         self.grid = grid
         self.solution = Field(f'Solution', level, self)
-        self.solution_tmp = Field(f'Solution_tmp', level, self)
+        # self.solution_tmp = Field(f'Solution_tmp', level, self)
         self.rhs = Field(f'RHS', level, self)
-        self.rhs_tmp = Field(f'RHS_tmp', level, self)
+        # self.rhs_tmp = Field(f'RHS_tmp', level, self)
         self.residual = Field(f'Residual', level, self)
         self.correction = Field(f'Correction', level, self)
 
@@ -189,17 +189,17 @@ class ProgramGenerator:
 
         for i, storage in enumerate(storages):
             solution = storage.solution.to_exa3()
-            solution_tmp = storage.solution_tmp.to_exa3()
+            # solution_tmp = storage.solution_tmp.to_exa3()
             rhs = storage.rhs.to_exa3()
-            rhs_tmp = storage.rhs_tmp.to_exa3()
+            # rhs_tmp = storage.rhs_tmp.to_exa3()
             residual = storage.residual.to_exa3()
             correction = storage.correction.to_exa3()
             program_string += f'Field {solution} with Real on Node of global = 0.0\n'
             # TODO handle boundary condition
             if i == 0:
                 program_string += f'Field {solution} on boundary = ' \
-                                  f'( cos ( ( PI * vf_boundaryPosition_0@(finest - {storage.solution.level})@[0, 0] ) ) - ' \
-                                  f'sin ( ( ( 2.0 * PI ) * vf_boundaryPosition_1@{storage.solution.level}@[0, 0] ) ) )\n'
+                                  f'( cos ( ( PI * vf_boundaryPos_x ) ) - ' \
+                                  f'sin ( ( ( 2.0 * PI ) * vf_boundaryPos_y) ) )\n'
             else:
                 program_string += f'Field {solution} on boundary = 0.0\n'
 
@@ -208,9 +208,9 @@ class ProgramGenerator:
             # TODO handle rhs
             if i == 0:
                 program_string += f'Field {rhs} with Real on Node of global = ' \
-                                f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePosition_0@(finest - {storage.rhs.level})@[0, 0] ) ) ) - ' \
+                                f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePos_x ) ) ) - ' \
                                 f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
-                                f'vf_nodePosition_1@(finest - {storage.rhs.level})@[0, 0] ) ) ) )\n'
+                                f'vf_nodePos_y ) ) ) )\n'
             else:
                 program_string += f'Field {rhs} with Real on Node of global = 0\n'
 

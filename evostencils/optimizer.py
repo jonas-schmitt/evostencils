@@ -40,7 +40,7 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         pset= multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
-                                               maximum_number_of_cycles=2)
+                                               maximum_number_of_cycles=3)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
