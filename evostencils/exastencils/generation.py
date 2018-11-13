@@ -350,18 +350,17 @@ class ProgramGenerator:
 
     def generate_coarse_grid_solver(self, expression: base.Expression, storages: [CycleStorage]):
         # TODO replace hard coded RB-GS by generic implementation
-        level = expression.storage.level
-        i = storages[-1].level
+        i = expression.storage.level
         n = 1000
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
-                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
-                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
+                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
                    f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
-                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {level}))) * ' \
-                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {level}) * ' \
+                   f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
+                   f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
                    f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
         program += '\n\t}\n'
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
