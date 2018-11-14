@@ -1,4 +1,4 @@
-from evostencils.expressions import multigrid
+from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
 
 # Not bugfree
@@ -86,14 +86,14 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
 
 def get_iteration_matrix(expression: base.Expression):
     result = expression.apply(get_iteration_matrix)
-    if isinstance(result, multigrid.Cycle):
+    if isinstance(result, mg.Cycle):
         if isinstance(result.iterate, base.ZeroOperator):
             return result.correction
         elif isinstance(result.correction, base.ZeroOperator):
             return result.iterate
         else:
             return result
-    elif isinstance(result, multigrid.Residual):
+    elif isinstance(result, mg.Residual):
         operand1 = result.rhs
         if isinstance(result.iterate, base.ZeroOperator):
             operand2 = result.iterate
@@ -148,37 +148,46 @@ def get_iteration_matrix(expression: base.Expression):
     else:
         return result
 
+
 # Not bugfree
-"""
-def set_weights(expression: base.Expression, weights: list) -> tuple:
-    if isinstance(expression, multigrid.Cycle):
+def set_weights(expression: base.Expression, weights: list) -> list:
+    if isinstance(expression, mg.Cycle):
         if len(weights) == 0:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
-        iterate, tail = set_weights(expression.iterate, tail)
-        correction, tail = set_weights(expression.correction, tail)
-        if len(tail) > 0:
-            raise RuntimeError("Too many weights have been supplied")
-        return multigrid.Cycle(iterate, correction, partitioning=expression.partitioning, weight=head), tail
-    elif isinstance(expression, base.Grid):
-        return expression, weights
+        expression._weight = head
+        return set_weights(expression.correction, tail)
+    elif isinstance(expression, mg.Residual):
+        tail = set_weights(expression.rhs, weights)
+        return set_weights(expression.iterate, tail)
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        return set_weights(expression.operand, weights)
+    elif isinstance(expression, base.BinaryExpression):
+        tail = set_weights(expression.operand1, weights)
+        return set_weights(expression.operand2, tail)
     else:
-        raise NotImplementedError("Not implemented")
+        return weights
 
 
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
-    if isinstance(expression, multigrid.Cycle):
+    if isinstance(expression, mg.Cycle):
         weights.append(expression.weight)
-        weights.extend(obtain_weights(expression.iterate))
         weights.extend(obtain_weights(expression.correction))
         return weights
-    elif isinstance(expression, base.Grid):
+    elif isinstance(expression, mg.Residual):
+        weights.extend(obtain_weights(expression.rhs))
+        weights.extend(obtain_weights(expression.iterate))
+        return weights
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        weights.extend(obtain_weights(expression.operand))
+        return weights
+    elif isinstance(expression, base.BinaryExpression):
+        weights.extend(obtain_weights(expression.operand1))
+        weights.extend(obtain_weights(expression.operand2))
         return weights
     else:
-        raise NotImplementedError("Not implemented")
-
-"""
+        return weights
 
 
 def obtain_iterate(expression: base.Expression):

@@ -124,9 +124,9 @@ class ProgramGenerator:
         expression.storage = storages[0].solution
         self.assign_storage_to_subexpressions(expression, storages, 0)
         program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
-        program += self.add_field_declarations_to_program_string(program, storages)
+        program += self.add_field_declarations_to_program_string(storages)
         program += '\n'
-        program = self.add_operator_declarations_to_program_string(program, coarsest_level)
+        program += self.add_operator_declarations_to_program_string(coarsest_level)
         program += '\n'
         program += f'Function Cycle@finest {{\n'
         program += self.generate_multigrid(expression, storages)
@@ -248,8 +248,8 @@ class ProgramGenerator:
             node.storage = storages[i].solution
 
     @staticmethod
-    def add_field_declarations_to_program_string(program_string: str, storages: [CycleStorage]):
-
+    def add_field_declarations_to_program_string(storages: [CycleStorage]):
+        program_string = ''
         for i, storage in enumerate(storages):
             solution = storage.solution.to_exa3()
             # solution_tmp = storage.solution_tmp.to_exa3()
@@ -313,7 +313,8 @@ class ProgramGenerator:
         program_string += '}\n'
         return program_string
 
-    def add_operator_declarations_to_program_string(self, program_string: str, maximum_level: int):
+    def add_operator_declarations_to_program_string(self, maximum_level: int):
+        program_string = ''
         grid = self.grid
         for i in range(maximum_level + 1):
             stencil = self.operator.stencil_generator(grid)

@@ -50,6 +50,10 @@ tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residu
 iteration_matrix = transformations.get_iteration_matrix(tmp)
 print(iteration_matrix)
 print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
+weights = transformations.obtain_weights(tmp)
+for i in range(len(weights)):
+    weights[i] = 0.8
+tail = transformations.set_weights(tmp, weights)
 
 
 """
@@ -85,6 +89,8 @@ tmp = multigrid.cycle(jacobi, None, tmp)
 """
 #print("Generating Multigrid\n")
 program = generator.generate(tmp)
-generator.write_program_to_file(program)
-print(generator.execute())
+print(program)
+print(program)
+#generator.write_program_to_file(program)
+#print(generator.execute())
 #print_declarations(temporaries)
