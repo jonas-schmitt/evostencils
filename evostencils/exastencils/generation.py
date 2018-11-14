@@ -1,4 +1,4 @@
-from evostencils.expressions import base, multigrid as mg
+from evostencils.expressions import base, multigrid as mg, partitioning as part
 from evostencils.stencils import constant
 import os
 import subprocess
@@ -32,7 +32,7 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Grid, rhs: base.Grid,
-                 dimension, coarsening_factor, interpolation, restriction, output_path="./generated"):
+                 dimension, coarsening_factor, interpolation, restriction, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
         self._output_path = output_path
@@ -146,7 +146,7 @@ class ProgramGenerator:
                         f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
                         f'{self.output_path}/{self.problem_name}.settings',
                         f'{self.output_path}/{self.problem_name}.knowledge',
-                        f'{self.exastencils_path}/Examples/lib/{platform}.platform', '/dev/null'],
+                        f'{self.exastencils_path}/Examples/lib/{platform}.platform'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -215,7 +215,6 @@ class ProgramGenerator:
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution
-            node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
@@ -354,6 +353,7 @@ class ProgramGenerator:
         n = 1000
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
+        # TODO currently hard coded for two dimensions
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
                    f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
@@ -378,11 +378,38 @@ class ProgramGenerator:
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages)
                 expression.rhs.storage.valid = True
-            program += self.generate_multigrid(expression.correction, storages)
             field = expression.storage
-            program += f'\t{field.to_exa3()} = ' \
-                       f'{expression.iterate.storage.to_exa3()} + ' \
-                       f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
+
+            if isinstance(expression.correction, base.Multiplication) \
+                    and part.can_be_partitioned(expression.correction.operand1):
+                new_iterate_str = expression.storage.to_exa3()
+                iterate_str = expression.iterate.storage.to_exa3()
+                if isinstance(expression.correction.operand2, mg.Residual):
+                    residual = expression.correction.operand2
+                    correction_str = f'({residual.rhs.storage.to_exa3()} - ' \
+                                     f'{self.generate_multigrid(residual.operator, storages)} * ' \
+                                     f'{residual.iterate.storage.to_exa3()})'
+                else:
+                    program += self.generate_multigrid(expression.correction.operand2, storages)
+                    correction_str = f'{expression.correction.operand2.storage.to_exa3()}'
+
+                smoother = f'{new_iterate_str} = {iterate_str} + {expression.weight} ' \
+                           f'* {self.generate_multigrid(expression.correction.operand1, storages)} ' \
+                           f'* {correction_str}'
+                if expression.partitioning == part.RedBlack:
+                    # TODO currently hard coded for two dimensions
+                    program += f'\t{smoother} where (((i0 + i1) % 2) == 0)\n'
+                    program += f'\t{smoother} where (((i0 + i1) % 2) == 1)\n'
+                elif expression.partitioning == part.Single:
+                    program += f'\t{smoother}\n'
+                else:
+                    raise RuntimeError(f"Partitioning {expression.partitioning} not supported")
+
+            else:
+                program += self.generate_multigrid(expression.correction, storages)
+                program += f'\t{field.to_exa3()} = ' \
+                           f'{expression.iterate.storage.to_exa3()} + ' \
+                           f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages)} * ' \
@@ -404,8 +431,10 @@ class ProgramGenerator:
                 operand2 = expression.operand2
                 if expression.operand1.storage is None:
                     if isinstance(operand1, mg.CoarseGridSolver):
-                        program += self.generate_multigrid(operand2, storages) \
-                                   + self.generate_coarse_grid_solver(expression, storages)
+                        program += self.generate_multigrid(operand2, storages)
+                        if expression.storage is not expression.operand2.storage:
+                            program += f'\t{expression.storage.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'
+                        program += self.generate_coarse_grid_solver(expression, storages)
                         return program
                     else:
                         tmp1 = self.generate_multigrid(operand1, storages)

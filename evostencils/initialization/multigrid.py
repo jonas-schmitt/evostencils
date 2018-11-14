@@ -70,7 +70,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     RHSType = types.RHS
     CorrectionType = types.Correction
     DiagonalOperatorType = types.DiagonalOperator
-    BlockDiagonalOperatorType = types.BlockDiagonalOperator
+    # BlockDiagonalOperatorType = types.BlockDiagonalOperator
     pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'add_{level}')
     # pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
     # pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
@@ -139,11 +139,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection),
                       f'solve_{level}')
 
-    # Create intergrid operators
-    #pset.addPrimitive(base.mul, [types.CoarseOperator, types.Restriction], types.Restriction, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [types.Interpolation, types.CoarseOperator], types.Interpolation, f'mul_{level}')
-    #pset.addPrimitive(base.mul, [types.Interpolation, types.Restriction], types.Operator, f'mul_{level}')
-
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
                            interpolation, restriction, maximum_number_of_cycles=1):
@@ -153,7 +148,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset = gp.PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS))
     pset.addTerminal((grid, rhs), multiple.generate_type_list(types.Grid, types.RHS), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
-    # pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+    pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
     coarsest = False
     if maximum_number_of_cycles == 1:

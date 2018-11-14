@@ -26,7 +26,7 @@ generator = ProgramGenerator('2D_FD_Poisson', '/local/ja42rica/ScalaExaStencil',
 # Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
-jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=0.6)
+jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
 #print("Generating Jacobi\n")
 
 # Block-Jacobi
@@ -37,16 +37,16 @@ block_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Singl
 # Red-Black-Block-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
-rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=1)
+rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=0.8)
 
 # Two-Grid
-tmp = jacobi
+tmp = rb_jacobi
 tmp = multigrid.residual(A, tmp, b)
 tmp = base.mul(multigrid.get_restriction(u, u_coarse), tmp)
 tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
-tmp = multigrid.cycle(jacobi, b, tmp)
-tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.6)
+tmp = multigrid.cycle(rb_jacobi, b, tmp)
+tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
 iteration_matrix = transformations.get_iteration_matrix(tmp)
 print(iteration_matrix)
 print(convergence_evaluator.compute_spectral_radius(iteration_matrix))

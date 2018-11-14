@@ -45,7 +45,7 @@ class Optimizer:
         self._init_creator()
         self._init_toolbox()
         self._weight_optimizer = WeightOptimizer(self)
-        self._program_generator = ProgramGenerator('2D_FD_Poisson', '/ja42rica/local/ScalaExaStencil', self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
+        self._program_generator = ProgramGenerator('2D_FD_Poisson', '/local/ja42rica/ScalaExaStencil', self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
 
     @staticmethod
     def _init_creator():
@@ -186,7 +186,7 @@ class Optimizer:
         return pop, log, hof
 
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
-        return self.simple_gp(population, generations, crossover_probability, mutation_probability)
+        return self.harm_gp(population, generations, crossover_probability, mutation_probability, )
 
     def optimize_weights(self, individual):
         expression = transformations.fold_intergrid_operations(self.compile_expression(individual))

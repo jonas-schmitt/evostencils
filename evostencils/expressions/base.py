@@ -412,3 +412,4 @@ def generate_operator_on_grid(name: str, grid: Grid, stencil_generator: callable
 def is_quadratic(expression: Expression) -> bool:
     return expression.shape[0] == expression.shape[1]
 
+

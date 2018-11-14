@@ -107,7 +107,7 @@ class Residual(base.Expression):
 
 
 class Cycle(base.Expression):
-    def __init__(self, iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
+    def __init__(self, iterate, rhs, correction, partitioning=part.Single, weight=0.5, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
@@ -168,7 +168,7 @@ class Cycle(base.Expression):
         return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
 
-def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
+def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1, predecessor=None):
     return Cycle(iterate, rhs, correction, partitioning, weight, predecessor)
 
 
