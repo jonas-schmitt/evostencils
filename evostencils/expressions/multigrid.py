@@ -17,7 +17,8 @@ class Restriction(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Restriction({repr(self.name)}, {repr(self.fine_grid)}, {repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Restriction({repr(self.name)}, {repr(self.fine_grid)}, ' \
+               f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class Interpolation(base.Operator):
@@ -35,7 +36,8 @@ class Interpolation(base.Operator):
         return self._coarse_grid
 
     def __repr__(self):
-        return f'Interpolation({repr(self.name)}, {repr(self.fine_grid)}, {repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
+        return f'Interpolation({repr(self.name)}, {repr(self.fine_grid)}, ' \
+               f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
 class CoarseGridSolver(base.Entity):
@@ -63,7 +65,7 @@ class CoarseGridSolver(base.Entity):
 
 class Residual(base.Expression):
     def __init__(self, operator, iterate, rhs):
-        #assert iterate.shape == rhs.shape, "Shapes of iterate and rhs must match"
+        # assert iterate.shape == rhs.shape, "Shapes of iterate and rhs must match"
         self._operator = operator
         self._iterate = iterate
         self._rhs = rhs
@@ -173,8 +175,8 @@ def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1, predeces
 
 
 def residual(operator, iterate, rhs):
+    # return base.Subtraction(rhs, base.Multiplication(operator, iterate))
     return Residual(operator, iterate, rhs)
-    #return base.Subtraction(rhs, base.Multiplication(operator, iterate))
 
 
 def get_interpolation(grid: base.Grid, coarse_grid: base.Grid, stencil_generator=None):
