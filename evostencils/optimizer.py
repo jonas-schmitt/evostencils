@@ -114,7 +114,6 @@ class Optimizer:
         return gp.compile(expression, self._primitive_set)
 
     def evaluate(self, individual):
-        import math
         if len(individual) > 150:
             return self.infinity,
         try:
@@ -122,23 +121,20 @@ class Optimizer:
         except MemoryError:
             return self.infinity,
 
-        # expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
-        # expression = transformations.remove_identity_operations(expression)
-
-        if individual.weights is not None:
-            expression = transformations.set_weights(expression, individual.weights)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
         if spectral_radius == 0.0:
             return self.infinity,
         else:
             # For testing
             if spectral_radius < 0.9:
-                program = self._program_generator.generate(expression)
-                self._program_generator.write_program_to_file(program)
-                time = self._program_generator.execute()
-                return time,
+                best_weights, best_spectral_radius = self.optimize_weights(expression)
+                # transformations.set_weights(expression, best_weights)
+                # program = self._program_generator.generate(expression)
+                # self._program_generator.write_program_to_file(program)
+                # time = self._program_generator.execute()
+                return best_spectral_radius,
             else:
-                return spectral_radius * 1e3,
+                return spectral_radius,
 
             """ 
             if self._performance_evaluator is not None:
@@ -188,12 +184,14 @@ class Optimizer:
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
         return self.harm_gp(population, generations, crossover_probability, mutation_probability, )
 
-    def optimize_weights(self, individual):
-        expression = transformations.fold_intergrid_operations(self.compile_expression(individual))
+    def optimize_weights(self, expression, iterations=50):
+        # expression = self.compile_expression(individual)
         weights = transformations.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(weights), 100)
+        best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)
         best_weights = list(best_individual)
         spectral_radius = best_individual.fitness.values[0]
+        # print(best_weights)
+        # print(spectral_radius)
         return best_weights, spectral_radius
 
     @staticmethod
