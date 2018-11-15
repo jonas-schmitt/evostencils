@@ -45,7 +45,7 @@ class ProgramGenerator:
         self._restriction = restriction
         if not os.path.exists(output_path):
             os.makedirs(output_path)
-        subprocess.run(['cp', '-r', 'lib', f'{output_path}'])
+        subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
         self.generate_settings_file()
         self.generate_knowledge_file()
 
@@ -146,7 +146,7 @@ class ProgramGenerator:
                         f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
                         f'{self.output_path}/{self.problem_name}.settings',
                         f'{self.output_path}/{self.problem_name}.knowledge',
-                        f'{self.exastencils_path}/Examples/lib/{platform}.platform'],
+                        f'{self.output_path}/lib/{platform}.platform'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -473,7 +473,7 @@ class ProgramGenerator:
             program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, base.Grid):
             pass
-            #program = f'{expression.storage.to_exa3()}'
+            # program = f'{expression.storage.to_exa3()}'
         else:
             print(type(expression))
             raise NotImplementedError("Case not implemented")
