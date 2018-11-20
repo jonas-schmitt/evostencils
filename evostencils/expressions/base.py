@@ -16,7 +16,7 @@ class Expression(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def apply(self, transform: callable):
+    def apply(self, transform: callable, *args):
         pass
 
 
@@ -129,6 +129,11 @@ class Grid(Entity):
         self._shape = (reduce(operator.mul, size), 1)
         super().__init__()
 
+    def __eq__(self, other):
+        if not isinstance(other, Grid):
+            return False
+        return self.name == other.name and self.size == other.size and self.step_size == other.step_size
+
     @property
     def size(self):
         return self._size
@@ -157,6 +162,11 @@ class Grid(Entity):
 
 
 class RightHandSide(Grid):
+
+    def __eq__(self, other):
+        if not isinstance(other, RightHandSide):
+            return False
+        return self.name == other.name and self.size == other.size and self.step_size == other.step_size
 
     def generate_stencil(self):
         return constant.get_null_stencil(self)

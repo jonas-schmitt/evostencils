@@ -110,10 +110,12 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     def move_level_up(cycle):
         return cycle.predecessor
 
-    def reduce(cycle):
-        return cycle, cycle.rhs
+    def reduce(cycle, times):
+        from evostencils.expressions import transformations
+        new_cycle = transformations.repeat(cycle, times)
+        return new_cycle, new_cycle.rhs
 
-    pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction)], multiple.generate_type_list(types.Grid, types.RHS), f"reduce_{level}")
+    pset.addPrimitive(reduce, [multiple.generate_type_list(types.Grid, types.Correction), int], multiple.generate_type_list(types.Grid, types.RHS), f"reduce_{level}")
 
     pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS), part.Partitioning], multiple.generate_type_list(GridType, CorrectionType), f"cycle_on_level_{level}")
     pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction)],
@@ -149,6 +151,9 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal((grid, rhs), multiple.generate_type_list(types.Grid, types.RHS), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+    pset.addTerminal(1, int, '1')
+    pset.addTerminal(2, int, '2')
+    #pset.addTerminal(3, int, '3')
 
     coarsest = False
     if maximum_number_of_cycles == 1:

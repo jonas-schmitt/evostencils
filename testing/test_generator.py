@@ -40,6 +40,7 @@ correction = base.mul(smoother, multigrid.residual(A, u, b))
 rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=0.8)
 
 # Two-Grid
+"""
 tmp = rb_jacobi
 tmp = multigrid.residual(A, tmp, b)
 tmp = base.mul(multigrid.get_restriction(u, u_coarse), tmp)
@@ -47,20 +48,14 @@ tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(rb_jacobi, b, tmp)
 tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
-iteration_matrix = transformations.get_iteration_matrix(tmp)
-print(iteration_matrix)
-print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
-weights = transformations.obtain_weights(tmp)
-for i in range(len(weights)):
-    weights[i] = 0.8
-tail = transformations.set_weights(tmp, weights)
-
-
 """
+
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 # Three-Grid
-tmp = mg.cycle(jacobi, b, base.mul(mg.get_restriction(u, u_coarse), mg.residual(A, jacobi, b)))
+tmp = mg.cycle(u, b, base.mul(mg.get_restriction(u, u_coarse), mg.residual(A, u, b)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(zero, tmp.correction, mg.residual(A_coarse, zero, tmp.correction)))
+tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correction.rhs, base.mul(base.Inverse(base.Diagonal(A_coarse)), tmp.correction.correction)))
+tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction, tmp.correction.rhs, mg.residual(A_coarse, tmp.correction, tmp.correction.rhs)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correction.rhs, base.mul(base.Inverse(base.Diagonal(A_coarse)), tmp.correction.correction)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction, tmp.correction.rhs, mg.residual(A_coarse, tmp.correction, tmp.correction.rhs)))
 u_coarse_coarse = multigrid.get_coarse_grid(u_coarse, coarsening_factor)
@@ -71,6 +66,7 @@ tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correc
 tmp = mg.cycle(tmp.iterate, tmp.rhs, base.mul(mg.get_interpolation(u, u_coarse), tmp.correction))
 
 
+"""
 tmp = multigrid.residual(A, u, b)
 tmp = base.mul(multigrid.get_restriction(u, u_coarse), tmp)
 f = tmp
@@ -87,9 +83,17 @@ tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(u, b, tmp)
 tmp = multigrid.cycle(jacobi, None, tmp)
 """
+tmp = transformations.repeat(rb_jacobi, 10)
+iteration_matrix = transformations.get_iteration_matrix(tmp)
+print(iteration_matrix)
+print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
+weights = transformations.obtain_weights(tmp)
+for i in range(len(weights)):
+    weights[i] = 0.8
+tail = transformations.set_weights(tmp, weights)
+
 #print("Generating Multigrid\n")
 program = generator.generate(tmp)
-print(program)
 print(program)
 #generator.write_program_to_file(program)
 #print(generator.execute())

@@ -215,8 +215,10 @@ class ProgramGenerator:
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution
+            #node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
-            ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
+            #ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
+            #ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
@@ -373,12 +375,12 @@ class ProgramGenerator:
             expression.storage.valid = False
 
         if isinstance(expression, mg.Cycle):
-            if isinstance(expression.iterate, base.ZeroGrid):
-                program += f'\t{expression.iterate.storage.to_exa3()} = 0'
-            program = self.generate_multigrid(expression.iterate, storages)
-            if not expression.rhs.storage.valid:
-                program += self.generate_multigrid(expression.rhs, storages)
-                expression.rhs.storage.valid = True
+            #if isinstance(expression.iterate, base.ZeroGrid):
+            #    program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
+            #program = self.generate_multigrid(expression.iterate, storages)
+            #if not expression.rhs.storage.valid:
+            #program += self.generate_multigrid(expression.rhs, storages)
+            #expression.rhs.storage.valid = True
             field = expression.storage
 
             if isinstance(expression.correction, base.Multiplication) \
@@ -387,6 +389,14 @@ class ProgramGenerator:
                 iterate_str = expression.iterate.storage.to_exa3()
                 if isinstance(expression.correction.operand2, mg.Residual):
                     residual = expression.correction.operand2
+                    #if not residual.iterate.storage.valid:
+                    program += self.generate_multigrid(residual.iterate, storages)
+                    #expression.iterate.storage.valid = True
+                    if not residual.rhs.storage.valid:
+                        program += self.generate_multigrid(residual.rhs, storages)
+                        residual.rhs.storage.valid = True
+                    if isinstance(residual.iterate, base.ZeroGrid):
+                        program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
                     correction_str = f'({residual.rhs.storage.to_exa3()} - ' \
                                      f'{self.generate_multigrid(residual.operator, storages)} * ' \
                                      f'{residual.iterate.storage.to_exa3()})'
@@ -412,6 +422,14 @@ class ProgramGenerator:
                            f'{expression.iterate.storage.to_exa3()} + ' \
                            f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
+            #if not expression.iterate.storage.valid:
+            program += self.generate_multigrid(expression.iterate, storages)
+            #expression.iterate.storage.valid = True
+            if not expression.rhs.storage.valid:
+                program += self.generate_multigrid(expression.rhs, storages)
+                expression.rhs.storage.valid = True
+            if isinstance(expression.iterate, base.ZeroGrid):
+                program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages)} * ' \
                        f'{expression.iterate.storage.to_exa3()}\n'

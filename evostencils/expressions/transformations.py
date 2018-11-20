@@ -195,3 +195,22 @@ def obtain_iterate(expression: base.Expression):
         return obtain_iterate(expression.operand2)
     elif isinstance(expression, base.Grid):
         return expression
+
+
+def repeat(cycle: mg.Cycle, times):
+    def replace_iterate(expression: base.Expression, iterate, new_iterate):
+        if isinstance(expression, mg.Residual):
+            #if str(expression.iterate) == str(iterate) and expression.iterate.grid.size == iterate.grid.size \
+            if expression.iterate.grid.size == iterate.grid.size \
+                    and expression.iterate.grid.step_size == iterate.grid.step_size:
+                return mg.Residual(expression.operator, new_iterate, expression.rhs)
+            else:
+                return expression.apply(replace_iterate, iterate, new_iterate)
+        else:
+            return expression.apply(replace_iterate, iterate, new_iterate)
+    new_cycle = cycle
+    for _ in range(1, times):
+        new_correction = replace_iterate(new_cycle.correction, new_cycle.iterate, new_cycle)
+        new_cycle = mg.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
+                             weight=new_cycle.weight, predecessor=new_cycle.predecessor)
+    return new_cycle

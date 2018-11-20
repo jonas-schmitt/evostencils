@@ -98,13 +98,16 @@ class Residual(base.Expression):
     def generate_expression(self):
         return base.sub(self.rhs, base.mul(self.operator, self.iterate))
 
-    def __repr__(self):
-        return f'Residual({self.operator}, {self.iterate}, {self.rhs})'
+    def __str__(self):
+        return f'({str(self.rhs)} - {str(self.operator)} * {str(self.iterate)}'
 
-    def apply(self, transform: callable):
-        operator = transform(self.operator)
-        iterate = transform(self.iterate)
-        rhs = transform(self.rhs)
+    def __repr__(self):
+        return f'Residual({repr(self.operator)}, {repr(self.iterate)}, {repr(self.rhs)})'
+
+    def apply(self, transform: callable, *args):
+        operator = transform(self.operator, *args)
+        iterate = transform(self.iterate, *args)
+        rhs = transform(self.rhs, *args)
         return Residual(operator, iterate, rhs)
 
 
@@ -164,9 +167,9 @@ class Cycle(base.Expression):
         return str(self.generate_expression())
 
     def apply(self, transform: callable, *args):
-        correction = transform(self.correction, *args)
         iterate = transform(self.iterate, *args)
         rhs = transform(self.rhs, *args)
+        correction = transform(self.correction, *args)
         return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
 
