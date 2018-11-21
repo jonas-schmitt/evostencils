@@ -152,8 +152,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     pset.addTerminal(1, int, '1')
-    pset.addTerminal(2, int, '2')
-    #pset.addTerminal(3, int, '3')
+    pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False
     if maximum_number_of_cycles == 1:

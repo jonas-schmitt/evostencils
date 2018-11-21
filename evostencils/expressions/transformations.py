@@ -85,14 +85,16 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
 
 
 def get_iteration_matrix(expression: base.Expression):
+    if hasattr(expression, 'iteration_matrix'):
+        return expression.iteration_matrix
     result = expression.apply(get_iteration_matrix)
     if isinstance(result, mg.Cycle):
         if isinstance(result.iterate, base.ZeroOperator):
-            return result.correction
+            iteration_matrix = result.correction
         elif isinstance(result.correction, base.ZeroOperator):
-            return result.iterate
+            iteration_matrix = result.iterate
         else:
-            return result
+            iteration_matrix = result
     elif isinstance(result, mg.Residual):
         operand1 = result.rhs
         if isinstance(result.iterate, base.ZeroOperator):
@@ -102,51 +104,53 @@ def get_iteration_matrix(expression: base.Expression):
         # Inefficient but sufficient for now
         if isinstance(operand1, base.ZeroOperator):
             if isinstance(operand2, base.ZeroOperator):
-                return operand2
+                iteration_matrix = operand2
             else:
-                return base.Scaling(-1, operand2)
+                iteration_matrix = base.Scaling(-1, operand2)
         elif isinstance(operand2, base.ZeroOperator):
-            return operand1
+            iteration_matrix = operand1
         else:
-            return base.Subtraction(operand1, operand2)
+            iteration_matrix = base.Subtraction(operand1, operand2)
 
     elif isinstance(result, base.Addition):
         if isinstance(result.operand1, base.ZeroOperator):
-            return result.operand2
+            iteration_matrix = result.operand2
         elif isinstance(result.operand2, base.ZeroOperator):
-            return result.operand1
+            iteration_matrix = result.operand1
         else:
-            return result
+            iteration_matrix = result
     elif isinstance(result, base.Subtraction):
         if isinstance(result.operand1, base.ZeroOperator):
             if isinstance(result.operand2, base.ZeroOperator):
-                return result.operand2
+                iteration_matrix = result.operand2
             else:
-                return base.Scaling(-1, result.operand2)
+                iteration_matrix = base.Scaling(-1, result.operand2)
         elif isinstance(result.operand2, base.ZeroOperator):
-            return result.operand1
+            iteration_matrix = result.operand1
         else:
-            return result
+            iteration_matrix = result
     elif isinstance(result, base.Multiplication):
         if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
-            return base.ZeroOperator(result.shape, result.grid)
+            iteration_matrix=  base.ZeroOperator(result.shape, result.grid)
         elif isinstance(result.operand1, base.Identity):
-            return result.operand2
+            iteration_matrix = result.operand2
         elif isinstance(result.operand2, base.Identity):
-            return result.operand1
+            iteration_matrix = result.operand1
         else:
-            return result
+            iteration_matrix = result
     elif isinstance(result, base.Scaling):
         if isinstance(result.operand, base.ZeroOperator):
-            return result.operand
+            iteration_matrix = result.operand
         else:
-            return result
+            iteration_matrix = result
     elif isinstance(result, base.ZeroGrid) or isinstance(result, base.RightHandSide):
-        return base.ZeroOperator((result.shape[0], result.shape[0]), result)
+        iteration_matrix = base.ZeroOperator((result.shape[0], result.shape[0]), result)
     elif isinstance(result, base.Grid):
-        return base.Identity((result.shape[0], result.shape[0]), result)
+        iteration_matrix = base.Identity((result.shape[0], result.shape[0]), result)
     else:
-        return result
+        iteration_matrix = result
+    expression.iteration_matrix = iteration_matrix
+    return iteration_matrix
 
 
 # Not bugfree

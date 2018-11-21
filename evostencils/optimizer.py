@@ -126,15 +126,15 @@ class Optimizer:
             return self.infinity,
         else:
             # For testing
-            if spectral_radius < 0.9:
+            if spectral_radius < 0.7:
                 best_weights, best_spectral_radius = self.optimize_weights(expression)
-                # transformations.set_weights(expression, best_weights)
-                # program = self._program_generator.generate(expression)
-                # self._program_generator.write_program_to_file(program)
-                # time = self._program_generator.execute()
-                return best_spectral_radius,
+                transformations.set_weights(expression, best_weights)
+                program = self._program_generator.generate(expression)
+                self._program_generator.write_program_to_file(program)
+                time = self._program_generator.execute()
+                return time,
             else:
-                return spectral_radius,
+                return 1e3 * spectral_radius,
 
             """ 
             if self._performance_evaluator is not None:
