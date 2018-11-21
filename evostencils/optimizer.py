@@ -59,6 +59,7 @@ class Optimizer:
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
         self._toolbox.register("select", tools.selTournament, tournsize=4)
+        #self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=4)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
@@ -126,7 +127,7 @@ class Optimizer:
             return self.infinity,
         else:
             # For testing
-            if spectral_radius < 0.7:
+            if spectral_radius < 1:
                 best_weights, best_spectral_radius = self.optimize_weights(expression)
                 transformations.set_weights(expression, best_weights)
                 program = self._program_generator.generate(expression)
@@ -134,7 +135,7 @@ class Optimizer:
                 time = self._program_generator.execute()
                 return time,
             else:
-                return 1e3 * spectral_radius,
+                return self.infinity * spectral_radius,
 
             """ 
             if self._performance_evaluator is not None:
@@ -184,7 +185,7 @@ class Optimizer:
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
         return self.harm_gp(population, generations, crossover_probability, mutation_probability, )
 
-    def optimize_weights(self, expression, iterations=50):
+    def optimize_weights(self, expression, iterations=20):
         # expression = self.compile_expression(individual)
         weights = transformations.obtain_weights(expression)
         best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)

@@ -160,6 +160,8 @@ def set_weights(expression: base.Expression, weights: list) -> list:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
         expression._weight = head
+        if hasattr(expression, 'iteration_matrix'):
+            del expression.iteration_matrix
         return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)

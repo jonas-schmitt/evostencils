@@ -226,3 +226,18 @@ def contains_intergrid_operation(expression: base.Expression) -> bool:
     else:
         raise RuntimeError("Expression does not only contain operators")
 
+
+def determine_maximum_tree_depth(expression: base.Expression) -> int:
+    if isinstance(expression, base.Entity):
+        return 0
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        return determine_maximum_tree_depth(expression.operand) + 1
+    elif isinstance(expression, base.BinaryExpression):
+        return max(determine_maximum_tree_depth(expression.operand1), determine_maximum_tree_depth(expression.operand2)) + 1
+    elif isinstance(expression, Residual):
+        return max(determine_maximum_tree_depth(expression.rhs), determine_maximum_tree_depth(expression.iterate) + 1) + 1
+    elif isinstance(expression, Cycle):
+        return max(determine_maximum_tree_depth(expression.iterate), determine_maximum_tree_depth(expression.correction) + 1) + 1
+    else:
+        raise RuntimeError("Case not implemented")
+

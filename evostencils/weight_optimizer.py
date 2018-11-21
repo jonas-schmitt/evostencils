@@ -11,11 +11,6 @@ class WeightOptimizer:
         self._gp_optimizer = gp_optimizer
 
     def optimize(self, expression: base.Expression, problem_size, number_of_generations):
-        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=1.0)
-
-        self._toolbox.register("generate", strategy.generate, creator.Weights)
-        self._toolbox.register("update", strategy.update)
-
         def evaluate(weights):
             tail = transformations.set_weights(expression, weights)
             if len(tail) > 0:
@@ -26,6 +21,11 @@ class WeightOptimizer:
             else:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
+        parent = creator.Weights([1.0] * problem_size)
+        parent.fitness.values = self._toolbox.evaluate(parent)
+        strategy = cma.StrategyOnePlusLambda(parent, sigma=1.0)
+        self._toolbox.register("generate", strategy.generate, creator.Weights)
+        self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
         algorithms.eaGenerateUpdate(self._toolbox, ngen=number_of_generations, halloffame=hof, verbose=False)
         return hof[0]
