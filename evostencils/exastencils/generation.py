@@ -140,20 +140,26 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
             print(program, file=file)
 
-    def execute(self, platform='linux'):
+    def execute(self, platform='linux', infinity=1e6):
         import subprocess
-        subprocess.run(['java', '-cp',
+        result = subprocess.run(['java', '-cp',
                         f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
                         f'{self.output_path}/{self.problem_name}.settings',
                         f'{self.output_path}/{self.problem_name}.knowledge',
                         f'{self.output_path}/lib/{platform}.platform'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if not result.returncode == 0:
+            return infinity
+        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if not result.returncode == 0:
+            return infinity
         import time
         start = time.time()
-        subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if not result.returncode == 0:
+            return infinity
         end = time.time()
         return end - start
 

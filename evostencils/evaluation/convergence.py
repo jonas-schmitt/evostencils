@@ -63,8 +63,8 @@ class ConvergenceEvaluator:
         return self.lfa_operator_generator(grid)
 
     def transform(self, expression: base.Expression):
-        if hasattr(expression, 'lfa'):
-            return expression.lfa
+        if expression.lfa_symbol is not None:
+            return expression.lfa_symbol
         if isinstance(expression, multigrid.Cycle):
             identity = base.Identity(expression.iterate.shape, expression.grid)
             tmp = base.Addition(identity, base.Scaling(expression.weight, expression.correction))
@@ -132,16 +132,27 @@ class ConvergenceEvaluator:
             result = operator
         else:
             raise NotImplementedError("Not implemented")
-        expression.lfa = result
+        expression.lfa_symbol = result
         return result
 
     def compute_spectral_radius(self, expression: base.Expression):
+        from multiprocessing import Process, Queue
+        from queue import Empty
         try:
             iteration_matrix = transformations.get_iteration_matrix(expression)
             lfa_expression = self.transform(iteration_matrix)
             symbol = lfa_expression.symbol()
-            return symbol.spectral_radius()
-        except RuntimeError as _:
+
+            def evaluate(q, s):
+                q.put(s.spectral_radius())
+
+            queue = Queue()
+            p = Process(target=evaluate, args=(queue, symbol))
+            p.start()
+            p.join()
+            result = queue.get(timeout=1)
+            return result
+        except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
             return 0.0
 
 

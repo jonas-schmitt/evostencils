@@ -85,7 +85,7 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
 
 
 def get_iteration_matrix(expression: base.Expression):
-    if hasattr(expression, 'iteration_matrix'):
+    if expression.iteration_matrix is not None:
         return expression.iteration_matrix
     result = expression.apply(get_iteration_matrix)
     if isinstance(result, mg.Cycle):
@@ -160,8 +160,8 @@ def set_weights(expression: base.Expression, weights: list) -> list:
             raise RuntimeError("Too few weights have been supplied")
         head, *tail = weights
         expression._weight = head
-        if hasattr(expression, 'iteration_matrix'):
-            del expression.iteration_matrix
+        if expression.iteration_matrix is not None:
+            expression.iteration_matrix = None
         return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)

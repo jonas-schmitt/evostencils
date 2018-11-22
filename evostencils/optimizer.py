@@ -123,11 +123,11 @@ class Optimizer:
             return self.infinity,
 
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-        if spectral_radius == 0.0:
+        if spectral_radius == 0.0 or spectral_radius > self.infinity:
             return self.infinity,
         else:
             # For testing
-            if spectral_radius < 1:
+            if spectral_radius < 0.7:
                 best_weights, best_spectral_radius = self.optimize_weights(expression)
                 transformations.set_weights(expression, best_weights)
                 program = self._program_generator.generate(expression)
@@ -135,7 +135,7 @@ class Optimizer:
                 time = self._program_generator.execute()
                 return time,
             else:
-                return self.infinity * spectral_radius,
+                return 1e3 * spectral_radius,
 
             """ 
             if self._performance_evaluator is not None:
@@ -185,7 +185,7 @@ class Optimizer:
     def default_optimization(self, population, generations, crossover_probability, mutation_probability):
         return self.harm_gp(population, generations, crossover_probability, mutation_probability, )
 
-    def optimize_weights(self, expression, iterations=20):
+    def optimize_weights(self, expression, iterations=50):
         # expression = self.compile_expression(individual)
         weights = transformations.obtain_weights(expression)
         best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)

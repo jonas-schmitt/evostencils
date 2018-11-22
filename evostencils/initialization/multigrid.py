@@ -151,7 +151,11 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal((grid, rhs), multiple.generate_type_list(types.Grid, types.RHS), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
-    pset.addTerminal(1, int, '1')
+    pset.addTerminal(1, int)
+    #pset.addTerminal(2, int)
+    #pset.addTerminal(3, int)
+    #pset.addTerminal(4, int)
+    #pset.addTerminal(5, int)
     pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False

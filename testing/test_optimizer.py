@@ -25,7 +25,7 @@ def main():
     R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor))
 
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
-    infinity = 1e100
+    infinity = 1e6
     epsilon = 1e-10
 
     # bytes_per_word = 8
@@ -35,7 +35,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(500, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(1000, 50, 0.5, 0.3)
 
     generator = optimizer._program_generator
     i = 1

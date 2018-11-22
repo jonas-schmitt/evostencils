@@ -8,6 +8,8 @@ from evostencils.stencils import constant
 # Base classes
 class Expression(abc.ABC):
     def __init__(self):
+        self.iteration_matrix = None
+        self.lfa_symbol = None
         self.storage = None
 
     @property
