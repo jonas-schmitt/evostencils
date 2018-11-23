@@ -129,9 +129,9 @@ class Optimizer:
             return self.infinity,
         else:
             # For testing
-            if spectral_radius < 0.7:
-                best_weights, best_spectral_radius = self.optimize_weights(expression)
-                transformations.set_weights(expression, best_weights)
+            if spectral_radius < 0.1:
+                #best_weights, best_spectral_radius = self.optimize_weights(expression, iterations=20)
+                #transformations.set_weights(expression, best_weights)
                 program = self._program_generator.generate(expression)
                 self._program_generator.write_program_to_file(program)
                 time = self._program_generator.execute()
@@ -150,22 +150,26 @@ class Optimizer:
                 return spectral_radius,
             """
 
-    def simple_gp(self, population, generations, crossover_probability, mutation_probability):
+    def ea_simple(self, population_size, generations, crossover_probability, mutation_probability):
         random.seed()
-        pop = self._toolbox.population(n=population)
+        pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean)
-        stats.register("std", np.std)
-        stats.register("min", np.min)
-        stats.register("max", np.max)
+
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+
         pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations,
-                                       stats=stats, halloffame=hof, verbose=True)
+                                       stats=mstats, halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def harm_gp(self, population, generations, crossover_probability, mutation_probability):
+    def gp_harm(self, population_size, generations, crossover_probability, mutation_probability):
         random.seed()
-        pop = self._toolbox.population(n=population)
+        pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
@@ -177,15 +181,31 @@ class Optimizer:
         mstats.register("max", np.max)
 
         pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations,
-                           alpha=0.05, beta=10, gamma=0.25, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
-        #for individual in hof:
-        #    weights, spectral_radius = self.optimize_weights(individual)
-        #    individual.set_weights(weights)
-        #    individual.fitness = creator.Fitness(values=self.evaluate(individual))
+                           alpha=0.05, beta=10, gamma=0.20, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
         return pop, log, hof
 
-    def default_optimization(self, population, generations, crossover_probability, mutation_probability):
-        return self.harm_gp(population, generations, crossover_probability, mutation_probability, )
+    def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
+        random.seed()
+        pop = self._toolbox.population(n=initial_population_size)
+        hof = tools.HallOfFame(10)
+
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+
+        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability,
+                                             mutation_probability, generations,
+                                             stats=mstats, halloffame=hof, verbose=True)
+        return pop, log, hof
+
+    def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
+        mu_ = population_size
+        lambda_ = population_size
+        return self.ea_mu_plus_lambda(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
 
     def optimize_weights(self, expression, iterations=50):
         # expression = self.compile_expression(individual)
@@ -209,6 +229,35 @@ class Optimizer:
             n = g.get_node(i)
             n.attr["label"] = labels[i]
         g.draw(f"{filename}.png", "png")
+
+    @staticmethod
+    def plot_minimum_fitness(logbook):
+        from matplotlib.ticker import MaxNLocator
+        gen = logbook.select("gen")
+        fit_mins = logbook.chapters["fitness"].select("min")
+        size_avgs = logbook.chapters["size"].select("avg")
+
+        import matplotlib.pyplot as plt
+
+        fig, ax1 = plt.subplots()
+        line1 = ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
+        ax1.set_xlabel("Generation")
+        ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax1.set_ylabel("Fitness", color="b")
+        for tl in ax1.get_yticklabels():
+            tl.set_color("b")
+
+        ax2 = ax1.twinx()
+        line2 = ax2.plot(gen, size_avgs, "r-", label="Average Size")
+        ax2.set_ylabel("Size", color="r")
+        for tl in ax2.get_yticklabels():
+            tl.set_color("r")
+
+        lns = line1 + line2
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs, loc="top right")
+
+        plt.show()
 
 
 

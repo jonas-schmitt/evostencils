@@ -515,7 +515,7 @@ class ProgramGenerator:
         return program
 
     def generate_solver_function(self, function_name: str, storages: [CycleStorage],
-                                 maximum_number_of_iterations=1000) -> str:
+                                 maximum_number_of_iterations=100) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@finest"
         solution = storages[0].solution.to_exa3()

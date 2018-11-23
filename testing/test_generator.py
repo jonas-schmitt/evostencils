@@ -48,7 +48,6 @@ tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(rb_jacobi, b, tmp)
 tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
 
-"""
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 # Three-Grid
 tmp = mg.cycle(u, b, base.mul(mg.get_restriction(u, u_coarse), mg.residual(A, u, b)))
@@ -64,7 +63,7 @@ tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correc
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correction.rhs, base.mul(mg.get_interpolation(u_coarse, u_coarse_coarse), tmp.correction.correction)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, base.mul(mg.get_interpolation(u, u_coarse), tmp.correction))
 
-
+"""
 tmp = multigrid.residual(A, u, b)
 tmp = base.mul(multigrid.get_restriction(u, u_coarse), tmp)
 f = tmp
@@ -88,10 +87,10 @@ weights = transformations.obtain_weights(tmp)
 for i in range(len(weights)):
     weights[i] = 0.8
 tail = transformations.set_weights(tmp, weights)
-
+print(mg.determine_maximum_tree_depth(tmp))
 print("Generating Multigrid\n")
 program = generator.generate(tmp)
 print(program)
-generator.write_program_to_file(program)
+#generator.write_program_to_file(program)
 #print(generator.execute())
 #print_declarations(temporaries)
