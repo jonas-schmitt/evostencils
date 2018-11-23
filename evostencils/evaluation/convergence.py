@@ -144,15 +144,18 @@ class ConvergenceEvaluator:
             symbol = lfa_expression.symbol()
 
             def evaluate(q, s):
-                q.put(s.spectral_radius())
+                try:
+                    q.put(s.spectral_radius())
+                except (ArithmeticError, RuntimeError, MemoryError) as _:
+                    q.put(0.0)
 
             queue = Queue()
             p = Process(target=evaluate, args=(queue, symbol))
             p.start()
             p.join()
-            result = queue.get(timeout=1)
+            result = queue.get(timeout=10)
             return result
-        except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
+        except (ArithmeticError, RuntimeError, MemoryError, Empty) as _:
             return 0.0
 
 

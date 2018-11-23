@@ -152,11 +152,12 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     pset.addTerminal(1, int)
-    #pset.addTerminal(2, int)
-    #pset.addTerminal(3, int)
-    #pset.addTerminal(4, int)
-    #pset.addTerminal(5, int)
-    pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
+    pset.addTerminal(2, int)
+    pset.addTerminal(3, int)
+    # TODO more steps are probably not a good idea as the LFA seems to crash often
+    # pset.addTerminal(4, int)
+    # pset.addTerminal(5, int)
+    # pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False
     if maximum_number_of_cycles == 1:

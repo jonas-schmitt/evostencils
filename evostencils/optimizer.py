@@ -123,7 +123,9 @@ class Optimizer:
             return self.infinity,
 
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-        if spectral_radius == 0.0 or spectral_radius > self.infinity:
+        import numpy, math
+        if spectral_radius == 0.0 or spectral_radius > self.infinity or math.isnan(spectral_radius) \
+                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity,
         else:
             # For testing
