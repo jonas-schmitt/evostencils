@@ -129,9 +129,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                            part.Partitioning],
                           multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection),
                           f"new_cycle_on_lower_level_{level}")
-    else:
-        pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
-        pset.addPrimitive(extend, [types.CoarseGridSolver, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
+    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
+    pset.addPrimitive(extend, [types.CoarseGridSolver, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                           multiple.generate_type_list(types.Grid, types.CoarseCorrection),
                           f'solve_{level}')
 
@@ -159,7 +158,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     # TODO more steps are probably not a good idea as the LFA seems to crash often
     # pset.addTerminal(4, int)
     # pset.addTerminal(5, int)
-    # pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
+    #pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False
     if maximum_number_of_cycles == 1:

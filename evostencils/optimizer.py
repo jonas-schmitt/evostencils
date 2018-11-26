@@ -54,7 +54,7 @@ class Optimizer:
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=2, max_height=6)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=15)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
@@ -132,16 +132,15 @@ class Optimizer:
             return self.infinity, coarsest_level
         else:
             # For testing
-            return spectral_radius, coarsest_level
-            if spectral_radius < 0.1:
-                #best_weights, best_spectral_radius = self.optimize_weights(expression, iterations=20)
-                #transformations.set_weights(expression, best_weights)
+            if spectral_radius < 1:
+                best_weights, best_spectral_radius = self.optimize_weights(expression, iterations=20)
+                transformations.set_weights(expression, best_weights)
                 program = self._program_generator.generate(expression)
                 self._program_generator.write_program_to_file(program)
-                time = self._program_generator.execute()
-                return time,
+                #time = self._program_generator.execute()
+                return best_spectral_radius, coarsest_level
             else:
-                return 1e3 * spectral_radius,
+                return spectral_radius, coarsest_level
 
             """ 
             if self._performance_evaluator is not None:
@@ -159,7 +158,7 @@ class Optimizer:
         pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)
@@ -176,7 +175,7 @@ class Optimizer:
         pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)
