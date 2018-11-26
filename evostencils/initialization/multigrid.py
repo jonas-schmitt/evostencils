@@ -61,7 +61,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     # pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
     # pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
     # pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
-    pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
+    # pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -108,6 +108,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                         cycle.predecessor)
 
     def move_level_up(cycle):
+        cycle.predecessor._correction = cycle
         return cycle.predecessor
 
     def reduce(cycle, times):
@@ -123,12 +124,16 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
                       f"extend_{level}")
     if not coarsest:
         pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection)], multiple.generate_type_list(types.Grid, types.CoarseCorrection), f"move_up_{level}")
-
         pset.addPrimitive(create_cycle_on_lower_level,
                           [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection),
                            part.Partitioning],
                           multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection),
                           f"new_cycle_on_lower_level_{level}")
+    else:
+        pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'S_{level}')
+        pset.addPrimitive(extend, [types.CoarseGridSolver, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
+                          multiple.generate_type_list(types.Grid, types.CoarseCorrection),
+                          f'solve_{level}')
 
     # Multigrid recipes
     pset.addPrimitive(extend, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction)],
@@ -137,9 +142,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, level, coarsest=
     pset.addPrimitive(extend, [types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
                       multiple.generate_type_list(types.Grid, types.Correction),
                       f'interpolate_{level}')
-    pset.addPrimitive(extend, [types.CoarseGridSolver, multiple.generate_type_list(types.Grid, types.CoarseCorrection)],
-                      multiple.generate_type_list(types.Grid, types.CoarseCorrection),
-                      f'solve_{level}')
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
@@ -152,8 +154,8 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     pset.addTerminal(1, int)
-    pset.addTerminal(2, int)
-    pset.addTerminal(3, int)
+    #pset.addTerminal(2, int)
+    #pset.addTerminal(3, int)
     # TODO more steps are probably not a good idea as the LFA seems to crash often
     # pset.addTerminal(4, int)
     # pset.addTerminal(5, int)
@@ -167,11 +169,12 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
         coarse_grid = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
         coarse_interpolation = mg.get_interpolation(coarse_grid, mg.get_coarse_grid(coarse_grid, coarsening_factor), interpolation.stencil_generator)
         coarse_restriction = mg.get_restriction(coarse_grid, mg.get_coarse_grid(coarse_grid, coarsening_factor), restriction.stencil_generator)
-        coarse_terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
+        terminals = Terminals(terminals.coarse_operator, coarse_grid, dimension, coarsening_factor,
                               coarse_interpolation, coarse_restriction)
         coarsest = False
         if i == maximum_number_of_cycles - 1:
             coarsest = True
-        add_cycle(pset, coarse_terminals, i, coarsest)
+        types = Types(terminals)
+        add_cycle(pset, terminals, i, coarsest, types)
 
     return pset

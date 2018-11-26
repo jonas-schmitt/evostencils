@@ -220,3 +220,34 @@ def repeat(cycle: mg.Cycle, times):
         new_cycle = mg.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
                              weight=new_cycle.weight, predecessor=new_cycle.predecessor)
     return new_cycle
+
+
+def obtain_coarsest_level(cycle: mg.Cycle) -> int:
+    def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
+        if isinstance(expression, mg.Cycle):
+            if expression.grid.size < current_size:
+                new_size = expression.grid.size
+                new_level = current_level + 1
+            else:
+                new_size = current_size
+                new_level = current_level
+            level_iterate = recursive_descent(expression.iterate, new_size, new_level)
+            level_correction = recursive_descent(expression.correction, new_size, new_level)
+            return max(level_iterate, level_correction)
+        elif isinstance(expression, mg.Residual):
+            level_iterate = recursive_descent(expression.iterate, current_size, current_level)
+            level_rhs = recursive_descent(expression.rhs, current_size, current_level)
+            return max(level_iterate, level_rhs)
+        elif isinstance(expression, base.BinaryExpression):
+            level_operand1 = recursive_descent(expression.operand1, current_size, current_level)
+            level_operand2 = recursive_descent(expression.operand2, current_size, current_level)
+            return max(level_operand1, level_operand2)
+        elif isinstance(expression, base.UnaryExpression):
+            return recursive_descent(expression.operand, current_size, current_level)
+        elif isinstance(expression, base.Scaling):
+            return recursive_descent(expression.operand, current_size, current_level)
+        elif isinstance(expression, base.Entity):
+            return current_level
+        else:
+            raise RuntimeError("Unexpected expression")
+    return recursive_descent(cycle, cycle.grid.size, 0) + 1

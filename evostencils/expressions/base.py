@@ -394,7 +394,7 @@ def add(operand1, operand2):
 
 
 def sub(operand1, operand2):
-    return Addition(operand1, operand2)
+    return Subtraction(operand1, operand2)
 
 
 def mul(operand1, operand2):
