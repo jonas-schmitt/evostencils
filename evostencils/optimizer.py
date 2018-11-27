@@ -40,7 +40,7 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         pset = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
-                                               maximum_number_of_cycles=8)
+                                               maximum_number_of_cycles=4)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
@@ -58,8 +58,8 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
-        #self._toolbox.register("select", tools.selTournament, tournsize=4)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selTournament, tournsize=4)
+        #self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=5)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
@@ -123,7 +123,8 @@ class Optimizer:
             return self.infinity, 0
 
         expression = expression1
-        coarsest_level = transformations.obtain_coarsest_level(expression)
+        #coarsest_level = transformations.obtain_coarsest_level(expression)
+        coarsest_level = 0
 
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
         import numpy, math
@@ -132,13 +133,13 @@ class Optimizer:
             return self.infinity, coarsest_level
         else:
             # For testing
-            if spectral_radius < 1:
-                best_weights, best_spectral_radius = self.optimize_weights(expression, iterations=20)
-                transformations.set_weights(expression, best_weights)
-                program = self._program_generator.generate(expression)
-                self._program_generator.write_program_to_file(program)
+            if spectral_radius < 0.5:
+                #best_weights, best_spectral_radius = self.optimize_weights(expression, iterations=50)
+                #transformations.set_weights(expression, best_weights)
+                #program = self._program_generator.generate(expression)
+                #self._program_generator.write_program_to_file(program)
                 #time = self._program_generator.execute()
-                return best_spectral_radius, coarsest_level
+                return spectral_radius, coarsest_level
             else:
                 return spectral_radius, coarsest_level
 

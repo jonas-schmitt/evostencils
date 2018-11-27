@@ -2,6 +2,7 @@ from evostencils.expressions import base, multigrid, partitioning, transformatio
 from evostencils.stencils import gallery
 from evostencils.exastencils.generation import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
+from evostencils.evaluation.roofline import RooflineEvaluator
 import lfa_lab as lfa
 
 dimension = 2
@@ -13,6 +14,8 @@ lfa_grid = lfa.Grid(dimension, step_size)
 lfa_operator = lfa.gallery.poisson_2d(lfa_grid)
 lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
 convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
+roofline_evaluator = RooflineEvaluator()
+
 
 u = base.generate_grid('u', grid_size, step_size)
 b = base.generate_rhs('f', grid_size, step_size)
@@ -28,6 +31,7 @@ smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
 #print("Generating Jacobi\n")
+print(roofline_evaluator.estimate_runtime(jacobi))
 
 # Block-Jacobi
 smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
@@ -38,6 +42,7 @@ block_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Singl
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=0.8)
+print(roofline_evaluator.estimate_runtime(rb_jacobi))
 
 # Two-Grid
 tmp = rb_jacobi
@@ -47,6 +52,7 @@ tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.get_interpolation(u, u_coarse), tmp)
 tmp = multigrid.cycle(rb_jacobi, b, tmp)
 tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
+#print(roofline_evaluator.estimate_runtime(tmp))
 
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 # Three-Grid

@@ -1,4 +1,4 @@
-from evostencils.expressions import base, multigrid
+from evostencils.expressions import base, multigrid as mg, partitioning as part
 import evostencils.stencils.constant as constant
 import evostencils.stencils.periodic as periodic
 
@@ -7,11 +7,13 @@ class RooflineEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, solver_properties=(4, 5)):
+    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, coarse_grid_solver_properties=(4, 5),
+                 coarse_grid_solver_iterations=100):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word
-        self._solver_properties = solver_properties
+        self._coarse_grid_solver_properties = coarse_grid_solver_properties
+        self._coarse_grid_solver_iterations = coarse_grid_solver_iterations
 
     @property
     def peak_performance(self):
@@ -27,7 +29,7 @@ class RooflineEvaluator:
 
     @property
     def solver_properties(self):
-        return self._solver_properties
+        return self._coarse_grid_solver_properties
 
     def compute_performance(self, intensity):
         return min(self.peak_performance, intensity * self.peak_bandwidth)
@@ -35,7 +37,7 @@ class RooflineEvaluator:
     def compute_arithmetic_intensity(self, operations, words):
         return operations / (words * self.bytes_per_word)
 
-    def estimate_runtime(self, expression: base.Expression, ):
+    def estimate_runtime(self, expression: base.Expression):
         from functools import reduce
         import operator
         list_of_metrics = self.estimate_operations_per_word(expression)
@@ -46,16 +48,72 @@ class RooflineEvaluator:
         return reduce(operator.add, runtimes)
 
     def estimate_operations_per_word(self, expression: base.Expression) -> list:
-        list_of_metrics = []
-        if isinstance(expression, multigrid.Correction):
-            list_of_metrics.extend(self._estimate_operations_per_word_for_correction(expression))
-            grid = expression.grid
-            list_of_metrics.extend(self.estimate_operations_per_word(grid))
-            return list_of_metrics
+        result = []
+        #if expression.storage is not None and expression.storage.valid:
+        #    expression.storage.valid = False
+
+        if isinstance(expression, mg.Cycle):
+            if isinstance(expression.correction, base.Multiplication) \
+                    and part.can_be_partitioned(expression.correction.operand1):
+                stencil_partitions = expression.partitioning.generate(expression.correction.operand1.generate_stencil(), expression.grid)
+                for smoother_stencil in stencil_partitions:
+                    if isinstance(expression.correction.operand2, mg.Residual):
+                        residual = expression.correction.operand2
+                        result.extend(self.estimate_operations_per_word(residual.iterate))
+                        result.extend(self.estimate_operations_per_word(residual.rhs))
+                        #if not residual.rhs.storage.valid:
+                        #    result.extend(self.estimate_operations_per_word(residual.rhs))
+                        #    residual.rhs.storage.valid = True
+                        combined_stencil = periodic.mul(smoother_stencil, residual.operator.generate_stencil())
+                        nentries_list1 = periodic.count_number_of_entries(smoother_stencil)
+                        nentries_list2 = periodic.count_number_of_entries(combined_stencil)
+                        problem_size = expression.shape[0] / max(len(nentries_list1), len(nentries_list2))
+                        for nentries1, nentries2 in zip(nentries_list1, nentries_list2):
+                            words = self.words_transferred_for_store() + self.words_transferred_for_load() + \
+                                    self.words_transferred_for_stencil_application(nentries1) + self.words_transferred_for_stencil_application(nentries2)
+                            operations = self.operations_for_addition() + self.operations_for_scaling() + \
+                                self.operations_for_subtraction() + self.operations_for_stencil_application(nentries1) + \
+                                self.operations_for_stencil_application(nentries2)
+                            result.append((words, operations, problem_size))
+                    else:
+                        result.extend(self.estimate_operations_per_word(expression.correction.operand2))
+                        nentries_list = periodic.count_number_of_entries(smoother_stencil)
+                        problem_size = expression.shape[0] / len(nentries_list)
+                        for nentries in nentries_list:
+                            words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
+                            operations = self.operations_for_addition() + self.operations_for_stencil_application(nentries)
+                            result.append((words, operations, problem_size))
+            else:
+                result.extend(self.estimate_operations_per_word(expression.correction))
+                words = self.words_transferred_for_store() + 2 * self.words_transferred_for_load()
+                operations = self.operations_for_addition()
+                result.append((words, operations, expression.shape[0]))
+
+        elif isinstance(expression, mg.Residual):
+            result.extend(self.estimate_operations_per_word(expression.iterate))
+            result.extend(self.estimate_operations_per_word(expression.rhs))
+            #if not expression.rhs.storage.valid:
+            #    result.extend(self.estimate_operations_per_word(expression.rhs))
+            #    expression.rhs.storage.valid = True
+            nentries_list = periodic.count_number_of_entries(expression.operator.generate_stencil())
+            for nentries in nentries_list:
+                words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
+                operations = self.operations_for_subtraction() + self.operations_for_stencil_application(nentries)
+                result.append((words, operations, expression.shape[0]))
+        elif isinstance(expression, base.Multiplication):
+            if isinstance(expression.operand1, mg.CoarseGridSolver):
+                for _ in range(0, self._coarse_grid_solver_iterations):
+                    result.append((*self.solver_properties, expression.shape[0]))
+            else:
+                stencil = expression.operand1.generate_stencil()
+                result.extend(self.estimate_operations_per_word_for_stencil(stencil, expression.shape[0]))
+            result.extend(self.estimate_operations_per_word(expression.operand2))
         elif isinstance(expression, base.Grid):
-            return list_of_metrics
+            pass
         else:
-            raise NotImplementedError("Not implemented")
+            print(type(expression))
+            raise NotImplementedError("Case not implemented")
+        return result
 
     @staticmethod
     def operations_for_addition():
@@ -85,58 +143,6 @@ class RooflineEvaluator:
     def words_transferred_for_store():
         return 1
 
-    def _estimate_operations_per_word_for_correction(self, correction: multigrid.Correction) -> list:
-        problem_size = correction.unknown.shape[0]
-        iteration_matrix = correction.iteration_matrix
-        evaluated, list_of_metrics = self._estimate_operations_per_word_for_iteration(iteration_matrix)
-        operator_stencil = correction.lfa_operator_generator.generate_stencil()
-        if not evaluated:
-            # u = u + omega * B * u - omega * B * A * u
-
-            iteration_matrix_stencil = iteration_matrix.generate_stencil()
-            combined_stencil = periodic.mul(iteration_matrix_stencil, operator_stencil)
-            iteration_matrix_stencil_number_of_entries_list = periodic.count_number_of_entries(iteration_matrix_stencil)
-            combined_stencil_number_of_entries_list = periodic.count_number_of_entries(combined_stencil)
-
-            if len(iteration_matrix_stencil_number_of_entries_list) < len(combined_stencil_number_of_entries_list):
-                unit_stencil = periodic.map_stencil(combined_stencil, lambda s: constant.get_null_stencil())
-                iteration_matrix_stencil = periodic.add(unit_stencil, iteration_matrix_stencil)
-                iteration_matrix_stencil_number_of_entries_list = periodic.count_number_of_entries(iteration_matrix_stencil)
-            elif len(iteration_matrix_stencil_number_of_entries_list) > len(combined_stencil_number_of_entries_list):
-                unit_stencil = periodic.map_stencil(iteration_matrix_stencil, lambda s: constant.get_null_stencil())
-                combined_stencil = periodic.add(unit_stencil, combined_stencil)
-                combined_stencil_number_of_entries_list = periodic.count_number_of_entries(combined_stencil)
-
-            for iteration_matrix_stencil_number_of_entries, combined_stencil_number_of_entries in \
-                    zip(iteration_matrix_stencil_number_of_entries_list, combined_stencil_number_of_entries_list):
-
-                operations = self.operations_for_stencil_application(iteration_matrix_stencil_number_of_entries) \
-                             + self.operations_for_stencil_application(combined_stencil_number_of_entries) \
-                             + self.operations_for_subtraction() + self.operations_for_addition() \
-                             + 2 * self.operations_for_scaling()
-
-                words = self.words_transferred_for_stencil_application(combined_stencil_number_of_entries) \
-                    + self.words_transferred_for_stencil_application(iteration_matrix_stencil_number_of_entries) \
-                    + self.words_transferred_for_load() + self.words_transferred_for_store()
-
-                list_of_metrics.append((operations, words,
-                                        float(problem_size) / len(combined_stencil_number_of_entries_list)))
-
-        else:
-            # u = u + omega * correction
-            # r = (b - A*x)
-            operator_stencil_number_of_entries_list = periodic.count_number_of_entries(operator_stencil)
-            for operator_stencil_number_of_entries in operator_stencil_number_of_entries_list:
-                operations_residual = self.operations_for_stencil_application(operator_stencil_number_of_entries) \
-                    + self.operations_for_subtraction()
-                words_residual = self.words_transferred_for_load() \
-                    + self.words_transferred_for_stencil_application(operator_stencil_number_of_entries) \
-                    + self.words_transferred_for_store()
-                list_of_metrics.append((operations_residual, words_residual, problem_size))
-            list_of_metrics.append((self.operations_for_addition() + self.operations_for_scaling(),
-                                   self.words_transferred_for_load(), problem_size))
-        return list_of_metrics
-
     @staticmethod
     def estimate_operations_per_word_for_solving_matrix(number_of_unknowns, problem_size) -> tuple:
         n = number_of_unknowns
@@ -153,85 +159,3 @@ class RooflineEvaluator:
                  RooflineEvaluator.words_transferred_for_store(),
                  float(problem_size) / len(number_of_entries_list))
                 for number_of_entries in number_of_entries_list]
-
-    def _estimate_operations_per_word_for_iteration(self, expression: base.Expression) -> tuple:
-        if isinstance(expression, base.BinaryExpression):
-            evaluated1, result1 = self._estimate_operations_per_word_for_iteration(expression.operand1)
-            evaluated2, result2 = self._estimate_operations_per_word_for_iteration(expression.operand2)
-            metrics = []
-            if not evaluated1 and not evaluated2:
-                return False, []
-
-            if evaluated1:
-                metrics.extend(result1)
-            else:
-                metrics.extend(self.estimate_operations_per_word_for_stencil(expression.operand1.generate_stencil(),
-                                                                             expression.operand1.shape[0]))
-
-            if evaluated2:
-                metrics.extend(result2)
-            else:
-                metrics.extend(self.estimate_operations_per_word_for_stencil(expression.operand2.generate_stencil(),
-                               expression.operand2.shape[0]))
-            # (A + B) * u = A * u + B * u => op(A*u) + op(B*u) + 1
-            if isinstance(expression, base.Addition):
-                metrics = [(operations + self.operations_for_addition(), words, problem_size)
-                           for operations, words, problem_size in metrics]
-            elif isinstance(expression, base.Subtraction):
-                metrics = [(operations + self.operations_for_subtraction(), words, problem_size)
-                           for operations, words, problem_size in metrics]
-            # A * B * u => op(A*u) + op(B*u)
-            return True, metrics
-        elif isinstance(expression, base.Inverse):
-            stencil = expression.operand.generate_stencil()
-            if periodic.is_diagonal(stencil):
-                return False, []
-            else:
-                subexpression = expression.operand
-                number_of_entries_list = periodic.count_number_of_entries(stencil)
-                number_of_unknowns = len(number_of_entries_list)
-                return True, [self.estimate_operations_per_word_for_solving_matrix(number_of_unknowns,
-                                                                                    expression.shape[0])]
-
-        elif isinstance(expression, base.UnaryExpression):
-            return False, []
-        elif isinstance(expression, base.Scaling):
-            result = self._estimate_operations_per_word_for_iteration(expression.operand)
-            if result[0]:
-                # Here we have to apply the scaling separately to the grid
-                # Operations: One multiplication per grid point
-                # Words: We have to load (into the cache) and store each grid point once
-                metrics = [(operations + self.operations_for_scaling(), words + self.words_transferred_for_load() +
-                            self.words_transferred_for_store(), problem_size)
-                           for operations, words, problem_size in result]
-                return True, metrics
-            else:
-                return False, []
-        elif isinstance(expression, multigrid.CoarseGridSolver):
-            return True, [(*self.solver_properties, expression.shape[0])]
-        elif isinstance(expression, base.Operator):
-            metrics = self.estimate_operations_per_word_for_stencil(expression.generate_stencil(), expression.shape[0])
-            return True, metrics
-        else:
-            raise NotImplementedError("Not implemented")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

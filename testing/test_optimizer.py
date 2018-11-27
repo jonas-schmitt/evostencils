@@ -35,7 +35,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(1000, 30, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(2500, 30, 0.5, 0.3)
 
     generator = optimizer._program_generator
     i = 1
@@ -52,7 +52,7 @@ def main():
             best_weights, spectral_radius = optimizer.optimize_weights(expression, iterations=100)
             transformations.set_weights(expression, best_weights)
             program = generator.generate(expression)
-            #print(program)
+            print(program)
             generator.write_program_to_file(program)
             time = generator.execute()
             print(f'Improved spectral radius: {spectral_radius}')
