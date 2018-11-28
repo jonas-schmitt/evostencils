@@ -40,7 +40,7 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         pset = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
-                                               maximum_number_of_cycles=4)
+                                                depth=4)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
@@ -49,12 +49,12 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("Fitness", deap.base.Fitness, weights=(-1.0, 1.0))
+        creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("Individual", AST, fitness=creator.Fitness)
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=15)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=10)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
@@ -116,21 +116,19 @@ class Optimizer:
 
     def evaluate(self, individual):
         if len(individual) > 150:
-            return self.infinity, 0
+            return len(individual) * self.infinity,
         try:
             expression1, expression2 = self.compile_expression(individual)
         except MemoryError:
-            return self.infinity, 0
+            return len(individual) * self.infinity,
 
         expression = expression1
-        #coarsest_level = transformations.obtain_coarsest_level(expression)
-        coarsest_level = 0
 
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
         import numpy, math
         if spectral_radius == 0.0 or spectral_radius > self.infinity or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
-            return self.infinity, coarsest_level
+            return self.infinity,
         else:
             # For testing
             if spectral_radius < 0.5:
@@ -139,9 +137,9 @@ class Optimizer:
                 #program = self._program_generator.generate(expression)
                 #self._program_generator.write_program_to_file(program)
                 #time = self._program_generator.execute()
-                return spectral_radius, coarsest_level
+                return spectral_radius,
             else:
-                return spectral_radius, coarsest_level
+                return spectral_radius,
 
             """ 
             if self._performance_evaluator is not None:
@@ -159,7 +157,7 @@ class Optimizer:
         pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)
@@ -176,7 +174,7 @@ class Optimizer:
         pop = self._toolbox.population(n=population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)
@@ -193,7 +191,7 @@ class Optimizer:
         pop = self._toolbox.population(n=initial_population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)

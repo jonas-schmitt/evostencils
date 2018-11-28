@@ -1,5 +1,6 @@
 import lfa_lab
 import evostencils.stencils.periodic as periodic
+import evostencils.stencils.constant as constant
 from evostencils.expressions import base, multigrid, transformations
 
 
@@ -16,6 +17,11 @@ def stencil_to_lfa(stencil: periodic.Stencil, grid):
     ndarray = lfa_lab.NdArray(tmp)
     tmp = lfa_lab.PeriodicStencil(ndarray)
     return lfa_lab.from_periodic_stencil(tmp, grid)
+
+
+def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
+    return constant.Stencil(tuple(entry for entry in stencil), stencil.dim)
+
 
 
 class ConvergenceEvaluator:

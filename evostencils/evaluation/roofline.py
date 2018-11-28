@@ -7,7 +7,7 @@ class RooflineEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, coarse_grid_solver_properties=(4, 5),
+    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, coarse_grid_solver_properties=(5, 4),
                  coarse_grid_solver_iterations=100):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth

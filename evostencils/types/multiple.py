@@ -20,3 +20,7 @@ class TypeListMetaClass(type):
 
 def generate_type_list(*types):
     return TypeListMetaClass("TypeList", (), {"types": types})
+
+
+def generate_new_type(name):
+    return type(name, (), {})
