@@ -7,8 +7,8 @@ class RooflineEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, coarse_grid_solver_properties=(5, 4),
-                 coarse_grid_solver_iterations=100):
+    def __init__(self, peak_performance=4*16*2e9, peak_bandwidth=2e10, bytes_per_word=8, coarse_grid_solver_properties=(4, 5),
+                 coarse_grid_solver_iterations=1000):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word
@@ -44,7 +44,7 @@ class RooflineEvaluator:
         tmp = ((N * operations, self.compute_arithmetic_intensity(operations, words))
                for operations, words, N in list_of_metrics)
         runtimes = ((total_number_of_operations / self.compute_performance(arithmetic_intensity))
-                    for total_number_of_operations, arithmetic_intensity in tmp)
+                    for total_number_of_operations, arithmetic_intensity in tmp if arithmetic_intensity > 0.0)
         return reduce(operator.add, runtimes)
 
     def estimate_operations_per_word(self, expression: base.Expression) -> list:
@@ -55,8 +55,9 @@ class RooflineEvaluator:
         if isinstance(expression, mg.Cycle):
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
-                stencil_partitions = expression.partitioning.generate(expression.correction.operand1.generate_stencil(), expression.grid)
-                for smoother_stencil in stencil_partitions:
+                smoother_stencil = expression.correction.operand1.generate_stencil()
+                stencil_partitions = expression.partitioning.generate(smoother_stencil, expression.grid)
+                for partition in stencil_partitions:
                     if isinstance(expression.correction.operand2, mg.Residual):
                         residual = expression.correction.operand2
                         result.extend(self.estimate_operations_per_word(residual.iterate))
@@ -64,17 +65,18 @@ class RooflineEvaluator:
                         #if not residual.rhs.storage.valid:
                         #    result.extend(self.estimate_operations_per_word(residual.rhs))
                         #    residual.rhs.storage.valid = True
-                        combined_stencil = periodic.mul(smoother_stencil, residual.operator.generate_stencil())
-                        nentries_list1 = periodic.count_number_of_entries(smoother_stencil)
+                        combined_stencil = periodic.mul(partition, periodic.mul(smoother_stencil, residual.operator.generate_stencil()))
+                        nentries_list1 = periodic.count_number_of_entries(periodic.mul(partition, smoother_stencil))
                         nentries_list2 = periodic.count_number_of_entries(combined_stencil)
                         problem_size = expression.shape[0] / max(len(nentries_list1), len(nentries_list2))
                         for nentries1, nentries2 in zip(nentries_list1, nentries_list2):
-                            words = self.words_transferred_for_store() + self.words_transferred_for_load() + \
-                                    self.words_transferred_for_stencil_application(nentries1) + self.words_transferred_for_stencil_application(nentries2)
-                            operations = self.operations_for_addition() + self.operations_for_scaling() + \
-                                self.operations_for_subtraction() + self.operations_for_stencil_application(nentries1) + \
-                                self.operations_for_stencil_application(nentries2)
-                            result.append((words, operations, problem_size))
+                            if nentries1 > 0 or nentries2 > 0:
+                                words = self.words_transferred_for_store() + self.words_transferred_for_load() + \
+                                        self.words_transferred_for_stencil_application(nentries1) + self.words_transferred_for_stencil_application(nentries2)
+                                operations = self.operations_for_addition() + self.operations_for_scaling() + \
+                                    self.operations_for_subtraction() + self.operations_for_stencil_application(nentries1) + \
+                                    self.operations_for_stencil_application(nentries2)
+                                result.append((operations, words, problem_size))
                     else:
                         result.extend(self.estimate_operations_per_word(expression.correction.operand2))
                         nentries_list = periodic.count_number_of_entries(smoother_stencil)
@@ -82,12 +84,12 @@ class RooflineEvaluator:
                         for nentries in nentries_list:
                             words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
                             operations = self.operations_for_addition() + self.operations_for_stencil_application(nentries)
-                            result.append((words, operations, problem_size))
+                            result.append((operations, words, problem_size))
             else:
                 result.extend(self.estimate_operations_per_word(expression.correction))
                 words = self.words_transferred_for_store() + 2 * self.words_transferred_for_load()
                 operations = self.operations_for_addition()
-                result.append((words, operations, expression.shape[0]))
+                result.append((operations, words, expression.shape[0]))
 
         elif isinstance(expression, mg.Residual):
             result.extend(self.estimate_operations_per_word(expression.iterate))
@@ -99,7 +101,7 @@ class RooflineEvaluator:
             for nentries in nentries_list:
                 words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
                 operations = self.operations_for_subtraction() + self.operations_for_stencil_application(nentries)
-                result.append((words, operations, expression.shape[0]))
+                result.append((operations, words, expression.shape[0]))
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, mg.CoarseGridSolver):
                 for _ in range(0, self._coarse_grid_solver_iterations):

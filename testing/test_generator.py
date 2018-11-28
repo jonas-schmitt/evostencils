@@ -6,7 +6,8 @@ from evostencils.evaluation.roofline import RooflineEvaluator
 import lfa_lab as lfa
 
 dimension = 2
-grid_size = (512, 512)
+size = 2**10
+grid_size = (size, size)
 step_size = (0.00390625, 0.00390625)
 coarsening_factor = (2, 2)
 
@@ -53,7 +54,7 @@ smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 block_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
 
-# Red-Black-Block-Jacobi
+# Red-Black-Jacobi
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=0.8)

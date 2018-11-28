@@ -482,7 +482,7 @@ class ProgramGenerator:
             else:
                 program += self.generate_multigrid(expression.operand, storages)
                 tmp = f'{operand.storage.to_exa()}'
-            program += f'{expression.factor} * {tmp}'
+            program += f'({expression.factor}) * {tmp}'
         elif isinstance(expression, base.Inverse):
             program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, base.Diagonal):

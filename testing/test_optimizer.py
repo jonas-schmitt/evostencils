@@ -1,41 +1,49 @@
 from evostencils.optimizer import Optimizer
 from evostencils.expressions import base, multigrid, transformations
 from evostencils.stencils.gallery import *
-from evostencils.evaluation.convergence import ConvergenceEvaluator
-# from evostencils.evaluation.roofline import *
-from evostencils.exastencils.generation import  ProgramGenerator
+from evostencils.evaluation.convergence import ConvergenceEvaluator, lfa_sparse_stencil_to_constant_stencil
+from evostencils.evaluation.roofline import RooflineEvaluator
 import lfa_lab as lfa
 
 
 def main():
-    # Create a 2D grid with step-size (1/32, 1/32).
     dimension = 2
-    grid_size = (512, 512)
+    size = 2**10
+    grid_size = (size, size)
     step_size = (0.00390625, 0.00390625)
     coarsening_factor = (2, 2)
 
     lfa_grid = lfa.Grid(dimension, step_size)
-    lfa_operator = lfa.gallery.poisson_2d(lfa_grid)
-    lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
+    lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(coarsening_factor))
+    interpolation = lfa_sparse_stencil_to_constant_stencil(lfa_interpolation)
+
+    def generate_interpolation(_):
+        return interpolation
+
+    lfa_restriction = lfa.gallery.fw_restriction_stencil(lfa_grid, lfa_grid.coarse(coarsening_factor))
+    restriction = lfa_sparse_stencil_to_constant_stencil(lfa_restriction)
+
+    def generate_restriction(_):
+        return restriction
 
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
     A = base.generate_operator_on_grid('A', u, generate_poisson_2d)
-    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor))
-    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor))
+    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_interpolation)
+    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_restriction)
 
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
-    infinity = 1e6
+    infinity = 1e20
     epsilon = 1e-10
 
-    # bytes_per_word = 8
-    # peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
-    # peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    # performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
+    bytes_per_word = 8
+    peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
+    peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
+    performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=None, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(500, 20, 0.5, 0.3)
+                          performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
+    pop, log, hof = optimizer.default_optimization(1000, 30, 0.5, 0.3)
 
     generator = optimizer._program_generator
     i = 1

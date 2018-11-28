@@ -99,7 +99,7 @@ class Residual(base.Expression):
         return base.sub(self.rhs, base.mul(self.operator, self.iterate))
 
     def __str__(self):
-        return f'({str(self.rhs)} - {str(self.operator)} * {str(self.iterate)}'
+        return f'({str(self.rhs)} - {str(self.operator)} * {str(self.iterate)})'
 
     def __repr__(self):
         return f'Residual({repr(self.operator)}, {repr(self.iterate)}, {repr(self.rhs)})'
