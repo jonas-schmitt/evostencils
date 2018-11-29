@@ -8,6 +8,7 @@ import evostencils.expressions.transformations as transformations
 from evostencils.deap_extension import generate_tree_with_minimum_height
 from evostencils.weight_optimizer import WeightOptimizer
 from evostencils.exastencils.generation import ProgramGenerator
+from evostencils.types import multiple
 
 
 class AST(gp.PrimitiveTree):
@@ -39,8 +40,11 @@ class Optimizer:
         self._performance_evaluator = performance_evaluator
         self._epsilon = epsilon
         self._infinity = infinity
+        self._LevelFinishedType = multiple.generate_new_type('LevelFinishedType')
+        self._LevelNotFinishedType = multiple.generate_new_type('LevelNotFinishedType')
         pset = multigrid.generate_primitive_set(op, grid, rhs, dimension, coarsening_factor, interpolation, restriction,
-                                                depth=4)
+                                                depth=4, LevelFinishedType=self._LevelFinishedType,
+                                                LevelNotFinishedType=self._LevelNotFinishedType)
         self._primitive_set = pset
         self._init_creator()
         self._init_toolbox()
@@ -49,19 +53,21 @@ class Optimizer:
 
     @staticmethod
     def _init_creator():
-        creator.create("Fitness", deap.base.Fitness, weights=(-1.0, -1.0))
+        creator.create("Fitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("Individual", AST, fitness=creator.Fitness)
 
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=10)
+        #self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=10, max_height=70, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=10, max_height=20, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
-        # self._toolbox.register("select", tools.selTournament, tournsize=3)
-        self._toolbox.register("select", tools.selNSGA2)
+        # self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=1, max_height=5)
+        #self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=20, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
     @property
@@ -117,12 +123,12 @@ class Optimizer:
     def evaluate(self, individual):
         if len(individual) > 150:
             retval = len(individual) * self.infinity
-            return retval, retval
+            return retval,
         try:
             expression1, expression2 = self.compile_expression(individual)
         except MemoryError:
             retval = len(individual) * self.infinity
-            return retval, retval
+            return retval,
 
         expression = expression1
 
@@ -130,18 +136,19 @@ class Optimizer:
         import numpy, math
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
-            return self.infinity, self.infinity
+            return self.infinity,
         else:
-            if spectral_radius > self.infinity:
-                spectral_radius = self.infinity
+            if spectral_radius < 1:
+                program = self._program_generator.generate(expression)
+                self._program_generator.write_program_to_file(program)
+            return spectral_radius,
+            """
             if self._performance_evaluator is not None:
                 runtime = self.performance_evaluator.estimate_runtime(expression)
-                if runtime > self.infinity:
-                    runtime = self.infinity
                 # return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
-                return spectral_radius, runtime
             else:
-                return spectral_radius, self.infinity
+                return spectral_radius, 
+            """
 
     def ea_simple(self, population_size, generations, crossover_probability, mutation_probability):
         random.seed()
@@ -182,7 +189,7 @@ class Optimizer:
         pop = self._toolbox.population(n=initial_population_size)
         hof = tools.HallOfFame(10)
 
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         mstats.register("avg", np.mean)
@@ -205,7 +212,7 @@ class Optimizer:
         weights = transformations.obtain_weights(expression)
         best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)
         best_weights = list(best_individual)
-        spectral_radius = best_individual.fitness.values[0]
+        spectral_radius = best_individual.fitness.values
         # print(best_weights)
         # print(spectral_radius)
         return best_weights, spectral_radius

@@ -329,6 +329,10 @@ class ProgramGenerator:
             grid = mg.get_coarse_grid(grid, self.coarsening_factor)
             program_string = self.add_constant_stencil_to_program_string(program_string, i, self.operator.name, stencil)
 
+        program_string += f"Operator {self.interpolation.name} from default prolongation on Node with 'linear'\n"
+        program_string += f"Operator {self.restriction.name} from default restriction on Node with 'linear'\n"
+
+        """
         if self.interpolation_stencil_generator is None:
             program_string += f"Operator {self.interpolation.name} from default prolongation on Node with 'linear'\n"
         else:
@@ -346,7 +350,7 @@ class ProgramGenerator:
                 stencil = self.restriction_stencil_generator(grid)
                 # TODO generate string for stencil
                 grid = mg.get_coarse_grid(grid, self.coarsening_factor)
-
+        """
         return program_string
 
     @staticmethod

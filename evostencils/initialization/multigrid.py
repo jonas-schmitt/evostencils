@@ -13,14 +13,8 @@ class Terminals:
         self.grid = grid
         self.dimension = dimension
         self.coarsening_factor = coarsening_factor
-
         self.interpolation = interpolation
         self.restriction = restriction
-
-        self.diagonal = base.Diagonal(operator)
-        self.block_diagonal = base.BlockDiagonal(operator, tuple(2 for _ in range(self.dimension)))
-        self.lower = base.LowerTriangle(operator)
-        self.upper = base.UpperTriangle(operator)
         self.coarse_grid = mg.get_coarse_grid(self.grid, self.coarsening_factor)
         self.coarse_operator = mg.get_coarse_operator(self.operator, self.coarse_grid)
         self.identity = base.Identity(self.operator.shape, self.grid)
@@ -32,13 +26,13 @@ class Terminals:
 class Types:
     def __init__(self, terminals: Terminals, LevelFinishedType, LevelNotFinishedType):
         self.Operator = matrix_types.generate_matrix_type(terminals.operator.shape)
-        self.LowerTriangularOperator = matrix_types.generate_lower_triangular_matrix_type(terminals.lower.shape)
-        self.UpperTriangularOperator = matrix_types.generate_upper_triangular_matrix_type(terminals.lower.shape)
+        self.LowerTriangularOperator = matrix_types.generate_lower_triangular_matrix_type(terminals.operator.shape)
+        self.UpperTriangularOperator = matrix_types.generate_upper_triangular_matrix_type(terminals.operator.shape)
         self.Grid = grid_types.generate_grid_type(terminals.grid.size)
         self.Correction = grid_types.generate_correction_type(terminals.grid.size)
         self.RHS = grid_types.generate_rhs_type(terminals.grid.size)
-        self.DiagonalOperator = matrix_types.generate_diagonal_matrix_type(terminals.diagonal.shape)
-        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.block_diagonal.shape)
+        self.DiagonalOperator = matrix_types.generate_diagonal_matrix_type(terminals.operator.shape)
+        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.operator.shape)
         self.Interpolation = matrix_types.generate_matrix_type(terminals.interpolation.shape)
         self.Restriction = matrix_types.generate_matrix_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_matrix_type(terminals.coarse_operator.shape)
@@ -57,10 +51,11 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
-    pset.addTerminal(terminals.diagonal, types.DiagonalOperator, f'D_{level}')
-    # pset.addTerminal(terminals.lower, types.LowerTriangularOperator, f'L_{level}')
-    # pset.addTerminal(terminals.upper, types.UpperTriangularOperator, f'U_{level}')
-    # pset.addTerminal(terminals.block_diagonal, types.BlockDiagonalOperator, f'BD_{level}')
+    pset.addTerminal(base.Diagonal(terminals.operator), types.DiagonalOperator, f'D_{level}')
+    pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
+    # pset.addTerminal(terminals.block_diagonal_2, types.BlockDiagonalOperator, f'BD2_{level}')
+    # pset.addTerminal(terminals.block_diagonal_3, types.BlockDiagonalOperator, f'BD3_{level}')
+    # pset.addTerminal(terminals.block_diagonal_4, types.BlockDiagonalOperator, f'BD4_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -89,6 +84,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, f'mul_{level}')
     pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
+    # pset.addPrimitive(base.diag, [OperatorType], DiagonalOperatorType, f'diag_{level}')
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
     # pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
@@ -110,7 +106,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         cycle.predecessor._correction = cycle
         return cycle.predecessor
 
-    def reduce(cycle, times):
+    def reduce(cycle, times=1):
         from evostencils.expressions import transformations
         new_cycle = transformations.repeat(cycle, times)
         return new_cycle, new_cycle.rhs
@@ -120,13 +116,24 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), part.Partitioning], multiple.generate_type_list(GridType, CorrectionType, types.LevelFinished), f"cycle_on_level_{level}")
     pset.addPrimitive(create_cycle_on_current_level, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), part.Partitioning], multiple.generate_type_list(GridType, CorrectionType, types.LevelNotFinished), f"cycle_on_level_{level}")
-
     pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.LevelFinished)],
                       multiple.generate_type_list(types.Grid, types.Correction, types.LevelFinished),
                       f"extend_{level}")
     pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.LevelNotFinished)],
                       multiple.generate_type_list(types.Grid, types.Correction, types.LevelNotFinished),
                       f"extend_{level}")
+
+    """
+
+    def smooth(args, operator, partitioning, times):
+        cycle = create_cycle_on_current_level(args, partitioning)
+        cycle = extend(operator, cycle)
+        return reduce(cycle, times)
+
+    pset.addPrimitive(smooth, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), OperatorType, part.Partitioning, int], multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), f'smooth_{level}')
+    pset.addPrimitive(smooth, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), OperatorType, part.Partitioning, int], multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), f'smooth_{level}')
+    """
+
     if not coarsest:
 
         pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.LevelFinished)], multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.LevelFinished), f"move_up_{level}")
@@ -168,11 +175,13 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 
 def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
-                           interpolation, restriction, depth=4):
+                           interpolation, restriction, depth=4, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     terminals = Terminals(operator, grid, dimension, coarsening_factor, interpolation, restriction)
-    LevelFinishedType = multiple.generate_new_type('LevelFinished')
-    LevelNotFinishedType = multiple.generate_new_type('LevelNotFinished')
+    if LevelFinishedType is None:
+        LevelFinishedType = multiple.generate_new_type('LevelFinished')
+    if LevelNotFinishedType is None:
+        LevelNotFinishedType = multiple.generate_new_type('LevelNotFinished')
     types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
     pset = gp.PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished))
     pset.addTerminal((grid, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), 'u_and_f')
@@ -183,7 +192,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     # pset.addTerminal(3, int)
     # pset.addTerminal(4, int)
     # pset.addTerminal(5, int)
-    # pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
+    pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False
     if depth == 1:

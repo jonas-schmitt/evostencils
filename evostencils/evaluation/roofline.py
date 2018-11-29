@@ -49,8 +49,9 @@ class RooflineEvaluator:
 
     def estimate_operations_per_word(self, expression: base.Expression) -> list:
         result = []
-        #if expression.storage is not None and expression.storage.valid:
-        #    expression.storage.valid = False
+        if hasattr(expression, 'evaluated'):
+            if expression.evaluated:
+                expression.evaluated = False
 
         if isinstance(expression, mg.Cycle):
             if isinstance(expression.correction, base.Multiplication) \
@@ -61,10 +62,10 @@ class RooflineEvaluator:
                     if isinstance(expression.correction.operand2, mg.Residual):
                         residual = expression.correction.operand2
                         result.extend(self.estimate_operations_per_word(residual.iterate))
-                        result.extend(self.estimate_operations_per_word(residual.rhs))
-                        #if not residual.rhs.storage.valid:
-                        #    result.extend(self.estimate_operations_per_word(residual.rhs))
-                        #    residual.rhs.storage.valid = True
+                        if hasattr(residual.rhs, 'evaluated'):
+                            if not residual.rhs.evaluated:
+                                result.extend(self.estimate_operations_per_word(residual.rhs))
+                                residual.rhs.evaluated = True
                         combined_stencil = periodic.mul(partition, periodic.mul(smoother_stencil, residual.operator.generate_stencil()))
                         nentries_list1 = periodic.count_number_of_entries(periodic.mul(partition, smoother_stencil))
                         nentries_list2 = periodic.count_number_of_entries(combined_stencil)
@@ -94,9 +95,10 @@ class RooflineEvaluator:
         elif isinstance(expression, mg.Residual):
             result.extend(self.estimate_operations_per_word(expression.iterate))
             result.extend(self.estimate_operations_per_word(expression.rhs))
-            #if not expression.rhs.storage.valid:
-            #    result.extend(self.estimate_operations_per_word(expression.rhs))
-            #    expression.rhs.storage.valid = True
+            if hasattr(expression.rhs, 'evaluated'):
+                if not expression.rhs.evaluated:
+                    result.extend(self.estimate_operations_per_word(expression.rhs))
+                    expression.rhs.evaluated = True
             nentries_list = periodic.count_number_of_entries(expression.operator.generate_stencil())
             for nentries in nentries_list:
                 words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)

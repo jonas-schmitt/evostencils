@@ -385,6 +385,11 @@ class Scaling(Expression):
 
 
 # Wrapper functions
+
+def diag(operand):
+    return Diagonal(operand)
+
+
 def inv(operand):
     return Inverse(operand)
 
