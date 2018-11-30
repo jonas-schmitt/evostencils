@@ -43,7 +43,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(500, 20, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(1000, 30, 0.5, 0.3)
     generator = optimizer._program_generator
     i = 1
     print('\n')
@@ -64,10 +64,7 @@ def main():
             #time = generator.execute()
             print(f'Improved spectral radius: {spectral_radius}')
             #print(f"Runtime: {time}")
-        expression = transformations.set_weights(expression, ind.weights)
         print(f'Update expression: {repr(expression)}')
-        iteration_matrix = transformations.get_iteration_matrix(expression[0])
-        print(f'Iteration Matrix: {repr(iteration_matrix)}\n')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')
         except:

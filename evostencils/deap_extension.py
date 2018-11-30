@@ -58,7 +58,7 @@ def generate(pset, min_height, max_height, condition, LevelFinishedType, LevelNo
             else:
                 raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
         else:
-            coin = random.randint(0, 1)
+            coin = random.randint(0, 4)
             if coin == 0:
                 if terminals_available:
                     nodes = pset.terminals[type_]

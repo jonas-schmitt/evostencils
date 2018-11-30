@@ -67,7 +67,7 @@ class Optimizer:
         self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
         #self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=20, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
-        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=2, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
     @property
@@ -121,33 +121,31 @@ class Optimizer:
         return gp.compile(expression, self._primitive_set)
 
     def evaluate(self, individual):
+        import numpy, math
         if len(individual) > 150:
-            retval = len(individual) * self.infinity
-            return retval,
+            return len(individual) * self.infinity,
         try:
             expression1, expression2 = self.compile_expression(individual)
         except MemoryError:
-            retval = len(individual) * self.infinity
-            return retval,
+            return len(individual) * self.infinity,
 
         expression = expression1
 
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-        import numpy, math
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity,
         else:
-            if spectral_radius < 1:
+            if spectral_radius < 0.7:
                 program = self._program_generator.generate(expression)
                 self._program_generator.write_program_to_file(program)
             return spectral_radius,
             """
             if self._performance_evaluator is not None:
                 runtime = self.performance_evaluator.estimate_runtime(expression)
-                # return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
             else:
-                return spectral_radius, 
+                return self.infinity * spectral_radius, 
             """
 
     def ea_simple(self, population_size, generations, crossover_probability, mutation_probability):

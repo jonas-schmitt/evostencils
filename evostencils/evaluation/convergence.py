@@ -23,7 +23,6 @@ def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
     return constant.Stencil(tuple(entry for entry in stencil), stencil.dim)
 
 
-
 class ConvergenceEvaluator:
 
     def __init__(self, finest_grid, coarsening_factor, dimension, lfa_operator_generator, lfa_interpolation_generator,

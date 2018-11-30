@@ -206,7 +206,6 @@ def obtain_iterate(expression: base.Expression):
 def repeat(cycle: mg.Cycle, times):
     def replace_iterate(expression: base.Expression, iterate, new_iterate):
         if isinstance(expression, mg.Residual):
-            #if str(expression.iterate) == str(iterate) and expression.iterate.grid.size == iterate.grid.size \
             if expression.iterate.grid.size == iterate.grid.size \
                     and expression.iterate.grid.step_size == iterate.grid.step_size:
                 return mg.Residual(expression.operator, new_iterate, expression.rhs)

@@ -46,46 +46,43 @@ class Types:
 
 
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, coarsest=False):
-    # pset.addTerminal(terminals.grid, types.Grid, f'u_{level}')
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
     pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     pset.addTerminal(base.Diagonal(terminals.operator), types.DiagonalOperator, f'D_{level}')
-    pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
-    # pset.addTerminal(terminals.block_diagonal_2, types.BlockDiagonalOperator, f'BD2_{level}')
-    # pset.addTerminal(terminals.block_diagonal_3, types.BlockDiagonalOperator, f'BD3_{level}')
-    # pset.addTerminal(terminals.block_diagonal_4, types.BlockDiagonalOperator, f'BD4_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
     OperatorType = types.Operator
     GridType = types.Grid
-    RHSType = types.RHS
     CorrectionType = types.Correction
     DiagonalOperatorType = types.DiagonalOperator
-    # BlockDiagonalOperatorType = types.BlockDiagonalOperator
     pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'add_{level}')
-    # pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
-    # pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
-    # pset.addPrimitive(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
     pset.addPrimitive(base.add, [OperatorType, OperatorType], OperatorType, f'add_{level}')
 
     pset.addPrimitive(base.sub, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'sub_{level}')
-    # pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
-    # pset.addPrimitive(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
-    # pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
     pset.addPrimitive(base.sub, [OperatorType, OperatorType], OperatorType, f'sub_{level}')
 
     pset.addPrimitive(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'mul_{level}')
-    # pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
-    # pset.addPrimitive(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
-    # pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
     pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, f'mul_{level}')
     pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
-    # pset.addPrimitive(base.diag, [OperatorType], DiagonalOperatorType, f'diag_{level}')
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
+
+    # BlockDiagonalOperatorType = types.BlockDiagonalOperator
+    # pset.addTerminal(terminals.block_diagonal_2, types.BlockDiagonalOperator, f'BD2_{level}')
+    # pset.addTerminal(terminals.block_diagonal_3, types.BlockDiagonalOperator, f'BD3_{level}')
+    # pset.addTerminal(terminals.block_diagonal_4, types.BlockDiagonalOperator, f'BD4_{level}')
+    # pset.addPrimitive(base.add, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    # pset.addPrimitive(base.add, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    # pset.addPrimitive(base.add, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'add_{level}')
+    # pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    # pset.addPrimitive(base.sub, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    # pset.addPrimitive(base.sub, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'sub_{level}')
+    # pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
+    # pset.addPrimitive(base.mul, [DiagonalOperatorType, BlockDiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
+    # pset.addPrimitive(base.mul, [BlockDiagonalOperatorType, DiagonalOperatorType], BlockDiagonalOperatorType, f'mul_{level}')
     # pset.addPrimitive(base.inv, [BlockDiagonalOperatorType], OperatorType, f'inverse_{level}')
 
     def create_cycle_on_lower_level(coarse_grid, cycle, partitioning):
@@ -122,18 +119,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(extend, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.LevelNotFinished)],
                       multiple.generate_type_list(types.Grid, types.Correction, types.LevelNotFinished),
                       f"extend_{level}")
-
-    """
-
-    def smooth(args, operator, partitioning, times):
-        cycle = create_cycle_on_current_level(args, partitioning)
-        cycle = extend(operator, cycle)
-        return reduce(cycle, times)
-
-    pset.addPrimitive(smooth, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), OperatorType, part.Partitioning, int], multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), f'smooth_{level}')
-    pset.addPrimitive(smooth, [multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), OperatorType, part.Partitioning, int], multiple.generate_type_list(types.Grid, types.RHS, types.LevelNotFinished), f'smooth_{level}')
-    """
-
     if not coarsest:
 
         pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.LevelFinished)], multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.LevelFinished), f"move_up_{level}")
@@ -188,11 +173,7 @@ def generate_primitive_set(operator, grid, rhs, dimension, coarsening_factor,
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     pset.addTerminal(1, int)
-    # pset.addTerminal(2, int)
-    # pset.addTerminal(3, int)
-    # pset.addTerminal(4, int)
-    # pset.addTerminal(5, int)
-    pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
+    # pset.addPrimitive(lambda x: x + 1, [int], int, 'inc')
 
     coarsest = False
     if depth == 1:
