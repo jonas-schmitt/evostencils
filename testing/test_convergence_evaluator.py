@@ -7,7 +7,7 @@ from evostencils.stencils import constant, gallery
 
 
 from evostencils.evaluation.convergence import *
-# Create a 2D grid with step-size (1/32, 1/32).
+# Create a finite_differences grid with step-size (1/32, 1/32).
 dimension = 2
 grid_size = (512, 512)
 step_size = (1.0, 1.0)

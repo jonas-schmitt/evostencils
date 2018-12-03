@@ -59,7 +59,7 @@ class Optimizer:
     def _init_toolbox(self):
         self._toolbox = deap.base.Toolbox()
         #self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=10, max_height=70, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=10, max_height=20, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=12, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate)
@@ -67,7 +67,7 @@ class Optimizer:
         self._toolbox.register("select", tools.selTournament, tournsize=4)
         self._toolbox.register("mate", gp.cxOnePoint)
         #self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=5, max_height=20, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
-        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=2, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=self._primitive_set, min_height=2, max_height=8, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=self._primitive_set)
 
     @property
@@ -203,7 +203,7 @@ class Optimizer:
     def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
         mu_ = population_size
         lambda_ = population_size
-        return self.ea_mu_plus_lambda(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
+        return self.ea_mu_plus_lambda(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
 
     def optimize_weights(self, expression, iterations=50):
         # expression = self.compile_expression(individual)

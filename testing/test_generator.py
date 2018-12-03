@@ -117,3 +117,5 @@ print(program)
 #generator.write_program_to_file(program)
 #print(generator.execute())
 #print_declarations(temporaries)
+from evostencils.exastencils.gallery.finite_differences import poisson_2D
+print(poisson_2D.operator())

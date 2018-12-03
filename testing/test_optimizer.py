@@ -43,7 +43,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(2500, 50, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(1000, 50, 0.5, 0.3)
     generator = optimizer._program_generator
     i = 1
     print('\n')
