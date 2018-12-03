@@ -43,7 +43,7 @@ def main():
 
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(1000, 30, 0.5, 0.3)
+    pop, log, hof = optimizer.default_optimization(2500, 50, 0.5, 0.3)
     generator = optimizer._program_generator
     i = 1
     print('\n')
@@ -51,20 +51,20 @@ def main():
         print(f'Individual {i} with fitness {ind.fitness}')
         expression = optimizer.compile_expression(ind)[0]
         if i == 1:
-            #program = generator.generate(expression)
-            #print(program)
-            #generator.write_program_to_file(program)
-            #time = generator.execute()
-            #print(f"Runtime: {time}")
+            program = generator.generate(expression)
+            print(program)
+            generator.write_program_to_file(program)
+            time = generator.execute()
+            print(f"Runtime: {time}")
             best_weights, spectral_radius = optimizer.optimize_weights(expression, iterations=100)
             transformations.set_weights(expression, best_weights)
-            #program = generator.generate(expression)
-            #print(program)
-            #generator.write_program_to_file(program)
-            #time = generator.execute()
+            program = generator.generate(expression)
+            print(program)
+            generator.write_program_to_file(program)
+            time = generator.execute()
             print(f'Improved spectral radius: {spectral_radius}')
-            #print(f"Runtime: {time}")
-        print(f'Update expression: {repr(expression)}')
+            print(f"Runtime: {time}")
+        #print(f'Update expression: {repr(expression)}')
         try:
             optimizer.visualize_tree(ind, f'tree{i}')
         except:
