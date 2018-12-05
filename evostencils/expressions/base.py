@@ -11,6 +11,8 @@ class Expression(abc.ABC):
         self.iteration_matrix = None
         self.lfa_symbol = None
         self.storage = None
+        self.runtime = None
+        self.program = None
 
     @property
     @abc.abstractmethod
@@ -19,6 +21,10 @@ class Expression(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, transform: callable, *args):
+        pass
+
+    @abc.abstractmethod
+    def mutate(self, f: callable, *args):
         pass
 
 
@@ -37,6 +43,9 @@ class Entity(Expression):
 
     def apply(self, _, *args):
         return self
+
+    def mutate(self, f: callable, *args):
+        pass
 
 
 class UnaryExpression(Expression):
@@ -60,6 +69,9 @@ class UnaryExpression(Expression):
     def apply(self, transform: callable, *args):
         return type(self)(transform(self.operand, *args))
 
+    def mutate(self, f: callable, *args):
+        f(self.operand, *args)
+
 
 class BinaryExpression(Expression):
 
@@ -77,6 +89,10 @@ class BinaryExpression(Expression):
 
     def apply(self, transform: callable, *args):
         return type(self)(transform(self.operand1, *args), transform(self.operand2, *args))
+
+    def mutate(self, f: callable, *args):
+        f(self.operand1, *args)
+        f(self.operand2, *args)
 
 
 # Entities
@@ -382,6 +398,9 @@ class Scaling(Expression):
 
     def apply(self, transform: callable, *args):
         return Scaling(self.factor, transform(self.operand, *args))
+
+    def mutate(self, f: callable, *args):
+        f(self.operand, *args)
 
 
 # Wrapper functions

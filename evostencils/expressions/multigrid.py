@@ -41,10 +41,11 @@ class Interpolation(base.Operator):
 
 
 class CoarseGridSolver(base.Entity):
-    def __init__(self, operator):
+    def __init__(self, operator, expression=None):
         self._name = "CGS"
         self._shape = operator.shape
         self._operator = operator
+        self._expression = expression
         super().__init__()
 
     @staticmethod
@@ -59,8 +60,12 @@ class CoarseGridSolver(base.Entity):
     def operator(self):
         return self._operator
 
+    @property
+    def expression(self):
+        return self._expression
+
     def __repr__(self):
-        return f'CoarseGridSolver({repr(self.operator)})'
+        return f'CoarseGridSolver({repr(self.operator)}, {repr(self.expression)})'
 
 
 class Residual(base.Expression):
@@ -109,6 +114,10 @@ class Residual(base.Expression):
         iterate = transform(self.iterate, *args)
         rhs = transform(self.rhs, *args)
         return Residual(operator, iterate, rhs)
+
+    def mutate(self, f: callable, *args):
+        f(self.rhs, *args)
+        f(self.iterate, *args)
 
 
 class Cycle(base.Expression):
@@ -172,6 +181,9 @@ class Cycle(base.Expression):
         correction = transform(self.correction, *args)
         return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
+    def mutate(self, f: callable, *args):
+        f(self.correction, *args)
+
 
 def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1, predecessor=None):
     return Cycle(iterate, rhs, correction, partitioning, weight, predecessor)
@@ -196,6 +208,14 @@ def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
     coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
     return base.Grid(f'{grid.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
+
+
+def get_coarse_rhs(rhs: base.RightHandSide, coarsening_factor: tuple):
+    from functools import reduce
+    import operator
+    coarse_size = tuple(size // factor for size, factor in zip(rhs.size, coarsening_factor))
+    coarse_step_size = tuple(h * factor for h, factor in zip(rhs.step_size, coarsening_factor))
+    return base.RightHandSide(f'{rhs.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
 
 
 def get_coarse_operator(operator, coarse_grid):

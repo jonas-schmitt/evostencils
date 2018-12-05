@@ -118,22 +118,28 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
 
-    def generate(self, expression: mg.Cycle):
-        coarsest_level = self.obtain_coarsest_level(expression)
-        storages = self.generate_storage(coarsest_level)
-        expression.storage = storages[0].solution
-        self.assign_storage_to_subexpressions(expression, storages, 0)
+    def generate_boilerplate(self, storages, coarsest_level):
         program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
         program += self.add_field_declarations_to_program_string(storages)
         program += '\n'
         program += self.add_operator_declarations_to_program_string(coarsest_level)
         program += '\n'
-        program += f'Function Cycle@finest {{\n'
-        program += self.generate_multigrid(expression, storages)
-        program += f'}}\n'
-        program += '\n'
         program += self.generate_solver_function("gen_solve", storages)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
+        return program
+
+    def generate_cycle_function(self, expression, storages):
+        base_level = 0
+        for i, storage in enumerate(storages):
+            if expression.grid.size == storage.grid.size:
+                expression.storage = storage.solution
+                base_level = i
+                break
+        self.assign_storage_to_subexpressions(expression, storages, base_level)
+        program = ''
+        program += f'Function Cycle@(finest - {base_level}) {{\n'
+        program += self.generate_multigrid(expression, storages)
+        program += f'}}\n'
         return program
 
     def write_program_to_file(self, program: str):
@@ -164,7 +170,7 @@ class ProgramGenerator:
         return end - start
 
     @staticmethod
-    def obtain_coarsest_level(cycle: mg.Cycle) -> int:
+    def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:
         def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
             if isinstance(expression, mg.Cycle):
                 if expression.grid.size < current_size:
@@ -192,7 +198,7 @@ class ProgramGenerator:
                 return current_level
             else:
                 raise RuntimeError("Unexpected expression")
-        return recursive_descent(cycle, cycle.grid.size, 0) + 1
+        return recursive_descent(cycle, cycle.grid.size, base_level) + 1
 
     def generate_storage(self, maximum_level):
         tmps = []
@@ -221,10 +227,7 @@ class ProgramGenerator:
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.iterate.storage = storages[i].solution
-            #node.rhs.storage = storages[i].rhs
             node.correction.storage = storages[i].correction
-            #ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
-            #ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
@@ -362,7 +365,7 @@ class ProgramGenerator:
 
     def generate_coarse_grid_solver(self, expression: base.Expression, storages: [CycleStorage]):
         # TODO replace hard coded RB-GS by generic implementation
-        i = expression.storage.level
+        i =  + expression.storage.level
         n = 1000
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
@@ -380,28 +383,21 @@ class ProgramGenerator:
         return program
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
+        if expression.program is not None:
+            return expression.program
         program = ''
         if expression.storage is not None and expression.storage.valid:
             expression.storage.valid = False
 
         if isinstance(expression, mg.Cycle):
-            #if isinstance(expression.iterate, base.ZeroGrid):
-            #    program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
-            #program = self.generate_multigrid(expression.iterate, storages)
-            #if not expression.rhs.storage.valid:
-            #program += self.generate_multigrid(expression.rhs, storages)
-            #expression.rhs.storage.valid = True
             field = expression.storage
-
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
                 iterate_str = expression.iterate.storage.to_exa3()
                 if isinstance(expression.correction.operand2, mg.Residual):
                     residual = expression.correction.operand2
-                    #if not residual.iterate.storage.valid:
                     program += self.generate_multigrid(residual.iterate, storages)
-                    #expression.iterate.storage.valid = True
                     if not residual.rhs.storage.valid:
                         program += self.generate_multigrid(residual.rhs, storages)
                         residual.rhs.storage.valid = True
@@ -432,9 +428,7 @@ class ProgramGenerator:
                            f'{expression.iterate.storage.to_exa3()} + ' \
                            f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
-            #if not expression.iterate.storage.valid:
             program += self.generate_multigrid(expression.iterate, storages)
-            #expression.iterate.storage.valid = True
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages)
                 expression.rhs.storage.valid = True
@@ -450,6 +444,8 @@ class ProgramGenerator:
                 operator_str = "+"
             elif isinstance(expression, base.Subtraction):
                 operator_str = "-"
+            else:
+                raise RuntimeError("Unexpected branch")
 
             if expression.storage is None:
                 return f'{self.generate_multigrid(expression.operand1, storages)} ' \
@@ -461,9 +457,15 @@ class ProgramGenerator:
                 if expression.operand1.storage is None:
                     if isinstance(operand1, mg.CoarseGridSolver):
                         program += self.generate_multigrid(operand2, storages)
-                        if expression.storage is not expression.operand2.storage:
-                            program += f'\t{expression.storage.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'
-                        program += self.generate_coarse_grid_solver(expression, storages)
+                        if operand1.expression is not None:
+                            level = expression.operand2.storage.level
+                            program += f'\t{storages[level].solution.to_exa3()} = 0\n'
+                            program += f'\t{storages[level].rhs.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'
+                            program += f'\tCycle@(finest - {level})\n'
+                        else:
+                            if expression.storage is not expression.operand2.storage:
+                                program += f'\t{expression.storage.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'
+                            program += self.generate_coarse_grid_solver(expression, storages)
                         return program
                     else:
                         tmp1 = self.generate_multigrid(operand1, storages)
@@ -505,7 +507,8 @@ class ProgramGenerator:
         else:
             print(type(expression))
             raise NotImplementedError("Case not implemented")
-        return f'{program}'
+        expression.program = program
+        return program
 
     @staticmethod
     def generate_l2_norm_residual(function_name: str, storages: [CycleStorage]) -> str:

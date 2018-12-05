@@ -14,7 +14,7 @@ coarsening_factor = (2, 2)
 lfa_grid = lfa.Grid(dimension, step_size)
 lfa_operator = lfa.gallery.poisson_2d(lfa_grid)
 lfa_coarse_operator = lfa.gallery.poisson_2d(lfa_grid.coarse(coarsening_factor))
-convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
+convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
 roofline_evaluator = RooflineEvaluator()
 
 lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(coarsening_factor))
@@ -47,7 +47,6 @@ smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Single, weight=1)
 #print("Generating Jacobi\n")
-print(roofline_evaluator.estimate_runtime(jacobi))
 
 # Block-Jacobi
 smoother = base.Inverse(base.BlockDiagonal(A, (2, 2)))
@@ -58,7 +57,6 @@ block_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.Singl
 smoother = base.Inverse(base.Diagonal(A))
 correction = base.mul(smoother, multigrid.residual(A, u, b))
 rb_jacobi = multigrid.cycle(u, b, correction, partitioning=partitioning.RedBlack, weight=0.8)
-print(roofline_evaluator.estimate_runtime(rb_jacobi))
 
 # Two-Grid
 tmp = rb_jacobi
@@ -68,7 +66,6 @@ tmp = base.mul(multigrid.CoarseGridSolver(A_coarse), tmp)
 tmp = base.mul(multigrid.get_interpolation(u, u_coarse, generate_interpolation), tmp)
 tmp = multigrid.cycle(rb_jacobi, b, tmp)
 tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
-print(roofline_evaluator.estimate_runtime(tmp))
 
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 # Three-Grid
@@ -84,7 +81,6 @@ tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correc
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correction.rhs, base.mul(mg.get_coarse_grid_solver(A_coarse_coarse), tmp.correction.correction)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, mg.cycle(tmp.correction.iterate, tmp.correction.rhs, base.mul(mg.get_interpolation(u_coarse, u_coarse_coarse, generate_interpolation), tmp.correction.correction)))
 tmp = mg.cycle(tmp.iterate, tmp.rhs, base.mul(mg.get_interpolation(u, u_coarse, generate_interpolation), tmp.correction))
-print(roofline_evaluator.estimate_runtime(tmp))
 
 """
 tmp = multigrid.residual(A, u, b)
@@ -104,18 +100,17 @@ tmp = multigrid.cycle(u, b, tmp)
 tmp = multigrid.cycle(jacobi, None, tmp)
 """
 iteration_matrix = transformations.get_iteration_matrix(tmp)
-print(iteration_matrix)
-print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
+#print(iteration_matrix)
+#print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
 weights = transformations.obtain_weights(tmp)
 for i in range(len(weights)):
     weights[i] = 0.8
 tail = transformations.set_weights(tmp, weights)
-print(mg.determine_maximum_tree_depth(tmp))
-print("Generating Multigrid\n")
-program = generator.generate(tmp)
+#print("Generating Multigrid\n")
+storages = generator.generate_storage(8)
+program = generator.generate_boilerplate(storages, 8)
+program += generator.generate_cycle_function(tmp, storages)
 print(program)
 #generator.write_program_to_file(program)
 #print(generator.execute())
 #print_declarations(temporaries)
-from evostencils.exastencils.gallery.finite_differences import poisson_2D
-print(poisson_2D.operator())

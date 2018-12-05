@@ -32,7 +32,7 @@ def main():
     P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_interpolation)
     R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_restriction)
 
-    convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.poisson_2d, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
+    convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e20
     epsilon = 1e-10
 
@@ -40,10 +40,13 @@ def main():
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
-
-    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, convergence_evaluator=convergence_evaluator,
+    levels = 4
+    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    pop, log, hof = optimizer.default_optimization(1000, 50, 0.5, 0.3)
+    #pop, log, hof = optimizer.default_optimization(50, 20, 0.5, 0.3)
+    program = optimizer.default_optimization(50, 20, 0.5, 0.3)
+    print(program)
+    """
     generator = optimizer._program_generator
     i = 1
     print('\n')
@@ -73,6 +76,7 @@ def main():
 
     optimizer.plot_minimum_fitness(log)
     return pop, log, hof
+    """
 
 
 if __name__ == "__main__":

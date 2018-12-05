@@ -25,18 +25,20 @@ def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, finest_grid, coarsening_factor, dimension, lfa_operator_generator, lfa_interpolation_generator,
+    def __init__(self, finest_grid, coarsening_factor, dimension, lfa_interpolation_generator,
                  lfa_restriction_generator):
         self._finest_grid = finest_grid
         self._coarsening_factor = coarsening_factor
         self._dimension = dimension
-        self._lfa_operator_generator = lfa_operator_generator
         self._lfa_interpolation_generator = lfa_interpolation_generator
         self._lfa_restriction_generator = lfa_restriction_generator
 
     @property
     def finest_grid(self):
         return self._finest_grid
+
+    def set_finest_grid(self, new_finest_grid):
+        self._finest_grid = new_finest_grid
 
     @property
     def coarsening_factor(self):
@@ -45,10 +47,6 @@ class ConvergenceEvaluator:
     @property
     def dimension(self):
         return self._dimension
-
-    @property
-    def lfa_operator_generator(self):
-        return self._lfa_operator_generator
 
     @property
     def lfa_interpolation_generator(self):
@@ -63,9 +61,6 @@ class ConvergenceEvaluator:
         while grid.step_size() < u.step_size:
             grid = grid.coarse(self.coarsening_factor)
         return grid
-
-    def get_lfa_operator_on_grid(self, grid):
-        return self.lfa_operator_generator(grid)
 
     def transform(self, expression: base.Expression):
         if expression.lfa_symbol is not None:
@@ -118,19 +113,25 @@ class ConvergenceEvaluator:
         elif isinstance(expression, base.ZeroOperator):
             lfa_grid = self.get_lfa_grid(expression.grid)
             result = lfa_lab.zero(lfa_grid)
-        elif type(expression) == multigrid.Restriction:
+        elif isinstance(expression, multigrid.Restriction):
             lfa_fine_grid = self.get_lfa_grid(expression.fine_grid)
             lfa_coarse_grid = self.get_lfa_grid(expression.coarse_grid)
             result = self.lfa_restriction_generator(lfa_fine_grid, lfa_coarse_grid)
-        elif type(expression) == multigrid.Interpolation:
+        elif isinstance(expression, multigrid.Interpolation):
             lfa_fine_grid = self.get_lfa_grid(expression.fine_grid)
             lfa_coarse_grid = self.get_lfa_grid(expression.coarse_grid)
             result = self.lfa_interpolation_generator(lfa_fine_grid, lfa_coarse_grid)
-        elif type(expression) == multigrid.CoarseGridSolver:
-            lfa_grid = self.get_lfa_grid(expression.grid)
-            stencil = expression.operator.generate_stencil()
-            operator = stencil_to_lfa(stencil, lfa_grid)
-            result = operator.inverse()
+        elif isinstance(expression, multigrid.CoarseGridSolver):
+            cgs_expression = expression.expression
+            if cgs_expression is None:
+                lfa_grid = self.get_lfa_grid(expression.grid)
+                stencil = expression.operator.generate_stencil()
+                operator = stencil_to_lfa(stencil, lfa_grid)
+                result = operator.inverse()
+            else:
+                if cgs_expression.iteration_matrix is None or cgs_expression.iteration_matrix.lfa_symbol is None:
+                    raise RuntimeError("Not evaluated")
+                result = cgs_expression.iteration_matrix.lfa_symbol
         elif isinstance(expression, base.Operator):
             lfa_grid = self.get_lfa_grid(expression.grid)
             operator = stencil_to_lfa(expression.generate_stencil(), lfa_grid)
