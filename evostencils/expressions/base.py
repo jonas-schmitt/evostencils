@@ -13,6 +13,7 @@ class Expression(abc.ABC):
         self.storage = None
         self.runtime = None
         self.program = None
+        self.evaluate = True
 
     @property
     @abc.abstractmethod

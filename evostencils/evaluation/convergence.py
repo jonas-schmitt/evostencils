@@ -123,7 +123,7 @@ class ConvergenceEvaluator:
             result = self.lfa_interpolation_generator(lfa_fine_grid, lfa_coarse_grid)
         elif isinstance(expression, multigrid.CoarseGridSolver):
             cgs_expression = expression.expression
-            if cgs_expression is None:
+            if cgs_expression is None or not cgs_expression.evaluate:
                 lfa_grid = self.get_lfa_grid(expression.grid)
                 stencil = expression.operator.generate_stencil()
                 operator = stencil_to_lfa(stencil, lfa_grid)

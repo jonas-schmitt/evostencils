@@ -224,9 +224,9 @@ class Optimizer:
             cgs_expression = best_expression
             self.convergence_evaluator.compute_spectral_radius(cgs_expression)
             self.performance_evaluator.estimate_runtime(cgs_expression)
+            cgs_expression.evaluate = False
             program += self._program_generator.generate_cycle_function(best_expression, storages)
         return program
-
 
     def optimize_weights(self, expression, iterations=50):
         # expression = self.compile_expression(individual)

@@ -40,12 +40,13 @@ def main():
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
-    levels = 4
+    levels = 8
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
     #pop, log, hof = optimizer.default_optimization(50, 20, 0.5, 0.3)
-    program = optimizer.default_optimization(50, 20, 0.5, 0.3)
+    program = optimizer.default_optimization(1000, 30, 0.5, 0.3)
     print(program)
+    optimizer._program_generator.write_program_to_file(program)
     """
     generator = optimizer._program_generator
     i = 1
