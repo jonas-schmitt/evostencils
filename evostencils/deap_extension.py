@@ -52,7 +52,6 @@ def generate(pset, min_height, max_height, condition, LevelFinishedType, LevelNo
                                 choice = node
                             elif 'restrict' in node.name:
                                 choice = node
-
                 if choice is None:
                     choice = random.choice(nodes)
             else:

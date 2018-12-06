@@ -67,6 +67,14 @@ tmp = base.mul(multigrid.get_interpolation(u, u_coarse, generate_interpolation),
 tmp = multigrid.cycle(rb_jacobi, b, tmp)
 tmp = multigrid.cycle(tmp, b, base.mul(base.Inverse(base.Diagonal(A)), mg.residual(A, tmp, b)), weight=0.8, partitioning=partitioning.RedBlack)
 
+iteration_matrix = transformations.get_iteration_matrix(tmp)
+print(iteration_matrix)
+storages = generator.generate_storage(8)
+program = generator.generate_boilerplate(storages, 8)
+program += generator.generate_cycle_function(tmp, storages)
+print(program)
+generator.write_program_to_file(program)
+
 zero = base.ZeroGrid(u_coarse.size, u_coarse.step_size)
 # Three-Grid
 tmp = mg.cycle(u, b, base.mul(mg.get_restriction(u, u_coarse, generate_restriction), mg.residual(A, u, b)))
@@ -100,17 +108,22 @@ tmp = multigrid.cycle(u, b, tmp)
 tmp = multigrid.cycle(jacobi, None, tmp)
 """
 iteration_matrix = transformations.get_iteration_matrix(tmp)
-#print(iteration_matrix)
-#print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
+print(iteration_matrix)
+print(convergence_evaluator.compute_spectral_radius(iteration_matrix))
+new_iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
+transformations.simplify_iteration_matrix_on_all_levels(new_iteration_matrix)
+print(new_iteration_matrix)
+print(convergence_evaluator.compute_spectral_radius(new_iteration_matrix))
+
 weights = transformations.obtain_weights(tmp)
 for i in range(len(weights)):
     weights[i] = 0.8
 tail = transformations.set_weights(tmp, weights)
 #print("Generating Multigrid\n")
-storages = generator.generate_storage(8)
-program = generator.generate_boilerplate(storages, 8)
-program += generator.generate_cycle_function(tmp, storages)
-print(program)
+#storages = generator.generate_storage(8)
+#program = generator.generate_boilerplate(storages, 8)
+#program += generator.generate_cycle_function(tmp, storages)
+#print(program)
 #generator.write_program_to_file(program)
 #print(generator.execute())
 #print_declarations(temporaries)

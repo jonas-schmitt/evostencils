@@ -462,6 +462,7 @@ class ProgramGenerator:
                             program += f'\t{storages[level].solution.to_exa3()} = 0\n'
                             program += f'\t{storages[level].rhs.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'
                             program += f'\tCycle@(finest - {level})()\n'
+                            program += f'\t{expression.storage.to_exa3()} = {storages[level].solution.to_exa3()}\n'
                         else:
                             if expression.storage is not expression.operand2.storage:
                                 program += f'\t{expression.storage.to_exa3()} = {expression.operand2.storage.to_exa3()}\n'

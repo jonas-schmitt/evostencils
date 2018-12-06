@@ -145,23 +145,24 @@ class ConvergenceEvaluator:
         from multiprocessing import Process, Queue
         from queue import Empty
         try:
-            iteration_matrix = transformations.get_iteration_matrix(expression)
+            iteration_matrix = expression
+            #iteration_matrix = transformations.get_iteration_matrix(expression)
             lfa_expression = self.transform(iteration_matrix)
-            symbol = lfa_expression.symbol()
 
-            def evaluate(q, s):
+            def evaluate(q, expr):
                 try:
+                    s = expr.symbol()
                     q.put(s.spectral_radius())
                 except (ArithmeticError, RuntimeError, MemoryError) as _:
                     q.put(0.0)
 
             queue = Queue()
-            p = Process(target=evaluate, args=(queue, symbol))
+            p = Process(target=evaluate, args=(queue, lfa_expression))
             p.start()
             p.join()
             result = queue.get(timeout=10)
             return result
-        except (ArithmeticError, RuntimeError, MemoryError, Empty) as _:
+        except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
             return 0.0
 
 

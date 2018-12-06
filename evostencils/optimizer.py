@@ -54,7 +54,7 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=pset, min_height=5, max_height=12, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=pset, min_height=5, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
@@ -129,9 +129,13 @@ class Optimizer:
             return fitness, fitness
 
         expression = expression1
-
-        spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-        if spectral_radius == 0.0 or math.isnan(spectral_radius) \
+        iteration_matrix = transformations.get_iteration_matrix(expression)
+        spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+        #simplified_iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
+        #transformations.simplify_iteration_matrix_on_all_levels(simplified_iteration_matrix)
+        #simplified_spectral_radius = self.convergence_evaluator.compute_spectral_radius(simplified_iteration_matrix)
+        #spectral_radius = simplified_spectral_radius
+        if spectral_radius == 0.0 or spectral_radius > self.infinity or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity, self.infinity
         else:
@@ -195,10 +199,10 @@ class Optimizer:
 
     def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
         from evostencils.expressions import multigrid as mg_exp
-        levels_per_run = 2
+        levels_per_run = 1
         grids = [self.grid]
         right_hand_sides = [self.rhs]
-        for i in range(1, self.levels):
+        for i in range(1, self.levels+1):
             grids.append(mg_exp.get_coarse_grid(grids[-1], self.coarsening_factor))
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
@@ -222,9 +226,12 @@ class Optimizer:
             best_individual = hof[0]
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
-            self.convergence_evaluator.compute_spectral_radius(cgs_expression)
-            self.performance_evaluator.estimate_runtime(cgs_expression)
             cgs_expression.evaluate = False
+            iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
+            #iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
+            #transformations.simplify_iteration_matrix_on_all_levels(iteration_matrix)
+            self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+            self.performance_evaluator.estimate_runtime(cgs_expression)
             program += self._program_generator.generate_cycle_function(best_expression, storages)
         return program
 

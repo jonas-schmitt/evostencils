@@ -343,7 +343,7 @@ class Subtraction(BinaryExpression):
 class Multiplication(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
+        #assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
