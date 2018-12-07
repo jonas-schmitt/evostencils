@@ -8,7 +8,7 @@ import lfa_lab as lfa
 
 def main():
     dimension = 2
-    size = 2**10
+    size = 2**20
     grid_size = (size, size)
     step_size = (0.00390625, 0.00390625)
     coarsening_factor = (2, 2)
@@ -43,7 +43,7 @@ def main():
     levels = 8
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    program = optimizer.default_optimization(500, 30, 0.7, 0.3)
+    program = optimizer.default_optimization(5000, 30, 0.7, 0.3)
     print(program)
     optimizer._program_generator.write_program_to_file(program)
     """
