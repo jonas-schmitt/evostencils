@@ -40,7 +40,7 @@ def generate(pset, min_height, max_height, condition, LevelFinishedType, LevelNo
                 if hasattr(type_, 'types') and len(type_.types) == 3:
                     if type_.types[2] == LevelFinishedType:
                         for node in nodes:
-                            if 'solve' in node.name and node.args[1].types[2] == LevelNotFinishedType:
+                            if 'solve' in node.name and node.args[2].types[2] == LevelNotFinishedType:
                                 choice = node
                             elif 'move_up' in node.name:
                                 choice = node

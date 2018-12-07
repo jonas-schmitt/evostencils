@@ -27,7 +27,7 @@ class AST(gp.PrimitiveTree):
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
                  interpolation, restriction, levels, convergence_evaluator=None, performance_evaluator=None,
-                 epsilon=1e-9, infinity=1e10):
+                 epsilon=1e-10, infinity=1e100):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
@@ -120,22 +120,21 @@ class Optimizer:
     def evaluate(self, individual, pset):
         import numpy, math
         if len(individual) > 150:
-            fitness = len(individual) * self.infinity
-            return fitness, fitness
+            return self.infinity, self.infinity
         try:
             expression1, expression2 = self.compile_expression(individual, pset)
         except MemoryError:
-            fitness = len(individual) * self.infinity
-            return fitness, fitness
+            return self.infinity, self.infinity
 
         expression = expression1
         iteration_matrix = transformations.get_iteration_matrix(expression)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-        #simplified_iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
-        #transformations.simplify_iteration_matrix_on_all_levels(simplified_iteration_matrix)
-        #simplified_spectral_radius = self.convergence_evaluator.compute_spectral_radius(simplified_iteration_matrix)
-        #spectral_radius = simplified_spectral_radius
-        if spectral_radius == 0.0 or spectral_radius > self.infinity or math.isnan(spectral_radius) \
+        # simplified_iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
+        # transformations.simplify_iteration_matrix_on_all_levels(simplified_iteration_matrix)
+        # simplified_spectral_radius = self.convergence_evaluator.compute_spectral_radius(simplified_iteration_matrix)
+        # spectral_radius = simplified_spectral_radius
+
+        if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity, self.infinity
         else:
@@ -199,7 +198,7 @@ class Optimizer:
 
     def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
         from evostencils.expressions import multigrid as mg_exp
-        levels_per_run = 1
+        levels_per_run = 2
         grids = [self.grid]
         right_hand_sides = [self.rhs]
         for i in range(1, self.levels+1):
@@ -228,8 +227,9 @@ class Optimizer:
             cgs_expression = best_expression
             cgs_expression.evaluate = False
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
-            #iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
-            #transformations.simplify_iteration_matrix_on_all_levels(iteration_matrix)
+            # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
+            # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
+            # transformations.simplify_iteration_matrix_on_all_levels(iteration_matrix)
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             self.performance_evaluator.estimate_runtime(cgs_expression)
             program += self._program_generator.generate_cycle_function(best_expression, storages)
