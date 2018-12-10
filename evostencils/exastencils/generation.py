@@ -411,7 +411,7 @@ class ProgramGenerator:
                     correction_str = f'{expression.correction.operand2.storage.to_exa3()}'
 
                 smoother = f'{new_iterate_str} = {iterate_str} + {expression.weight} ' \
-                           f'* {self.generate_multigrid(expression.correction.operand1, storages)} ' \
+                           f'* ({self.generate_multigrid(expression.correction.operand1, storages)}) ' \
                            f'* {correction_str}'
                 if expression.partitioning == part.RedBlack:
                     # TODO currently hard coded for two dimensions
@@ -469,7 +469,7 @@ class ProgramGenerator:
                             program += self.generate_coarse_grid_solver(expression, storages)
                         return program
                     else:
-                        tmp1 = self.generate_multigrid(operand1, storages)
+                        tmp1 = f'({self.generate_multigrid(operand1, storages)})'
                 else:
                     program += self.generate_multigrid(operand1, storages)
                     tmp1 = f'{operand1.storage.to_exa3()}'
