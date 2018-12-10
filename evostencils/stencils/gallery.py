@@ -24,6 +24,13 @@ def generate_poisson_2d(grid):
     return constant.Stencil(entries)
 
 
+def get_coefficient(kappa, position: tuple):
+    from math import exp, pow
+    pos_x = position[0]
+    pos_y = position[1]
+    return exp((kappa * ((pos_x - (pos_x ** 2)) * (pos_y - (pos_y ** 2)))))
+
+
 def generate_poisson_2d_with_variable_coefficients(grid, get_coefficient: callable, position: tuple):
     assert len(position) == 2, 'Position must be a two dimensional array'
     pos_x = position[0]
