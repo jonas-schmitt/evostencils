@@ -1,6 +1,3 @@
-from sympy import MatrixSymbol
-from sympy import BlockMatrix
-import sympy as sp
 from functools import reduce
 import operator
 

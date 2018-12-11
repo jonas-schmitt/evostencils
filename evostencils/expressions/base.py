@@ -1,5 +1,4 @@
 import abc
-from operator import mul as builtin_mul
 from functools import reduce
 from evostencils.stencils import periodic
 from evostencils.stencils import constant
@@ -116,7 +115,12 @@ class Operator(Entity):
     def generate_stencil(self):
         if self._stencil_generator is None:
             return None
-        return self._stencil_generator(self._grid)
+        return self._stencil_generator.generate_stencil(self._grid)
+
+    def generate_exa3(self):
+        if self._stencil_generator is None:
+            return None
+        return self._stencil_generator.generate_exa3(self._name)
 
     def __repr__(self):
         return f'Operator({repr(self.name)}, {repr(self.shape)}, {repr(self.shape)}, {repr(self._stencil_generator)})'
@@ -124,7 +128,8 @@ class Operator(Entity):
 
 class Identity(Operator):
     def __init__(self, shape, grid):
-        super().__init__('I', shape, grid, constant.get_unit_stencil)
+        from evostencils.stencils.gallery import IdentityGenerator
+        super().__init__('I', shape, grid, IdentityGenerator(grid.dimension))
 
     def __repr__(self):
         return f'Identity({repr(self.shape)}, {repr(self.grid)})'

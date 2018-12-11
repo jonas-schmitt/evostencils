@@ -7,7 +7,6 @@ import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
 from evostencils.deap_extension import generate_tree_with_minimum_height
 from evostencils.weight_optimizer import WeightOptimizer
-from evostencils.exastencils.generation import ProgramGenerator
 from evostencils.types import multiple
 
 
@@ -27,7 +26,7 @@ class AST(gp.PrimitiveTree):
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
                  interpolation, restriction, levels, convergence_evaluator=None, performance_evaluator=None,
-                 epsilon=1e-10, infinity=1e100):
+                 program_generator=None, epsilon=1e-10, infinity=1e100):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
@@ -39,13 +38,13 @@ class Optimizer:
         self._levels = levels
         self._convergence_evaluator = convergence_evaluator
         self._performance_evaluator = performance_evaluator
+        self._program_generator = program_generator
         self._epsilon = epsilon
         self._infinity = infinity
         self._LevelFinishedType = multiple.generate_new_type('LevelFinishedType')
         self._LevelNotFinishedType = multiple.generate_new_type('LevelNotFinishedType')
         self._init_creator()
         self._weight_optimizer = WeightOptimizer(self)
-        self._program_generator = ProgramGenerator('2D_FD_Poisson', '/local/ja42rica/ScalaExaStencil', self.operator, self.grid, self.rhs, self.dimension, self.coarsening_factor, self.interpolation, self.restriction)
 
     @staticmethod
     def _init_creator():
@@ -207,7 +206,7 @@ class Optimizer:
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
         storages = self._program_generator.generate_storage(self.levels)
-        program = self._program_generator.generate_boilerplate(storages, self.levels)
+        program = self._program_generator.generate_boilerplate(storages)
         for i in range(self.levels - levels_per_run, -1, -levels_per_run):
             grid = grids[i]
             rhs = right_hand_sides[i]

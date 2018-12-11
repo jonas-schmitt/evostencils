@@ -49,10 +49,10 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, coarsest=False):
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
-    pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
-    # pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
-    pset.addTerminal(base.Diagonal(terminals.operator), types.DiagonalOperator, f'D_{level}')
-    # pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
+    # pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
+    pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
+    # pset.addTerminal(base.Diagonal(terminals.operator), types.DiagonalOperator, f'D_{level}')
+    pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -60,6 +60,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     GridType = types.Grid
     CorrectionType = types.Correction
     DiagonalOperatorType = types.DiagonalOperator
+    """
     pset.addPrimitive(base.add, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'add_{level}')
     pset.addPrimitive(base.add, [OperatorType, OperatorType], OperatorType, f'add_{level}')
 
@@ -71,7 +72,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
-
+    """
     # BlockDiagonalOperatorType = types.BlockDiagonalOperator
     # pset.addTerminal(terminals.block_diagonal_2, types.BlockDiagonalOperator, f'BD2_{level}')
     # pset.addTerminal(terminals.block_diagonal_3, types.BlockDiagonalOperator, f'BD3_{level}')

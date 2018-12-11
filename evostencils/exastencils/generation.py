@@ -32,17 +32,20 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Grid, rhs: base.Grid,
-                 dimension, coarsening_factor, interpolation, restriction, output_path="./execution"):
+                 identity: base.Identity, interpolation: mg.Interpolation, restriction: mg.Restriction,
+                 dimension, coarsening_factor, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
         self._output_path = output_path
         self._operator = op
         self._grid = grid
         self._rhs = rhs
-        self._dimension = dimension
-        self._coarsening_factor = coarsening_factor
+        self._identity = identity
         self._interpolation = interpolation
         self._restriction = restriction
+        self._dimension = dimension
+        self._coarsening_factor = coarsening_factor
+        self._initialization_information = initialization_information
         if not os.path.exists(output_path):
             os.makedirs(output_path)
         subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
@@ -78,20 +81,16 @@ class ProgramGenerator:
         return self._coarsening_factor
 
     @property
+    def identity(self):
+        return self._identity
+
+    @property
     def interpolation(self):
         return self._interpolation
 
     @property
     def restriction(self):
         return self._restriction
-
-    @property
-    def interpolation_stencil_generator(self):
-        return self._interpolation.stencil_generator
-
-    @property
-    def restriction_stencil_generator(self):
-        return self._restriction.stencil_generator
 
     def generate_settings_file(self):
         tmp = f'user\t= "Guest"\n\n'
@@ -118,11 +117,11 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
 
-    def generate_boilerplate(self, storages, coarsest_level):
+    def generate_boilerplate(self, storages):
         program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
         program += self.add_field_declarations_to_program_string(storages)
         program += '\n'
-        program += self.add_operator_declarations_to_program_string(coarsest_level)
+        program += self.add_operator_declarations_to_program_string()
         program += '\n'
         program += self.generate_solver_function("gen_solve", storages)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
@@ -258,8 +257,7 @@ class ProgramGenerator:
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].solution
 
-    @staticmethod
-    def add_field_declarations_to_program_string(storages: [CycleStorage]):
+    def add_field_declarations_to_program_string(self, storages: [CycleStorage]):
         program_string = ''
         for i, storage in enumerate(storages):
             solution = storage.solution.to_exa3()
@@ -269,29 +267,19 @@ class ProgramGenerator:
             residual = storage.residual.to_exa3()
             correction = storage.correction.to_exa3()
             program_string += f'Field {solution} with Real on Node of global = 0.0\n'
-            # TODO handle boundary condition
             if i == 0:
                 program_string += f'Field {solution} on boundary = ' \
-                                  f'( cos ( ( PI * vf_boundaryPos_x ) ) - ' \
-                                  f'sin ( ( ( 2.0 * PI ) * vf_boundaryPos_y) ) )\n'
+                                  f'{self._initialization_information.get_boundary_as_str()}\n'
             else:
                 program_string += f'Field {solution} on boundary = 0.0\n'
 
-            # program_string += f'Field {solution_tmp} with Real on Node of global = 0.0\n'
-            # program_string += f'Field {solution_tmp} on boundary = 0.0\n'
-            # TODO handle rhs
             if i == 0:
                 program_string += f'Field {rhs} with Real on Node of global = ' \
-                                f'( ( ( PI ** 2 ) * cos ( ( PI * vf_nodePos_x ) ) ) - ' \
-                                f'( ( 4.0 * ( PI ** 2 ) ) * sin ( ( ( 2.0 * PI ) * ' \
-                                f'vf_nodePos_y ) ) ) )\n'
+                                f'{self._initialization_information.get_rhs_as_str()}\n'
             else:
                 program_string += f'Field {rhs} with Real on Node of global = 0\n'
 
             program_string += f'Field {rhs} on boundary = 0.0\n'
-
-            # program_string += f'Field {rhs_tmp} with Real on Node of global = 0.0\n'
-            # program_string += f'Field {rhs_tmp} on boundary = 0.0\n'
 
             program_string += f'Field {residual} with Real on Node of global = 0.0\n'
             program_string += f'Field {residual} on boundary = 0.0\n'
@@ -324,36 +312,12 @@ class ProgramGenerator:
         program_string += '}\n'
         return program_string
 
-    def add_operator_declarations_to_program_string(self, maximum_level: int):
+    def add_operator_declarations_to_program_string(self):
         program_string = ''
-        grid = self.grid
-        for i in range(maximum_level + 1):
-            stencil = self.operator.stencil_generator(grid)
-            grid = mg.get_coarse_grid(grid, self.coarsening_factor)
-            program_string = self.add_constant_stencil_to_program_string(program_string, i, self.operator.name, stencil)
-
-        program_string += f"Operator {self.interpolation.name} from default prolongation on Node with 'linear'\n"
-        program_string += f"Operator {self.restriction.name} from default restriction on Node with 'linear'\n"
-
-        """
-        if self.interpolation_stencil_generator is None:
-            program_string += f"Operator {self.interpolation.name} from default prolongation on Node with 'linear'\n"
-        else:
-            grid = self.grid
-            for i in range(maximum_level):
-                stencil = self.interpolation_stencil_generator(grid)
-                # TODO generate string for stencil
-                grid = mg.get_coarse_grid(grid, self.coarsening_factor)
-
-        if self.restriction_stencil_generator is None:
-            program_string += f"Operator {self.restriction.name} from default restriction on Node with 'linear'\n"
-        else:
-            grid = self.grid
-            for i in range(maximum_level):
-                stencil = self.restriction_stencil_generator(grid)
-                # TODO generate string for stencil
-                grid = mg.get_coarse_grid(grid, self.coarsening_factor)
-        """
+        program_string += self.operator.generate_exa3()
+        program_string += self.identity.generate_exa3()
+        program_string += self.interpolation.generate_exa3()
+        program_string += self.restriction.generate_exa3()
         return program_string
 
     @staticmethod

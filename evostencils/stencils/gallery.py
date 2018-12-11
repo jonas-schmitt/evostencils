@@ -1,53 +1,161 @@
+import abc
 from evostencils.stencils import constant
+from evostencils.expressions import base
 
 
-def generate_poisson_1d(grid):
-    h, = grid.step_size
-    entries = [
-        ((-1,), -1 / (h * h)),
-        ((0,), 2 / (h * h)),
-        ((1,), -1 / (h * h)),
-    ]
-    return constant.Stencil(entries)
+class StencilGenerator(abc.ABC):
+
+    @abc.abstractmethod
+    def generate_stencil(self, grid):
+        pass
+
+    @abc.abstractmethod
+    def generate_exa3(self, name):
+        pass
 
 
-def generate_poisson_2d(grid):
-    eps = 1.0
-    h0, h1 = grid.step_size
-    entries = [
-        ((0, -1), -1 / (h1 * h1)),
-        ((-1, 0), -1 / (h0 * h0) * eps),
-        ((0, 0), 2 / (h0 * h0) * eps + 2 / (h1 * h1)),
-        ((1, 0), -1 / (h0 * h0) * eps),
-        ((0, 1), -1 / (h1 * h1))
-    ]
-    return constant.Stencil(entries)
+class Poisson1D(StencilGenerator):
+
+    def generate_stencil(self, grid):
+        h, = grid.step_size
+        entries = [
+            ((-1,), -1 / (h * h)),
+            ((0,), 2 / (h * h)),
+            ((1,), -1 / (h * h)),
+        ]
+        return constant.Stencil(entries)
+
+    def generate_exa3(self, name):
+        # TODO implement this function
+        pass
 
 
-def get_coefficient(kappa, position: tuple):
-    from math import exp, pow
-    pos_x = position[0]
-    pos_y = position[1]
-    return exp((kappa * ((pos_x - (pos_x ** 2)) * (pos_y - (pos_y ** 2)))))
+class Poisson2D(StencilGenerator):
+
+    def generate_stencil(self, grid):
+        eps = 1.0
+        h0, h1 = grid.step_size
+        entries = [
+            ((0, -1), -1 / (h1 * h1)),
+            ((-1, 0), -1 / (h0 * h0) * eps),
+            ((0, 0), 2 / (h0 * h0) * eps + 2 / (h1 * h1)),
+            ((1, 0), -1 / (h0 * h0) * eps),
+            ((0, 1), -1 / (h1 * h1))
+        ]
+        return constant.Stencil(entries)
+
+    def generate_exa3(self, name):
+        return """
+Operator A from Stencil {
+    [ 0,  0] =>  2.0 / ( vf_gridWidth_x ** 2 ) + 2.0 / ( vf_gridWidth_y ** 2 )
+    [-1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+    [ 1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+    [ 0, -1] => -1.0 / ( vf_gridWidth_y ** 2 )
+    [ 0,  1] => -1.0 / ( vf_gridWidth_y ** 2 )
+}
+    """
 
 
-def generate_poisson_2d_with_variable_coefficients(grid, get_coefficient: callable, position: tuple):
-    assert len(position) == 2, 'Position must be a two dimensional array'
-    pos_x = position[0]
-    pos_y = position[1]
-    width_x, width_y = grid.step_size
-    entries = [
-        ((0, 0), (((get_coefficient((pos_x + (0.5 * width_x)), pos_y) + get_coefficient((pos_x - (0.5 * width_x)), pos_y))
-                   / (width_x * width_x))
-                  + ((get_coefficient(pos_x, (pos_y + (0.5 * width_y))) + get_coefficient(pos_x, (pos_y - (0.5 * width_y))))
-                     / (width_y * width_y)))),
-        ((1, 0), ((-1.0 * get_coefficient((pos_x + (0.5 * width_x)), pos_y))
-                  / (width_x * width_x))),
-        ((-1, 0), ((-1.0 * get_coefficient((pos_x - (0.5 * width_x)), pos_y))
-                   / (width_x * width_x))),
-        ((0, 1),  ((-1.0 * get_coefficient(pos_x, (pos_y + (0.5 * width_y))))
-                   / (width_y * width_y))),
-        ((0, -1), ((-1.0 * get_coefficient(pos_x, (pos_y - (0.5 * width_y))))
-                   / (width_y * width_y)))
-    ]
-    return constant.Stencil(entries)
+def get_coefficient(pos_x, pos_y):
+    from math import exp
+    kappa = 10.0
+    return exp((kappa * ((pos_x - (pos_x * pos_x)) * (pos_y - (pos_y * pos_y)))))
+
+
+class Poisson2DVarCoeffs(StencilGenerator):
+    def __init__(self, coefficient_function, kappa, position):
+        assert len(self.position) == 2, 'Position must be a two dimensional array'
+        self.get_coefficient = coefficient_function
+        self.kappa = kappa
+        self.position = position
+
+    def generate_stencil(self, grid):
+        pos_x = self.position[0]
+        pos_y = self.position[1]
+        width_x, width_y = grid.step_size
+        entries = [
+            ((0, 0), (((self.get_coefficient((pos_x + (0.5 * width_x)), pos_y) + self.get_coefficient((pos_x - (0.5 * width_x)), pos_y))
+                       / (width_x * width_x))
+                      + ((self.get_coefficient(pos_x, (pos_y + (0.5 * width_y))) + self.get_coefficient(pos_x, (pos_y - (0.5 * width_y))))
+                         / (width_y * width_y)))),
+            ((1, 0), ((-1.0 * self.get_coefficient((pos_x + (0.5 * width_x)), pos_y))
+                      / (width_x * width_x))),
+            ((-1, 0), ((-1.0 * self.get_coefficient((pos_x - (0.5 * width_x)), pos_y))
+                       / (width_x * width_x))),
+            ((0, 1),  ((-1.0 * self.get_coefficient(pos_x, (pos_y + (0.5 * width_y))))
+                       / (width_y * width_y))),
+            ((0, -1), ((-1.0 * self.get_coefficient(pos_x, (pos_y - (0.5 * width_y))))
+                       / (width_y * width_y)))
+        ]
+        return constant.Stencil(entries)
+
+    def generate_exa3(self, name):
+        return """
+Globals {
+    Val kappa : Real = 10.0
+}
+
+Function getCoefficient ( xPos : Real, yPos : Real ) : Real {
+    return exp ( ( kappa * ( ( xPos - ( xPos ** 2 ) ) * ( yPos - ( yPos ** 2 ) ) ) ) )
+}
+
+Operator A from Stencil {
+    [0, 0] => ( ( ( getCoefficient ( ( vf_nodePosition_x@current + ( 0.5 * vf_gridWidth_x@current ) ), vf_nodePosition_y@current ) + getCoefficient ( ( vf_nodePosition_x@current - ( 0.5 * vf_gridWidth_x@current ) ), vf_nodePosition_y@current ) ) / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) ) + ( ( getCoefficient ( vf_nodePosition_x@current, ( vf_nodePosition_y@current + ( 0.5 * vf_gridWidth_y@current ) ) ) + getCoefficient ( vf_nodePosition_x@current, ( vf_nodePosition_y@current - ( 0.5 * vf_gridWidth_y@current ) ) ) ) / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) ) )
+    [1, 0] => ( ( -1.0 * getCoefficient ( ( vf_nodePosition_x@current + ( 0.5 * vf_gridWidth_x@current ) ), vf_nodePosition_y@current ) ) / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) )
+    [-1, 0] => ( ( -1.0 * getCoefficient ( ( vf_nodePosition_x@current - ( 0.5 * vf_gridWidth_x@current ) ), vf_nodePosition_y@current ) ) / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) )
+    [0, 1] => ( ( -1.0 * getCoefficient ( vf_nodePosition_x@current, ( vf_nodePosition_y@current + ( 0.5 * vf_gridWidth_y@current ) ) ) ) / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) )
+    [0, -1] => ( ( -1.0 * getCoefficient ( vf_nodePosition_x@current, ( vf_nodePosition_y@current - ( 0.5 * vf_gridWidth_y@current ) ) ) ) / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) )
+}
+    """
+
+
+class InterpolationGenerator:
+
+    def __init__(self, coarsening_factor):
+        self.coarsening_factor = coarsening_factor
+
+    def generate_stencil(self, grid: base.Grid):
+        import lfa_lab as lfa
+        from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
+        lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
+        lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
+        return lfa_sparse_stencil_to_constant_stencil(lfa_interpolation)
+
+    @staticmethod
+    def generate_exa3(name):
+        return f"Operator {name} from default prolongation on Node with 'linear'\n"
+
+
+class RestrictionGenerator:
+
+    def __init__(self, coarsening_factor):
+        self.coarsening_factor = coarsening_factor
+
+    def generate_stencil(self, grid: base.Grid):
+        import lfa_lab as lfa
+        from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
+        lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
+        lfa_restriction = lfa.gallery.fw_restriction_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
+        return lfa_sparse_stencil_to_constant_stencil(lfa_restriction)
+
+    @staticmethod
+    def generate_exa3(name):
+        return f"Operator {name} from default restriction on Node with 'linear'\n"
+
+
+class IdentityGenerator:
+    def __init__(self, dimension):
+        self.dimension = dimension
+
+    @staticmethod
+    def generate_stencil(grid: base.Grid):
+        return constant.get_unit_stencil(grid)
+
+    def generate_exa3(self, name):
+        result = f'Operator {name} from Stencil {{\n'
+        result += '\t['
+        for i in range(self.dimension-1):
+            result += '0, '
+        result += f'0] => (1.0)\n'
+        result += f'}}\n'
+        return result

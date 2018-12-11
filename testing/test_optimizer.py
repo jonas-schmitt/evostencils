@@ -1,37 +1,35 @@
 from evostencils.optimizer import Optimizer
-from evostencils.expressions import base, multigrid, transformations
+from evostencils.expressions import multigrid
 from evostencils.stencils.gallery import *
-from evostencils.evaluation.convergence import ConvergenceEvaluator, lfa_sparse_stencil_to_constant_stencil
+from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
+from evostencils.exastencils.generation import ProgramGenerator
+from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
 import lfa_lab as lfa
 
 
 def main():
     dimension = 2
+    levels = 8
     size = 2**20
     grid_size = (size, size)
-    step_size = (0.00390625, 0.00390625)
+    h = 1/(2**levels)
+    step_size = (h, h)
     coarsening_factor = (2, 2)
-
-    lfa_grid = lfa.Grid(dimension, step_size)
-    lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(coarsening_factor))
-    interpolation = lfa_sparse_stencil_to_constant_stencil(lfa_interpolation)
-
-    def generate_interpolation(_):
-        return interpolation
-
-    lfa_restriction = lfa.gallery.fw_restriction_stencil(lfa_grid, lfa_grid.coarse(coarsening_factor))
-    restriction = lfa_sparse_stencil_to_constant_stencil(lfa_restriction)
-
-    def generate_restriction(_):
-        return restriction
 
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
-    A = base.generate_operator_on_grid('A', u, generate_poisson_2d)
-    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_interpolation)
-    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor), generate_restriction)
 
+    stencil_generator = Poisson2D()
+    interpolation_generator = InterpolationGenerator(coarsening_factor)
+    restriction_generator = RestrictionGenerator(coarsening_factor)
+
+    A = base.generate_operator_on_grid('A', u, stencil_generator)
+    I = base.Identity(A.shape, u)
+    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor), interpolation_generator)
+    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor), restriction_generator)
+
+    lfa_grid = lfa.Grid(dimension, step_size)
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e20
     epsilon = 1e-10
@@ -40,10 +38,12 @@ def main():
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
-    levels = 8
+    program_generator = ProgramGenerator('2D_FD_Poisson', '/local/ja42rica/ScalaExaStencil', A, u, b, I, P, R,
+                                         dimension, coarsening_factor,
+                                         initialization_information=InitializationInformation)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator, epsilon=epsilon, infinity=infinity)
-    program = optimizer.default_optimization(5000, 30, 0.7, 0.3)
+                          performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
+    program = optimizer.default_optimization(500, 30, 0.7, 0.3)
     print(program)
     optimizer._program_generator.write_program_to_file(program)
     """
