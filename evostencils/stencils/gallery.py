@@ -63,10 +63,9 @@ def get_coefficient(pos_x, pos_y):
 
 
 class Poisson2DVarCoeffs(StencilGenerator):
-    def __init__(self, coefficient_function, kappa, position):
-        assert len(self.position) == 2, 'Position must be a two dimensional array'
+    def __init__(self, coefficient_function, position):
+        assert len(position) == 2, 'Position must be a two dimensional array'
         self.get_coefficient = coefficient_function
-        self.kappa = kappa
         self.position = position
 
     def generate_stencil(self, grid):

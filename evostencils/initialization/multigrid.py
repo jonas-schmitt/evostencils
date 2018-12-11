@@ -50,7 +50,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     null_grid_coarse = base.ZeroGrid(terminals.coarse_grid.size, terminals.coarse_grid.step_size)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     # pset.addTerminal(terminals.operator, types.Operator, f'A_{level}')
-    pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
+    # pset.addTerminal(terminals.identity, types.DiagonalOperator, f'I_{level}')
     # pset.addTerminal(base.Diagonal(terminals.operator), types.DiagonalOperator, f'D_{level}')
     pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')

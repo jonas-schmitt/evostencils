@@ -4,7 +4,7 @@ from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.exastencils.generation import ProgramGenerator
-from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
+from evostencils.exastencils.gallery.finite_differences.var_coeff_2D import InitializationInformation
 import lfa_lab as lfa
 
 
@@ -20,7 +20,9 @@ def main():
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    stencil_generator = Poisson2D()
+    #stencil_generator = Poisson2D()
+    kappa = 10.0
+    stencil_generator = Poisson2DVarCoeffs(get_coefficient, (0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
     restriction_generator = RestrictionGenerator(coarsening_factor)
 
@@ -43,7 +45,7 @@ def main():
                                          initialization_information=InitializationInformation)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
-    program = optimizer.default_optimization(500, 30, 0.7, 0.3)
+    program = optimizer.default_optimization(20, 5, 0.7, 0.3)
     print(program)
     optimizer._program_generator.write_program_to_file(program)
     """

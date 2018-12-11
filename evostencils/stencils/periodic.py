@@ -30,12 +30,6 @@ def check_predicate(stencil, predicate):
     return recursive_descent(stencil.constant_stencils, stencil.dimension)
 
 
-def is_diagonal(stencil):
-    def predicate(constant_stencil):
-        return all(all(i == 0 for i in offset) for offset, _ in constant_stencil.entries)
-    return check_predicate(stencil, predicate)
-
-
 def convert_constant_stencils(func):
     def wrapper(*args, **kwargs):
         def to_periodic_stencil(constant_stencil: constant.Stencil):
@@ -60,6 +54,13 @@ def convert_constant_stencils(func):
                 converted_kwargs[key] = arg
         return func(*converted_args, **converted_kwargs)
     return wrapper
+
+
+@convert_constant_stencils
+def is_diagonal(stencil):
+    def predicate(constant_stencil):
+        return all(all(i == 0 for i in offset) for offset, _ in constant_stencil.entries)
+    return check_predicate(stencil, predicate)
 
 
 @convert_constant_stencils

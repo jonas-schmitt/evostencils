@@ -1,5 +1,5 @@
 from evostencils.expressions import base, multigrid as mg, partitioning as part
-from evostencils.stencils import constant
+from evostencils.stencils import constant, periodic
 import os
 import subprocess
 
@@ -359,7 +359,8 @@ class ProgramGenerator:
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
                 iterate_str = expression.iterate.storage.to_exa3()
-                if isinstance(expression.correction.operand2, mg.Residual):
+                stencil = expression.correction.operand1.generate_stencil()
+                if isinstance(expression.correction.operand2, mg.Residual) and periodic.is_diagonal(stencil):
                     residual = expression.correction.operand2
                     program += self.generate_multigrid(residual.iterate, storages)
                     if not residual.rhs.storage.valid:
@@ -367,16 +368,23 @@ class ProgramGenerator:
                         residual.rhs.storage.valid = True
                     if isinstance(residual.iterate, base.ZeroGrid):
                         program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
+                    if isinstance(expression.correction.operand1, base.Operator):
+                        operator_str = f'diag({self.generate_multigrid(expression.correction.operand1, storages)})'
+                    else:
+                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages)})'
                     correction_str = f'({residual.rhs.storage.to_exa3()} - ' \
                                      f'{self.generate_multigrid(residual.operator, storages)} * ' \
                                      f'{residual.iterate.storage.to_exa3()})'
                 else:
                     program += self.generate_multigrid(expression.correction.operand2, storages)
+                    if isinstance(expression.correction.operand1, base.BinaryExpression) or isinstance(expression.correction.operand1, base.Scaling):
+                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages)})'
+                    else:
+                        operator_str = f'{self.generate_multigrid(expression.correction.operand1, storages)}'
                     correction_str = f'{expression.correction.operand2.storage.to_exa3()}'
 
                 smoother = f'{new_iterate_str} = {iterate_str} + {expression.weight} ' \
-                           f'* ({self.generate_multigrid(expression.correction.operand1, storages)}) ' \
-                           f'* {correction_str}'
+                           f'* {operator_str} * {correction_str}'
                 if expression.partitioning == part.RedBlack:
                     # TODO currently hard coded for two dimensions
                     program += f'\t{smoother} where (((i0 + i1) % 2) == 0)\n'
