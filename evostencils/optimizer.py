@@ -57,7 +57,7 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=pset, min_height=2, max_height=8, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
@@ -138,7 +138,7 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                runtime = self.performance_evaluator.estimate_runtime(expression)
+                runtime = 1e3 * self.performance_evaluator.estimate_runtime(expression)
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
@@ -258,6 +258,7 @@ class Optimizer:
 
     def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
         from evostencils.expressions import multigrid as mg_exp
+        import math
         levels_per_run = 2
         grids = [self.grid]
         right_hand_sides = [self.rhs]
@@ -287,7 +288,13 @@ class Optimizer:
             # pop, log, hof = self.nsgaII(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
             pops.append(pop)
             stats.append(log)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+
+            def key_function(ind):
+                if ind.fitness.values[0] < 1:
+                    return math.log(self.epsilon) / math.log(ind.fitness.values[0]) * ind.fitness.values[1]
+                else:
+                    return self.infinity
+            hof = sorted(hof, key=key_function)
             best_individual = hof[0]
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
@@ -329,12 +336,12 @@ class Optimizer:
         g.draw(f"{filename}.png", "png")
 
     @staticmethod
-    def plot_multiobjective_data(generations, convergence_data, runtime_data, label_convergence, label2):
+    def plot_multiobjective_data(generations, convergence_data, runtime_data, label1, label2):
         from matplotlib.ticker import MaxNLocator
         import matplotlib.pyplot as plt
 
         fig, ax1 = plt.subplots()
-        line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label_convergence}")
+        line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label1}")
         ax1.set_xlabel("Generation")
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax1.set_ylabel("Spectral Radius", color="b")
@@ -354,14 +361,14 @@ class Optimizer:
         plt.show()
 
     @staticmethod
-    def plot_average_fitness(logbook):
+    def plot_minimum_fitness(logbook):
         gen = logbook.select("gen")
-        convergence_mins = logbook.chapters["convergence"].select("avg")
-        runtime_mins = logbook.chapters["runtime"].select("avg")
+        convergence_mins = logbook.chapters["convergence"].select("min")
+        runtime_mins = logbook.chapters["runtime"].select("min")
         Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Runtime')
 
     @staticmethod
-    def plot_minimum_fitness(logbook):
+    def plot_average_fitness(logbook):
         gen = logbook.select("gen")
         convergence_avgs = logbook.chapters["convergence"].select("avg")
         runtime_avgs = logbook.chapters["runtime"].select("avg")

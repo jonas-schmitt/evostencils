@@ -108,6 +108,8 @@ class RooflineEvaluator:
                     if expression.operand1.expression.runtime is None:
                         raise RuntimeError("Not evaluated")
                     runtime += expression.operand1.expression.runtime
+                else:
+                    runtime += self.runtime_coarse_grid_solver
             else:
                 stencil = expression.operand1.generate_stencil()
                 list_of_metrics = self.estimate_operations_per_word_for_stencil(stencil, expression.shape[0])
