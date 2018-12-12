@@ -180,7 +180,7 @@ class Optimizer:
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
         random.seed()
         pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(10)
+        hof = tools.ParetoFront()
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -196,6 +196,66 @@ class Optimizer:
                                              stats=mstats, halloffame=hof, verbose=True)
         return pop, log, hof
 
+    def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
+        random.seed()
+        pop = self._toolbox.population(n=initial_population_size)
+        hof = tools.HallOfFame(10)
+
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        logbook = tools.Logbook()
+        logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+        toolbox = self._toolbox
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+
+        hof.update(pop)
+
+        # This is just to assign the crowding distance to the individuals
+        # no actual selection is done
+        pop = toolbox.select(pop, len(pop))
+
+        record = mstats.compile(pop)
+        logbook.record(gen=0, evals=len(invalid_ind), **record)
+        print(logbook.stream)
+
+        # Begin the generational process
+        for gen in range(1, generations):
+            # Vary the population
+            offspring = tools.selTournamentDCD(pop, len(pop))
+            offspring = [toolbox.clone(ind) for ind in offspring]
+
+            for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
+                if random.random() <= crossover_probability:
+                    toolbox.mate(ind1, ind2)
+
+                toolbox.mutate(ind1)
+                toolbox.mutate(ind2)
+                del ind1.fitness.values, ind2.fitness.values
+
+            # Evaluate the individuals with an invalid fitness
+            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            hof.update(pop)
+
+            # Select the next generation population
+            pop = toolbox.select(pop + offspring, mu_)
+            record = mstats.compile(pop)
+            logbook.record(gen=gen, evals=len(invalid_ind), **record)
+            print(logbook.stream)
+
+        return pop, logbook, hof
+
     def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
         from evostencils.expressions import multigrid as mg_exp
         levels_per_run = 2
@@ -207,6 +267,8 @@ class Optimizer:
         cgs_expression = None
         storages = self._program_generator.generate_storage(self.levels)
         program = self._program_generator.generate_boilerplate(storages)
+        pops = []
+        stats = []
         for i in range(self.levels - levels_per_run, -1, -levels_per_run):
             grid = grids[i]
             rhs = right_hand_sides[i]
@@ -222,10 +284,18 @@ class Optimizer:
             mu_ = population_size
             lambda_ = population_size
             pop, log, hof = self.ea_mu_plus_lambda(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            # pop, log, hof = self.nsgaII(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            pops.append(pop)
+            stats.append(log)
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             best_individual = hof[0]
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
+            #print(best_individual.fitness.values[0])
+            #best_weights, spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
+            #print(spectral_radius)
+            #transformations.set_weights(cgs_expression, best_weights)
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
             # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
@@ -233,7 +303,7 @@ class Optimizer:
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             self.performance_evaluator.estimate_runtime(cgs_expression)
             program += self._program_generator.generate_cycle_function(best_expression, storages)
-        return program
+        return program, pops, stats
 
     def optimize_weights(self, expression, iterations=50):
         # expression = self.compile_expression(individual)
@@ -259,25 +329,21 @@ class Optimizer:
         g.draw(f"{filename}.png", "png")
 
     @staticmethod
-    def plot_minimum_fitness(logbook):
+    def plot_multiobjective_data(generations, convergence_data, runtime_data, label_convergence, label2):
         from matplotlib.ticker import MaxNLocator
-        gen = logbook.select("gen")
-        fit_mins = logbook.chapters["fitness"].select("min")
-        size_avgs = logbook.chapters["size"].select("avg")
-
         import matplotlib.pyplot as plt
 
         fig, ax1 = plt.subplots()
-        line1 = ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
+        line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label_convergence}")
         ax1.set_xlabel("Generation")
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax1.set_ylabel("Fitness", color="b")
+        ax1.set_ylabel("Spectral Radius", color="b")
         for tl in ax1.get_yticklabels():
             tl.set_color("b")
 
         ax2 = ax1.twinx()
-        line2 = ax2.plot(gen, size_avgs, "r-", label="Average Size")
-        ax2.set_ylabel("Size", color="r")
+        line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
+        ax2.set_ylabel("Runtime", color="r")
         for tl in ax2.get_yticklabels():
             tl.set_color("r")
 
@@ -285,6 +351,31 @@ class Optimizer:
         labs = [l.get_label() for l in lns]
         ax1.legend(lns, labs, loc="top right")
 
+        plt.show()
+
+    @staticmethod
+    def plot_average_fitness(logbook):
+        gen = logbook.select("gen")
+        convergence_mins = logbook.chapters["convergence"].select("avg")
+        runtime_mins = logbook.chapters["runtime"].select("avg")
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Runtime')
+
+    @staticmethod
+    def plot_minimum_fitness(logbook):
+        gen = logbook.select("gen")
+        convergence_avgs = logbook.chapters["convergence"].select("avg")
+        runtime_avgs = logbook.chapters["runtime"].select("avg")
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Runtime')
+
+    @staticmethod
+    def plot_pareto_front(pop):
+        import matplotlib.pyplot as plt
+        import numpy
+        pop.sort(key=lambda x: x.fitness.values)
+
+        front = numpy.array([ind.fitness.values for ind in pop])
+        plt.scatter(front[:, 0], front[:, 1], c="b")
+        plt.axis("tight")
         plt.show()
 
 

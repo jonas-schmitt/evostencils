@@ -347,6 +347,7 @@ class ProgramGenerator:
         return program
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
+        import decimal
         if expression.program is not None:
             return expression.program
         program = ''
@@ -355,6 +356,8 @@ class ProgramGenerator:
 
         if isinstance(expression, mg.Cycle):
             field = expression.storage
+            decimal.getcontext().prec = 50
+            weight = decimal.Decimal(expression.weight)
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
@@ -383,7 +386,7 @@ class ProgramGenerator:
                         operator_str = f'{self.generate_multigrid(expression.correction.operand1, storages)}'
                     correction_str = f'{expression.correction.operand2.storage.to_exa3()}'
 
-                smoother = f'{new_iterate_str} = {iterate_str} + {expression.weight} ' \
+                smoother = f'{new_iterate_str} = {iterate_str} + ({weight}) ' \
                            f'* {operator_str} * {correction_str}'
                 if expression.partitioning == part.RedBlack:
                     # TODO currently hard coded for two dimensions
@@ -398,7 +401,7 @@ class ProgramGenerator:
                 program += self.generate_multigrid(expression.correction, storages)
                 program += f'\t{field.to_exa3()} = ' \
                            f'{expression.iterate.storage.to_exa3()} + ' \
-                           f'{expression.weight} * {expression.correction.storage.to_exa3()}\n'
+                           f'({weight}) * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
             program += self.generate_multigrid(expression.iterate, storages)
             if not expression.rhs.storage.valid:

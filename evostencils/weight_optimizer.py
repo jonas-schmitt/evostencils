@@ -15,7 +15,8 @@ class WeightOptimizer:
             tail = transformations.set_weights(expression, weights)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
-            spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(expression)
+            iteration_matrix = transformations.get_iteration_matrix(expression)
+            spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             if spectral_radius == 0.0:
                 return self._gp_optimizer.infinity,
             else:

@@ -4,25 +4,30 @@ from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.exastencils.generation import ProgramGenerator
+# from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
 from evostencils.exastencils.gallery.finite_differences.var_coeff_2D import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.var_coeff_3D import InitializationInformation
 import lfa_lab as lfa
 
 
 def main():
     dimension = 2
     levels = 8
+    max_levels = 8
     size = 2**20
     grid_size = (size, size)
-    h = 1/(2**levels)
+    h = 1/(2**max_levels)
     step_size = (h, h)
     coarsening_factor = (2, 2)
 
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    #stencil_generator = Poisson2D()
-    kappa = 10.0
-    stencil_generator = Poisson2DVarCoeffs(get_coefficient, (0.5, 0.5))
+    # stencil_generator = Poisson2D()
+    stencil_generator = Poisson2DVarCoeffs(get_coefficient_2D, (0.5, 0.5))
+    # stencil_generator = Poisson3D()
+    # stencil_generator = Poisson3DVarCoeffs(get_coefficient_3D, (0.5, 0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
     restriction_generator = RestrictionGenerator(coarsening_factor)
 
@@ -39,15 +44,19 @@ def main():
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
+    runtime_cgs = 8.91155 * 1e-3 # ms Poisson 2D
+    performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     program_generator = ProgramGenerator('2D_FD_Poisson', '/local/ja42rica/ScalaExaStencil', A, u, b, I, P, R,
                                          dimension, coarsening_factor,
                                          initialization_information=InitializationInformation)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
-    program = optimizer.default_optimization(20, 5, 0.7, 0.3)
+    program, pops, stats = optimizer.default_optimization(500, 30, 0.7, 0.3)
     print(program)
     optimizer._program_generator.write_program_to_file(program)
+    for log in stats:
+        optimizer.plot_average_fitness(log)
+        optimizer.plot_minimum_fitness(log)
     """
     generator = optimizer._program_generator
     i = 1
