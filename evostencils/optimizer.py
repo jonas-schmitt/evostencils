@@ -138,7 +138,7 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                runtime = 1e3 * self.performance_evaluator.estimate_runtime(expression)
+                runtime = self.performance_evaluator.estimate_runtime(expression)
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
@@ -186,7 +186,15 @@ class Optimizer:
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
-        mstats.register("avg", np.mean)
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
@@ -205,7 +213,16 @@ class Optimizer:
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
-        mstats.register("avg", np.mean)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
@@ -223,23 +240,25 @@ class Optimizer:
         # no actual selection is done
         pop = toolbox.select(pop, len(pop))
 
-        record = mstats.compile(pop)
-        logbook.record(gen=0, evals=len(invalid_ind), **record)
+        record = mstats.compile(pop) if mstats is not None else {}
+        logbook.record(gen=0, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
         # Begin the generational process
-        for gen in range(1, generations):
+        for gen in range(1, generations + 1):
             # Vary the population
-            offspring = tools.selTournamentDCD(pop, len(pop))
+            offspring = tools.selTournamentDCD(pop, lambda_)
             offspring = [toolbox.clone(ind) for ind in offspring]
 
             for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() <= crossover_probability:
+                rnd = random.random()
+                if rnd <= crossover_probability:
                     toolbox.mate(ind1, ind2)
-
-                toolbox.mutate(ind1)
-                toolbox.mutate(ind2)
-                del ind1.fitness.values, ind2.fitness.values
+                    del ind1.fitness.values, ind2.fitness.values
+                elif rnd <= crossover_probability + mutation_probability:
+                    toolbox.mutate(ind1)
+                    toolbox.mutate(ind2)
+                    del ind1.fitness.values, ind2.fitness.values
 
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -251,7 +270,7 @@ class Optimizer:
             # Select the next generation population
             pop = toolbox.select(pop + offspring, mu_)
             record = mstats.compile(pop)
-            logbook.record(gen=gen, evals=len(invalid_ind), **record)
+            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             print(logbook.stream)
 
         return pop, logbook, hof
@@ -284,14 +303,15 @@ class Optimizer:
             self._init_toolbox(pset)
             mu_ = population_size
             lambda_ = population_size
-            pop, log, hof = self.ea_mu_plus_lambda(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
-            # pop, log, hof = self.nsgaII(population_size * 2, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            # pop, log, hof = self.ea_mu_plus_lambda(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            pop, log, hof = self.nsgaII(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
             pops.append(pop)
             stats.append(log)
 
             def key_function(ind):
                 if ind.fitness.values[0] < 1:
-                    return math.log(self.epsilon) / math.log(ind.fitness.values[0]) * ind.fitness.values[1]
+                    tmp = math.log(self.epsilon) / math.log(ind.fitness.values[0]) * ind.fitness.values[1]
+                    return tmp
                 else:
                     return self.infinity
             hof = sorted(hof, key=key_function)
@@ -299,17 +319,23 @@ class Optimizer:
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            #print(best_individual.fitness.values[0])
-            #best_weights, spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
-            #print(spectral_radius)
-            #transformations.set_weights(cgs_expression, best_weights)
+            # print(best_individual.fitness.values[0])
+            # optimized_best_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
+            # if optimized_spectral_radius < best_individual.fitness.values[0]:
+            #     transformations.set_weights(cgs_expression, optimized_best_weights)
+            #     print(optimized_spectral_radius)
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
             # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
             # transformations.simplify_iteration_matrix_on_all_levels(iteration_matrix)
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             self.performance_evaluator.estimate_runtime(cgs_expression)
-            program += self._program_generator.generate_cycle_function(best_expression, storages)
+            try:
+                program += self._program_generator.generate_cycle_function(best_expression, storages)
+            except Exception as e:
+                print('Ungeneratable program')
+                print(e)
+
         return program, pops, stats
 
     def optimize_weights(self, expression, iterations=50):
@@ -317,7 +343,7 @@ class Optimizer:
         weights = transformations.obtain_weights(expression)
         best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)
         best_weights = list(best_individual)
-        spectral_radius = best_individual.fitness.values
+        spectral_radius, = best_individual.fitness.values
         # print(best_weights)
         # print(spectral_radius)
         return best_weights, spectral_radius
@@ -382,6 +408,8 @@ class Optimizer:
 
         front = numpy.array([ind.fitness.values for ind in pop])
         plt.scatter(front[:, 0], front[:, 1], c="b")
+        plt.xlabel("Spectral Radius")
+        plt.ylabel("Runtime")
         plt.axis("tight")
         plt.show()
 

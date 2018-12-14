@@ -22,9 +22,10 @@ class WeightOptimizer:
             else:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        parent = creator.Weights([1.0] * problem_size)
-        parent.fitness.values = self._toolbox.evaluate(parent)
-        strategy = cma.StrategyOnePlusLambda(parent, sigma=1.0, lambda_=10)
+        # parent = creator.Weights([1.0] * problem_size)
+        # parent.fitness.values = self._toolbox.evaluate(parent)
+        # strategy = cma.StrategyOnePlusLambda(parent, sigma=1.0, lambda_=10)
+        strategy = cma.Strategy([0.75] * problem_size, 0.25)
         self._toolbox.register("generate", strategy.generate, creator.Weights)
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)

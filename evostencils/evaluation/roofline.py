@@ -59,11 +59,12 @@ class RooflineEvaluator:
                 for partition in stencil_partitions:
                     if isinstance(expression.correction.operand2, mg.Residual):
                         residual = expression.correction.operand2
-                        runtime += self.estimate_runtime(residual.iterate)
-                        if hasattr(residual.rhs, 'evaluated'):
-                            if not residual.rhs.evaluated:
-                                runtime += self.estimate_runtime(residual.rhs)
-                                residual.rhs.evaluated = True
+                        tmp = self.estimate_runtime(residual.iterate)
+                        runtime += tmp
+                        if not hasattr(residual.rhs, 'runtime_evaluated') or not residual.rhs.runtime_evaluated:
+                            tmp = self.estimate_runtime(residual.rhs)
+                            runtime += tmp
+                            residual.rhs.runtime_evaluated = True
                         combined_stencil = periodic.mul(partition, periodic.mul(smoother_stencil, residual.operator.generate_stencil()))
                         nentries_list1 = periodic.count_number_of_entries(periodic.mul(partition, smoother_stencil))
                         nentries_list2 = periodic.count_number_of_entries(combined_stencil)
@@ -75,47 +76,61 @@ class RooflineEvaluator:
                                 operations = self.operations_for_addition() + self.operations_for_scaling() + \
                                     self.operations_for_subtraction() + self.operations_for_stencil_application(nentries1) + \
                                     self.operations_for_stencil_application(nentries2)
-                                runtime += self.compute_runtime(operations, words, problem_size)
+                                tmp = self.compute_runtime(operations, words, problem_size)
+                                runtime += tmp
                     else:
-                        runtime += self.estimate_runtime(expression.correction.operand2)
+                        tmp = self.estimate_runtime(expression.correction.operand2)
+                        runtime += tmp
                         nentries_list = periodic.count_number_of_entries(smoother_stencil)
                         problem_size = expression.shape[0] / len(nentries_list)
                         for nentries in nentries_list:
                             words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
                             operations = self.operations_for_addition() + self.operations_for_stencil_application(nentries)
-                            runtime += self.compute_runtime(operations, words, problem_size)
+                            tmp = self.compute_runtime(operations, words, problem_size)
+                            runtime += tmp
             else:
-                runtime += self.estimate_runtime(expression.correction)
+                tmp = self.estimate_runtime(expression.correction)
+                runtime += tmp
                 words = self.words_transferred_for_store() + 2 * self.words_transferred_for_load()
                 operations = self.operations_for_addition()
-                runtime += self.compute_runtime(operations, words, expression.shape[0])
+                tmp = self.compute_runtime(operations, words, expression.shape[0])
+                runtime += tmp
 
         elif isinstance(expression, mg.Residual):
-            runtime += self.estimate_runtime(expression.iterate)
-            runtime += self.estimate_runtime(expression.rhs)
-            if hasattr(expression.rhs, 'evaluated'):
-                if not expression.rhs.evaluated:
-                    runtime += self.estimate_runtime(expression.rhs)
-                    expression.rhs.evaluated = True
+            tmp = self.estimate_runtime(expression.iterate)
+            runtime += tmp
+            tmp = self.estimate_runtime(expression.rhs)
+            runtime += tmp
+
+            if not hasattr(expression.rhs, 'runtime_evaluated') or not expression.rhs.runtime_evaluated:
+                tmp = self.estimate_runtime(expression.rhs)
+                runtime += tmp
+                expression.rhs.runtime_evaluated = True
             nentries_list = periodic.count_number_of_entries(expression.operator.generate_stencil())
             for nentries in nentries_list:
                 words = self.words_transferred_for_store() + self.words_transferred_for_load() + self.words_transferred_for_stencil_application(nentries)
                 operations = self.operations_for_subtraction() + self.operations_for_stencil_application(nentries)
-                runtime += self.compute_runtime(operations, words, expression.shape[0])
+                tmp = self.compute_runtime(operations, words, expression.shape[0])
+                runtime += tmp
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, mg.CoarseGridSolver):
                 if expression.operand1.expression is not None:
                     if expression.operand1.expression.runtime is None:
                         raise RuntimeError("Not evaluated")
-                    runtime += expression.operand1.expression.runtime
+                    tmp = expression.operand1.expression.runtime
+                    runtime += tmp
                 else:
-                    runtime += self.runtime_coarse_grid_solver
+                    tmp = 1000 * 2 * self.compute_runtime(4, 5, expression.operand2.shape[0] / 2)
+                    # tmp = self.runtime_coarse_grid_solver
+                    runtime += tmp
             else:
                 stencil = expression.operand1.generate_stencil()
                 list_of_metrics = self.estimate_operations_per_word_for_stencil(stencil, expression.shape[0])
                 for operations, words, problem_size in list_of_metrics:
-                    runtime += self.compute_runtime(operations, words, problem_size)
-            runtime += self.estimate_runtime(expression.operand2)
+                    tmp = self.compute_runtime(operations, words, problem_size)
+                    runtime += tmp
+            tmp = self.estimate_runtime(expression.operand2)
+            runtime += tmp
         elif isinstance(expression, base.Grid):
             pass
         else:

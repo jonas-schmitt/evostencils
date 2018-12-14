@@ -356,8 +356,9 @@ class ProgramGenerator:
 
         if isinstance(expression, mg.Cycle):
             field = expression.storage
-            decimal.getcontext().prec = 50
-            weight = decimal.Decimal(expression.weight)
+            #decimal.getcontext().prec = 14
+            #weight = decimal.Decimal(expression.weight)
+            weight = expression.weight
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
@@ -469,6 +470,10 @@ class ProgramGenerator:
             program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
+        elif isinstance(expression, base.LowerTriangle):
+            program = f'lower({self.generate_multigrid(expression.operand, storages)})'
+        elif isinstance(expression, base.UpperTriangle):
+            program = f'upper({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
             level_offset = self.determine_operator_level(expression, storages) - 1
             program = f'{expression.name}@(finest - {level_offset})'
