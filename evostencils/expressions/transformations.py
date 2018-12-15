@@ -1,5 +1,6 @@
 from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
+from evostencils.expressions import partitioning as part
 
 # Not bugfree
 """
@@ -153,15 +154,19 @@ def get_iteration_matrix(expression: base.Expression):
     return iteration_matrix
 
 
-# Not bugfree
 def set_weights(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, mg.Cycle):
         if len(weights) == 0:
             raise RuntimeError("Too few weights have been supplied")
-        head, *tail = weights
-        expression._weight = head
-        if expression.iteration_matrix is not None:
-            expression.iteration_matrix = None
+        if isinstance(expression.correction, mg.Residual) \
+                or (isinstance(expression.correction, base.Multiplication)
+                    and part.can_be_partitioned(expression.correction.operand1)):
+            head, *tail = weights
+            expression._weight = head
+            if expression.iteration_matrix is not None:
+                expression.iteration_matrix = None
+        else:
+            tail = weights
         return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)
@@ -178,7 +183,10 @@ def set_weights(expression: base.Expression, weights: list) -> list:
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, mg.Cycle):
-        weights.append(expression.weight)
+        if isinstance(expression.correction, mg.Residual) \
+                or (isinstance(expression.correction, base.Multiplication)
+                    and part.can_be_partitioned(expression.correction.operand1)):
+            weights.append(expression.weight)
         weights.extend(obtain_weights(expression.correction))
         return weights
     elif isinstance(expression, mg.Residual):
@@ -246,7 +254,6 @@ def simplify_iteration_matrix(expression: base.Expression):
 def simplify_iteration_matrix_on_all_levels(expression: base.Expression):
     expression.mutate(simplify_iteration_matrix)
     expression.mutate(simplify_iteration_matrix_on_all_levels)
-
 
 
 def obtain_coarsest_level(cycle: mg.Cycle) -> int:
