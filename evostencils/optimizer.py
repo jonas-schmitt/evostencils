@@ -247,18 +247,17 @@ class Optimizer:
         # Begin the generational process
         for gen in range(1, generations + 1):
             # Vary the population
-            offspring = tools.selTournamentDCD(pop, lambda_)
+            offspring = tools.selTournamentDCD(pop, 4 * (lambda_ // 4))
             offspring = [toolbox.clone(ind) for ind in offspring]
 
             for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
                 rnd = random.random()
                 if rnd <= crossover_probability:
                     toolbox.mate(ind1, ind2)
-                    del ind1.fitness.values, ind2.fitness.values
                 elif rnd <= crossover_probability + mutation_probability:
                     toolbox.mutate(ind1)
                     toolbox.mutate(ind2)
-                    del ind1.fitness.values, ind2.fitness.values
+                del ind1.fitness.values, ind2.fitness.values
 
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -304,7 +303,7 @@ class Optimizer:
             mu_ = population_size
             lambda_ = population_size
             # pop, log, hof = self.ea_mu_plus_lambda(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
-            pop, log, hof = self.nsgaII(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            pop, log, hof = self.nsgaII(population_size, generations, mu_, lambda_, crossover_probability, mutation_probability)
             pops.append(pop)
             stats.append(log)
 
@@ -319,11 +318,15 @@ class Optimizer:
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            # print(best_individual.fitness.values[0])
-            # optimized_best_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
-            # if optimized_spectral_radius < best_individual.fitness.values[0]:
-            #     transformations.set_weights(cgs_expression, optimized_best_weights)
-            #     print(optimized_spectral_radius)
+            print(best_individual.fitness.values[0])
+            old_weights = transformations.obtain_weights(cgs_expression)
+            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
+            #if optimized_spectral_radius < best_individual.fitness.values[0]:
+            self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
+            transformations.set_weights(cgs_expression, optimized_weights)
+            print(optimized_spectral_radius)
+            #else:
+            #    transformations.set_weights(cgs_expression, old_weights)
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
             # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)

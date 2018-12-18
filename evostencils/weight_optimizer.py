@@ -10,8 +10,17 @@ class WeightOptimizer:
         self._toolbox = deap.base.Toolbox()
         self._gp_optimizer = gp_optimizer
 
+    @staticmethod
+    def restrict_weights(weights, minimum, maximum):
+        for i, w in enumerate(weights):
+            if w < minimum:
+                weights[i] = minimum
+            elif w > maximum:
+                weights[i] = maximum
+
     def optimize(self, expression: base.Expression, problem_size, number_of_generations):
         def evaluate(weights):
+            self.restrict_weights(weights, 0.0, 2.0)
             tail = transformations.set_weights(expression, weights)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
@@ -22,12 +31,15 @@ class WeightOptimizer:
             else:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        # parent = creator.Weights([1.0] * problem_size)
-        # parent.fitness.values = self._toolbox.evaluate(parent)
-        # strategy = cma.StrategyOnePlusLambda(parent, sigma=1.0, lambda_=10)
-        strategy = cma.Strategy([0.75] * problem_size, 0.25)
+        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=50)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        import numpy
+        stats.register("avg", numpy.mean)
+        stats.register("std", numpy.std)
+        stats.register("min", numpy.min)
+        stats.register("max", numpy.max)
         self._toolbox.register("generate", strategy.generate, creator.Weights)
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
-        algorithms.eaGenerateUpdate(self._toolbox, ngen=number_of_generations, halloffame=hof, verbose=False)
+        algorithms.eaGenerateUpdate(self._toolbox, ngen=number_of_generations, halloffame=hof, verbose=True, stats=stats)
         return hof[0]

@@ -53,7 +53,7 @@ Operator A from Stencil {
     [ 0, -1] => -1.0 / ( vf_gridWidth_y ** 2 )
     [ 0,  1] => -1.0 / ( vf_gridWidth_y ** 2 )
 }
-    """
+"""
 
 
 class Poisson3D(StencilGenerator):

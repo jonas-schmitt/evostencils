@@ -91,7 +91,7 @@ def get_iteration_matrix(expression: base.Expression):
     result = expression.apply(get_iteration_matrix)
     if isinstance(result, mg.Cycle):
         if isinstance(result.iterate, base.ZeroOperator):
-            iteration_matrix = result.correction
+            iteration_matrix = base.scale(result.weight, result.correction)
         elif isinstance(result.correction, base.ZeroOperator):
             iteration_matrix = result.iterate
         else:
@@ -156,15 +156,15 @@ def get_iteration_matrix(expression: base.Expression):
 
 def set_weights(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, mg.Cycle):
-        if len(weights) == 0:
-            raise RuntimeError("Too few weights have been supplied")
+        if expression.iteration_matrix is not None:
+            expression.iteration_matrix = None
         if isinstance(expression.correction, mg.Residual) \
                 or (isinstance(expression.correction, base.Multiplication)
                     and part.can_be_partitioned(expression.correction.operand1)):
+            if len(weights) == 0:
+                raise RuntimeError("Too few weights have been supplied")
             head, *tail = weights
             expression._weight = head
-            if expression.iteration_matrix is not None:
-                expression.iteration_matrix = None
         else:
             tail = weights
         return set_weights(expression.correction, tail)

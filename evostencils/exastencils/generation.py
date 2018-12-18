@@ -145,6 +145,21 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
             print(program, file=file)
 
+    def run_exastencils_compiler(self, platform='linux'):
+        import subprocess
+        result = subprocess.run(['java', '-cp',
+                        f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
+                        f'{self.output_path}/{self.problem_name}.settings',
+                        f'{self.output_path}/{self.problem_name}.knowledge',
+                        f'{self.output_path}/lib/{platform}.platform'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if not result.returncode == 0:
+            return result.returncode
+
+        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        return result.returncode
+
     def execute(self, platform='linux', infinity=1e6):
         import subprocess
         result = subprocess.run(['java', '-cp',
@@ -467,19 +482,20 @@ class ProgramGenerator:
                 tmp = f'{operand.storage.to_exa()}'
             program += f'({expression.factor}) * {tmp}'
         elif isinstance(expression, base.Inverse):
-            program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
+            if isinstance(expression.operand, base.Inverse):
+                program = self.generate_multigrid(expression.operand, storages)
+            else:
+                program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages)})'
-        elif isinstance(expression, base.LowerTriangle):
-            program = f'lower({self.generate_multigrid(expression.operand, storages)})'
-        elif isinstance(expression, base.UpperTriangle):
-            program = f'upper({self.generate_multigrid(expression.operand, storages)})'
         elif isinstance(expression, mg.Restriction):
             level_offset = self.determine_operator_level(expression, storages) - 1
             program = f'{expression.name}@(finest - {level_offset})'
         elif isinstance(expression, mg.Interpolation):
             level_offset = self.determine_operator_level(expression, storages) + 1
             program = f'{expression.name}@(finest - {level_offset})'
+        elif isinstance(expression, base.Identity):
+            program = f'1'
         elif isinstance(expression, base.Operator):
             program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
         elif isinstance(expression, base.Grid):
