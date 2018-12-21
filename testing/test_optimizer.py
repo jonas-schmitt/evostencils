@@ -54,7 +54,7 @@ def main():
                                          initialization_information=InitializationInformation)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
-    program, pops, stats = optimizer.default_optimization(1000, 100, 0.7, 0.3)
+    program, pops, stats = optimizer.default_optimization(20, 10, 0.7, 0.3)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}_data'

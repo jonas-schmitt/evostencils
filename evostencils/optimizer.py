@@ -140,7 +140,10 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                runtime = self.performance_evaluator.estimate_runtime(expression)
+                try:
+                    runtime = self.performance_evaluator.estimate_runtime(expression)
+                except RuntimeError as _:
+                    return self.infinity, self.infinity
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity

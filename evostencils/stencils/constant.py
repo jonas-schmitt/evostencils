@@ -97,9 +97,11 @@ def transpose(self):
 def inverse(self):
     def reciprocal(offsets, value):
         if all(i == 0 for i in offsets):
+            if abs(value) < 1e-10:
+                raise RuntimeError("Division by zero")
             return offsets, 1.0 / value
         else:
-            return offsets, value
+            raise RuntimeError("Can not invert non-diagonal matrix")
     return map_stencil(self, reciprocal)
 
 

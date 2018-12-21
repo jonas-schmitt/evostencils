@@ -141,14 +141,11 @@ class ConvergenceEvaluator:
         expression.lfa_symbol = result
         return result
 
-    def compute_spectral_radius(self, expression: base.Expression):
+    def compute_spectral_radius(self, iteration_matrix: base.Expression):
         from multiprocessing import Process, Queue
         from queue import Empty
         try:
-            iteration_matrix = expression
-            #iteration_matrix = transformations.get_iteration_matrix(expression)
             lfa_expression = self.transform(iteration_matrix)
-
             def evaluate(q, expr):
                 try:
                     s = expr.symbol()
