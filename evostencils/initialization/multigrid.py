@@ -70,9 +70,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     pset.addPrimitive(base.mul, [DiagonalOperatorType, DiagonalOperatorType], DiagonalOperatorType, f'mul_{level}')
     pset.addPrimitive(base.mul, [OperatorType, OperatorType], OperatorType, f'mul_{level}')
-    pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
     pset.addPrimitive(base.inv, [DiagonalOperatorType], DiagonalOperatorType, f'inverse_{level}')
+    pset.addPrimitive(base.minus, [OperatorType], OperatorType, f'minus_{level}')
 
     # BlockDiagonalOperatorType = types.BlockDiagonalOperator
     # pset.addTerminal(terminals.block_diagonal_2, types.BlockDiagonalOperator, f'BD2_{level}')
@@ -103,12 +103,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return mg.cycle(cycle.iterate, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
                         cycle.predecessor)
 
-    """
-    def move_level_up(cycle):
-        cycle.predecessor._correction = cycle
-        return cycle.predecessor
-    """
-
     def move_level_up(interpolation, cycle):
         cycle.predecessor._correction = base.mul(interpolation, cycle)
         return reduce(cycle.predecessor)
@@ -131,7 +125,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       f"extend_{level}")
     if not coarsest:
 
-        # pset.addPrimitive(move_level_up, [multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.LevelFinished)], multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.LevelFinished), f"move_up_{level}")
         pset.addPrimitive(move_level_up, [types.Interpolation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.LevelFinished)], multiple.generate_type_list(types.Grid, types.RHS, types.LevelFinished), f"move_up_{level}")
 
         pset.addPrimitive(create_cycle_on_lower_level,

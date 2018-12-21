@@ -64,8 +64,8 @@ def main():
     for log in stats:
         pickle.dump(log, open(f"{log_dir_name}/log{i}.p", "wb"))
         i += 1
-        optimizer.plot_average_fitness(log)
-        # optimizer.plot_minimum_fitness(log)
+        # optimizer.plot_average_fitness(log)
+        optimizer.plot_minimum_fitness(log)
     for pop in pops:
         optimizer.plot_pareto_front(pop)
     """

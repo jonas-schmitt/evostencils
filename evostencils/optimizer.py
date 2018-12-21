@@ -5,7 +5,7 @@ import random
 from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.deap_extension import generate_tree_with_minimum_height
+from evostencils.deap_extension import genGrow
 from evostencils.weight_optimizer import WeightOptimizer
 from evostencils.types import multiple
 
@@ -53,14 +53,16 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", generate_tree_with_minimum_height, pset=pset, min_height=5, max_height=10, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=5, max_height=10)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
-        self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("expr_mut", generate_tree_with_minimum_height, pset=pset, min_height=2, max_height=8, LevelFinishedType=self._LevelFinishedType, LevelNotFinishedType=self._LevelNotFinishedType)
+        # self._toolbox.register("mate", gp.cxOnePoint)
+        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
+        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
+        # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
 
     @property
     def operator(self) -> base.Operator:
@@ -186,6 +188,7 @@ class Optimizer:
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+
         def mean(xs):
             avg = 0
             for x in xs:
@@ -204,10 +207,70 @@ class Optimizer:
                                              stats=mstats, halloffame=hof, verbose=True)
         return pop, log, hof
 
+    def random_search(self, initial_population_size, generations, mu_, lambda_):
+        random.seed()
+        pop = self._toolbox.population(n=initial_population_size)
+        hof = tools.ParetoFront()
+
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        logbook = tools.Logbook()
+        logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+        toolbox = self._toolbox
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+
+        hof.update(pop)
+
+        # This is just to assign the crowding distance to the individuals
+        # no actual selection is done
+        pop = toolbox.select(pop, len(pop))
+
+        record = mstats.compile(pop) if mstats is not None else {}
+        logbook.record(gen=0, nevals=len(invalid_ind), **record)
+        print(logbook.stream)
+
+        # Begin the generational process
+        for gen in range(1, generations + 1):
+            # Vary the population
+            offspring = toolbox.population(n=lambda_)
+
+            # Evaluate the individuals with an invalid fitness
+            invalid_ind = offspring
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            hof.update(pop)
+
+            # Select the next generation population
+            pop = toolbox.select(pop + offspring, mu_)
+            record = mstats.compile(pop)
+            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            print(logbook.stream)
+
+        return pop, logbook, hof
+
     def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
         random.seed()
         pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(10)
+        hof = tools.ParetoFront()
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -302,8 +365,9 @@ class Optimizer:
             self._init_toolbox(pset)
             mu_ = population_size
             lambda_ = population_size
-            # pop, log, hof = self.ea_mu_plus_lambda(population_size * 10, generations, mu_, lambda_, crossover_probability, mutation_probability)
-            pop, log, hof = self.nsgaII(population_size, generations, mu_, lambda_, crossover_probability, mutation_probability)
+            pop, log, hof = self.nsgaII(population_size, generations, mu_, lambda_,
+                                       crossover_probability, mutation_probability)
+            # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
             stats.append(log)
 
@@ -319,14 +383,10 @@ class Optimizer:
             cgs_expression = best_expression
             cgs_expression.evaluate = False
             print(best_individual.fitness.values[0])
-            old_weights = transformations.obtain_weights(cgs_expression)
-            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=100)
-            #if optimized_spectral_radius < best_individual.fitness.values[0]:
+            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=200)
             self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
             transformations.set_weights(cgs_expression, optimized_weights)
             print(optimized_spectral_radius)
-            #else:
-            #    transformations.set_weights(cgs_expression, old_weights)
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
             # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)

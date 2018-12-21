@@ -31,7 +31,10 @@ class WeightOptimizer:
             else:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=50)
+        parent = creator.Weights([1.0] * problem_size)
+        parent.fitness.values = self._toolbox.evaluate(parent)
+        strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=50)
+        # strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=200)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         import numpy
         stats.register("avg", numpy.mean)
