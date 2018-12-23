@@ -42,7 +42,7 @@ def main():
     lfa_grid = lfa.Grid(dimension, step_size)
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e100
-    epsilon = 1e-10
+    epsilon = 1e-15
 
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
@@ -54,7 +54,7 @@ def main():
                                          initialization_information=InitializationInformation)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
-    program, pops, stats = optimizer.default_optimization(100, 100, 0.7, 0.3)
+    program, pops, stats = optimizer.default_optimization(1000, 100, 0.7, 0.3)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}_data'

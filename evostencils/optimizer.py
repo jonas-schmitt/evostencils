@@ -377,15 +377,16 @@ class Optimizer:
                 else:
                     return self.infinity
             hof = sorted(hof, key=key_function)
+            for j in range(0, min(5, len(hof))):
+                print(f"Individual with rank {j}: ({hof[j].fitness.values[0]}), ({hof[j].fitness.values[1]})")
             best_individual = hof[0]
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            print(best_individual.fitness.values[0])
             optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=200)
             self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
             transformations.set_weights(cgs_expression, optimized_weights)
-            print(optimized_spectral_radius)
+            print(f"Best individual: ({optimized_spectral_radius}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
