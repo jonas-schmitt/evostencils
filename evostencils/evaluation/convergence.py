@@ -157,7 +157,7 @@ class ConvergenceEvaluator:
             p = Process(target=evaluate, args=(queue, lfa_expression))
             p.start()
             p.join()
-            result = queue.get(timeout=10)
+            result = queue.get(timeout=1)
             return result
         except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
             return 0.0

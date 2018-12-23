@@ -130,10 +130,6 @@ class Optimizer:
         expression = expression1
         iteration_matrix = transformations.get_iteration_matrix(expression)
         spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-        # simplified_iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
-        # transformations.simplify_iteration_matrix_on_all_levels(simplified_iteration_matrix)
-        # simplified_spectral_radius = self.convergence_evaluator.compute_spectral_radius(simplified_iteration_matrix)
-        # spectral_radius = simplified_spectral_radius
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
@@ -368,7 +364,7 @@ class Optimizer:
             self._init_toolbox(pset)
             mu_ = population_size
             lambda_ = population_size
-            pop, log, hof = self.nsgaII(population_size, generations, mu_, lambda_,
+            pop, log, hof = self.nsgaII(population_size * 10, generations, mu_, lambda_,
                                        crossover_probability, mutation_probability)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
@@ -391,9 +387,7 @@ class Optimizer:
             transformations.set_weights(cgs_expression, optimized_weights)
             print(optimized_spectral_radius)
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
-            # Potentially speeds up the convergence evaluation but leads to slightly different spectral radii
-            # iteration_matrix = transformations.simplify_iteration_matrix(iteration_matrix)
-            # transformations.simplify_iteration_matrix_on_all_levels(iteration_matrix)
+            # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             self.performance_evaluator.estimate_runtime(cgs_expression)
             try:
