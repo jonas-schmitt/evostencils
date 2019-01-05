@@ -26,7 +26,7 @@ class AST(gp.PrimitiveTree):
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
                  interpolation, restriction, levels, convergence_evaluator=None, performance_evaluator=None,
-                 program_generator=None, epsilon=1e-10, infinity=1e100):
+                 program_generator=None, epsilon=1e-20, infinity=1e100):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
@@ -59,7 +59,7 @@ class Optimizer:
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         # self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
+        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
         self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
         # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
@@ -137,7 +137,7 @@ class Optimizer:
         else:
             if self._performance_evaluator is not None:
                 try:
-                    runtime = self.performance_evaluator.estimate_runtime(expression)
+                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
                 except RuntimeError as _:
                     return self.infinity, self.infinity
                 return spectral_radius, runtime
@@ -364,7 +364,7 @@ class Optimizer:
             self._init_toolbox(pset)
             mu_ = population_size
             lambda_ = population_size
-            pop, log, hof = self.nsgaII(population_size * 20, generations, mu_, lambda_,
+            pop, log, hof = self.nsgaII(10 * population_size, generations, mu_, lambda_,
                                        crossover_probability, mutation_probability)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
@@ -380,11 +380,12 @@ class Optimizer:
                     avg_spectral_radius += spectral_radius
                 avg_spectral_radius /= nsamples
                 ind.fitness.values = (avg_spectral_radius, ind.fitness.values[1])
-                if avg_spectral_radius < 1:
-                    tmp = math.log(self.epsilon) / math.log(avg_spectral_radius) * ind.fitness.values[1]
+                if avg_spectral_radius < 0.1:
+                    tmp = math.log(self.epsilon) / math.log(avg_spectral_radius)
+                    tmp = tmp * ind.fitness.values[1]
                     return tmp
                 else:
-                    return self.infinity
+                    return avg_spectral_radius * self.infinity
             hof = sorted(hof, key=key_function)
             for j in range(0, min(5, len(hof))):
                 print(f"Individual with rank {j}: ({hof[j].fitness.values[0]}), ({hof[j].fitness.values[1]})")
