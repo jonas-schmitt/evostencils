@@ -7,8 +7,8 @@ from evostencils.exastencils.generation import ProgramGenerator
 import os
 # from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.var_coeff_2D import InitializationInformation
-# from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
-from evostencils.exastencils.gallery.finite_differences.var_coeff_3D import InitializationInformation
+from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.var_coeff_3D import InitializationInformation
 import pickle
 import lfa_lab as lfa
 
@@ -18,7 +18,7 @@ def main():
     dimension = 3
     levels = 4
     max_levels = 6
-    size = 2**8
+    size = 2**max_levels
     # grid_size = (size, size)
     grid_size = (size, size, size)
     h = 1/(2**max_levels)
@@ -30,14 +30,14 @@ def main():
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    #problem_name = 'const_coeffs_2D'
-    #problem_name = 'var_coeffs_2D'
-    #problem_name = 'const_coeffs_3D'
-    problem_name = 'var_coeffs_3D'
+    # problem_name = 'const_coeffs_2D'
+    # problem_name = 'var_coeffs_2D'
+    problem_name = 'const_coeffs_3D'
+    # problem_name = 'var_coeffs_3D'
     # stencil_generator = Poisson2D()
     # stencil_generator = Poisson2DVarCoeffs(get_coefficient_2D, (0.5, 0.5))
-    # stencil_generator = Poisson3D()
-    stencil_generator = Poisson3DVarCoeffs(get_coefficient_3D, (0.5, 0.5, 0.5))
+    stencil_generator = Poisson3D()
+    # stencil_generator = Poisson3DVarCoeffs(get_coefficient_3D, (0.5, 0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
     restriction_generator = RestrictionGenerator(coarsening_factor)
 
@@ -62,6 +62,7 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
     program, pops, stats = optimizer.default_optimization(500, 100, 0.7, 0.3)
+    # program, pops, stats = optimizer.default_optimization(5, 2, 0.7, 0.3)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}_data'

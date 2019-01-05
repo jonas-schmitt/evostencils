@@ -120,7 +120,10 @@ class RooflineEvaluator:
                     tmp = expression.operand1.expression.runtime
                     runtime += tmp
                 else:
-                    tmp = 1000 * 2 * self.compute_runtime(4, 5, expression.operand2.shape[0] / 2)
+                    # 2D rb gs
+                    # tmp = 1000 * 2 * self.compute_runtime(4, 5, expression.operand2.shape[0] / 2)
+                    # 3D rb gs
+                    tmp = 1000 * 2 * self.compute_runtime(6, 7, expression.operand2.shape[0] / 2)
                     # tmp = self.runtime_coarse_grid_solver
                     runtime += tmp
             else:

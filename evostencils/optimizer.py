@@ -347,7 +347,7 @@ class Optimizer:
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
         storages = self._program_generator.generate_storage(self.levels)
-        program = self._program_generator.generate_boilerplate(storages)
+        program = self._program_generator.generate_boilerplate(storages, self.dimension)
         pops = []
         stats = []
         for i in range(self.levels - levels_per_run, -1, -levels_per_run):
@@ -371,21 +371,13 @@ class Optimizer:
             stats.append(log)
 
             def key_function(ind):
-                expression = self.compile_expression(ind, pset)[0]
-                avg_spectral_radius = 0
-                nsamples = 10
-                for _ in range(0, nsamples):
-                    spectral_radius = self.convergence_evaluator.compute_spectral_radius(
-                        transformations.get_iteration_matrix(expression))
-                    avg_spectral_radius += spectral_radius
-                avg_spectral_radius /= nsamples
-                ind.fitness.values = (avg_spectral_radius, ind.fitness.values[1])
-                if avg_spectral_radius < 0.1:
-                    tmp = math.log(self.epsilon) / math.log(avg_spectral_radius)
+                spectral_radius = ind.fitness.values[0]
+                if spectral_radius < 0.1:
+                    tmp = math.log(self.epsilon) / math.log(spectral_radius)
                     tmp = tmp * ind.fitness.values[1]
                     return tmp
                 else:
-                    return avg_spectral_radius * self.infinity
+                    return spectral_radius * self.infinity
             hof = sorted(hof, key=key_function)
             for j in range(0, min(5, len(hof))):
                 print(f"Individual with rank {j}: ({hof[j].fitness.values[0]}), ({hof[j].fitness.values[1]})")

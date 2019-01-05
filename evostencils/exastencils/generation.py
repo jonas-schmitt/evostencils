@@ -117,8 +117,15 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
 
-    def generate_boilerplate(self, storages):
-        program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
+    def generate_boilerplate(self, storages, dimension):
+        if dimension == 1:
+            program = "Domain global < [0.0] to [1.0] >\n"
+        elif dimension == 2:
+            program = "Domain global < [0.0, 0.0] to [1.0, 1.0] >\n"
+        elif dimension == 3:
+            program = "Domain global < [0.0, 0.0, 0.0] to [1.0, 1.0, 1.0] >\n"
+        else:
+            raise RuntimeError("Only 1-3D currently supported")
         program += self.add_field_declarations_to_program_string(storages)
         program += '\n'
         program += self.add_operator_declarations_to_program_string()
