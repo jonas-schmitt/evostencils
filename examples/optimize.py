@@ -18,7 +18,7 @@ import lfa_lab as lfa
 def main():
     dimension = 2
     # dimension = 3
-    levels = 0
+    levels = 8
     max_levels = 8
     # levels = 4
     # max_levels = 6
