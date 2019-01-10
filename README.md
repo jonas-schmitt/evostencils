@@ -5,7 +5,7 @@ Python >= 3.5
 ## Setup
 1. Install LFA Lab  
 Follow these instructions: https://hrittich.github.io/lfa-lab/install.html  
-2. Install DEAP:  
+2. Install DEAP  
 ```
 pip install deap
 ```
