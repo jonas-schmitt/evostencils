@@ -73,7 +73,7 @@ class Poisson3D(StencilGenerator):
 
     def generate_exa3(self, name):
         return """
-Operator Laplace from Stencil {
+Operator A from Stencil {
     [ 0,  0,  0] =>  2.0 / ( vf_gridWidth_x ** 2 ) + 2.0 / ( vf_gridWidth_y ** 2 ) + 2.0 / ( vf_gridWidth_z ** 2 )
     [-1,  0,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
     [ 1,  0,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
@@ -91,7 +91,7 @@ def get_coefficient_2D(pos_x, pos_y):
     return exp((kappa * ((pos_x - (pos_x * pos_x)) * (pos_y - (pos_y * pos_y)))))
 
 
-class Poisson2DVarCoeffs(StencilGenerator):
+class Poisson2DVariableCoefficients(StencilGenerator):
     def __init__(self, coefficient_function, position):
         assert len(position) == 2, 'Position must be a two dimensional array'
         self.get_coefficient = coefficient_function
@@ -143,7 +143,7 @@ def get_coefficient_3D(pos_x, pos_y, pos_z):
     return exp ((kappa * (((pos_x - (pos_x ** 2)) * (pos_y - (pos_y ** 2))) * (pos_z - (pos_z ** 2)))))
 
 
-class Poisson3DVarCoeffs(StencilGenerator):
+class Poisson3DVariableCoefficients(StencilGenerator):
     def __init__(self, coefficient_function, position):
         assert len(position) == 3, 'Position must be a three dimensional array'
         self.get_coefficient = coefficient_function
