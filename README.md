@@ -14,4 +14,4 @@ pip install deap
 source ./setup.sh
 ```
 ## Running
-An example script can be found in the examples folder. Note that a working version of the ExaStencils framework (http://exastencils.org/, currently not open source) is required for the code generation.
+An example script can be found in the examples folder. Note that a working version of the ExaStencils framework (http://exastencils.org - currently not open source) is required for the code generation.
