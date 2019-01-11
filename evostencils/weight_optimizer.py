@@ -18,7 +18,7 @@ class WeightOptimizer:
             elif w > maximum:
                 weights[i] = maximum
 
-    def optimize(self, expression: base.Expression, problem_size, number_of_generations):
+    def optimize(self, expression: base.Expression, problem_size, lambda_, generations):
         def evaluate(weights):
             self.restrict_weights(weights, 0.0, 2.0)
             tail = transformations.set_weights(expression, weights)
@@ -33,7 +33,7 @@ class WeightOptimizer:
         self._toolbox.register("evaluate", evaluate)
         parent = creator.Weights([1.0] * problem_size)
         parent.fitness.values = self._toolbox.evaluate(parent)
-        strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=50)
+        strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=lambda_)
         # strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=200)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         import numpy
@@ -44,5 +44,5 @@ class WeightOptimizer:
         self._toolbox.register("generate", strategy.generate, creator.Weights)
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
-        algorithms.eaGenerateUpdate(self._toolbox, ngen=number_of_generations, halloffame=hof, verbose=True, stats=stats)
+        algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         return hof[0]

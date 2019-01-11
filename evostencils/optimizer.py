@@ -274,7 +274,8 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def default_optimization(self, population_size, generations, crossover_probability, mutation_probability):
+    def default_optimization(self, gp_mu=500, gp_lambda=500, gp_generations=100, gp_crossover_probability=0.7, gp_mutation_probability=0.3,
+                             es_lambda=50, es_generations=200):
         from evostencils.expressions import multigrid as mg_exp
         import math
         levels_per_run = 2
@@ -300,10 +301,8 @@ class Optimizer:
                                                     depth=levels_per_run, LevelFinishedType=self._LevelFinishedType,
                                                     LevelNotFinishedType=self._LevelNotFinishedType)
             self._init_toolbox(pset)
-            mu_ = population_size
-            lambda_ = population_size
-            pop, log, hof = self.nsgaII(10 * population_size, generations, mu_, lambda_,
-                                       crossover_probability, mutation_probability)
+            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                                        gp_crossover_probability, gp_mutation_probability)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
             stats.append(log)
@@ -323,8 +322,7 @@ class Optimizer:
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            # optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=200)
-            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=20)
+            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, es_lambda, es_generations)
             if optimized_spectral_radius < best_individual.fitness.values[0]:
                 self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
                 transformations.set_weights(cgs_expression, optimized_weights)
@@ -341,10 +339,10 @@ class Optimizer:
 
         return program, pops, stats
 
-    def optimize_weights(self, expression, iterations=50):
+    def optimize_weights(self, expression, lambda_, generations):
         # expression = self.compile_expression(individual)
         weights = transformations.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(weights), iterations)
+        best_individual = self._weight_optimizer.optimize(expression, len(weights), lambda_, generations)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
         # print(best_weights)
