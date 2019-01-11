@@ -359,17 +359,25 @@ class ProgramGenerator:
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
                    f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
-                   f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 0)\n'
+                   f'{storages[i].solution.to_exa3()}))) '
+        program += f'where (((i0'
+        for i in range(1, expression.grid.dimension):
+            program += f' + i{i}'
+        program += f') % 2) == 0)\n'
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
                    f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
-                   f'{storages[i].solution.to_exa3()}))) where (((i0 + i1) % 2) == 1)'
+                   f'{storages[i].solution.to_exa3()}))) '
+        program += f'where (((i0'
+        for i in range(1, expression.grid.dimension):
+            program += f' + i{i}'
+        program += f') % 2) == 0)\n'
         program += '\n\t}\n'
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         return program
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
-        import decimal
+        # import decimal
         if expression.program is not None:
             return expression.program
         program = ''
@@ -378,8 +386,8 @@ class ProgramGenerator:
 
         if isinstance(expression, mg.Cycle):
             field = expression.storage
-            #decimal.getcontext().prec = 14
-            #weight = decimal.Decimal(expression.weight)
+            # decimal.getcontext().prec = 14
+            # weight = decimal.Decimal(expression.weight)
             weight = expression.weight
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
@@ -412,9 +420,14 @@ class ProgramGenerator:
                 smoother = f'{new_iterate_str} = {iterate_str} + ({weight}) ' \
                            f'* {operator_str} * {correction_str}'
                 if expression.partitioning == part.RedBlack:
-                    # TODO currently hard coded for two dimensions
-                    program += f'\t{smoother} where (((i0 + i1) % 2) == 0)\n'
-                    program += f'\t{smoother} where (((i0 + i1) % 2) == 1)\n'
+                    program += f'\t{smoother} where (((i0'
+                    for i in range(1, expression.grid.dimension):
+                        program += f' + i{i}'
+                    program += f') % 2) == 0)\n'
+                    program += f'\t{smoother} where (((i0'
+                    for i in range(1, expression.grid.dimension):
+                        program += f' + i{i}'
+                    program += f') % 2) == 1)\n'
                 elif expression.partitioning == part.Single:
                     program += f'\t{smoother}\n'
                 else:

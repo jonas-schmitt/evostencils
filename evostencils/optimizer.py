@@ -144,68 +144,6 @@ class Optimizer:
             else:
                 return spectral_radius, self.infinity
 
-    def ea_simple(self, population_size, generations, crossover_probability, mutation_probability):
-        random.seed()
-        pop = self._toolbox.population(n=population_size)
-        hof = tools.HallOfFame(10)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-        mstats.register("avg", np.mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-
-        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations,
-                                       stats=mstats, halloffame=hof, verbose=True)
-        return pop, log, hof
-
-    def gp_harm(self, population_size, generations, crossover_probability, mutation_probability):
-        random.seed()
-        pop = self._toolbox.population(n=population_size)
-        hof = tools.HallOfFame(10)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-        mstats.register("avg", np.mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-
-        pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations,
-                           alpha=0.05, beta=10, gamma=0.20, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
-        return pop, log, hof
-
-    def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
-        random.seed()
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.ParetoFront()
-
-        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-
-        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability,
-                                             mutation_probability, generations,
-                                             stats=mstats, halloffame=hof, verbose=True)
-        return pop, log, hof
-
     def random_search(self, initial_population_size, generations, mu_, lambda_):
         random.seed()
         pop = self._toolbox.population(n=initial_population_size)
@@ -385,7 +323,8 @@ class Optimizer:
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=200)
+            # optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=200)
+            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, iterations=20)
             if optimized_spectral_radius < best_individual.fitness.values[0]:
                 self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
                 transformations.set_weights(cgs_expression, optimized_weights)
