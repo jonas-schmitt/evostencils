@@ -117,7 +117,7 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
 
-    def generate_boilerplate(self, storages, dimension):
+    def generate_boilerplate(self, storages, dimension, epsilon=1e-10):
         if dimension == 1:
             program = "Domain global < [0.0] to [1.0] >\n"
         elif dimension == 2:
@@ -130,7 +130,7 @@ class ProgramGenerator:
         program += '\n'
         program += self.add_operator_declarations_to_program_string()
         program += '\n'
-        program += self.generate_solver_function("gen_solve", storages)
+        program += self.generate_solver_function("gen_solve", storages, epsilon=epsilon)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
@@ -538,7 +538,7 @@ class ProgramGenerator:
         program += f"}}\n"
         return program
 
-    def generate_solver_function(self, function_name: str, storages: [CycleStorage],
+    def generate_solver_function(self, function_name: str, storages: [CycleStorage], epsilon=1e-10,
                                  maximum_number_of_iterations=100) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@finest"
@@ -555,7 +555,7 @@ class ProgramGenerator:
         program += f'\tprint("Starting residual:", gen_initRes)\n'
         program += f"\tVar gen_curIt : Integer = 0\n"
         program += f"\trepeat until(((gen_curIt >= {maximum_number_of_iterations}) " \
-                   f"|| (gen_curRes <= (1.0E-10 * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
+                   f"|| (gen_curRes <= ({epsilon} * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
                    f"\t\tCycle@finest()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"

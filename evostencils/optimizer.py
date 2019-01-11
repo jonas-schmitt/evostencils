@@ -286,7 +286,7 @@ class Optimizer:
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
         storages = self._program_generator.generate_storage(self.levels)
-        program = self._program_generator.generate_boilerplate(storages, self.dimension)
+        program = self._program_generator.generate_boilerplate(storages, self.dimension, 1e-10)
         pops = []
         stats = []
         for i in range(self.levels - levels_per_run, -1, -levels_per_run):
