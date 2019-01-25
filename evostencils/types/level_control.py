@@ -3,19 +3,19 @@ class LevelControlType:
         self.finished = finished
 
     def __eq__(self, other):
-        if hasattr(other, 'finished'):
+        if isinstance(other, type(self)):
             return self.finished == other.finished
         else:
             return False
 
     def issubtype(self, other):
-        if hasattr(other, 'finished'):
+        if isinstance(other, type(self)):
             return self.finished == other.finished
         else:
             return False
 
     def __hash__(self):
-        return hash(self.finished)
+        return hash((type(self), self.finished))
 
 
 def generate_finished_type():

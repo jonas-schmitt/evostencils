@@ -4,13 +4,13 @@ class GridType:
         self.type = type_
 
     def __eq__(self, other):
-        if hasattr(other, 'size') and hasattr(other, 'type'):
+        if isinstance(other, type(self)):
             return self.size == other.size and self.type == other.type
         else:
             return False
 
     def issubtype(self, other):
-        if hasattr(other, 'size') and hasattr(other, 'type'):
+        if isinstance(other, type(self)):
             is_subtype = True
             if self.size != other.size:
                 return False
@@ -27,7 +27,7 @@ class GridType:
             return False
 
     def __hash__(self):
-        return hash((*self.size, self.type))
+        return hash((type(self), *self.size, self.type))
 
 
 def generate_grid_type(size):
