@@ -1,43 +1,44 @@
-class GridTypeMetaClass(type):
-    def __new__(mcs, class_name, bases, dct):
-        return super(GridTypeMetaClass, mcs).__new__(mcs, class_name, bases, dct)
+class GridType:
+    def __init__(self, size_, type_):
+        self.size = size_
+        self.type = type_
 
     def __eq__(self, other):
-        if hasattr(other, 'size') and hasattr(other, 'grid_type'):
-            return self.size == other.size \
-                   and self.grid_type == other.grid_type
+        if hasattr(other, 'size') and hasattr(other, 'type'):
+            return self.size == other.size and self.type == other.type
         else:
             return False
 
-    def __subclasscheck__(self, other):
-        if hasattr(other, 'size') and hasattr(other, 'grid_type'):
-            is_subclass = True
+    def issubtype(self, other):
+        if hasattr(other, 'size') and hasattr(other, 'type'):
+            is_subtype = True
             if self.size != other.size:
                 return False
-            if self.grid_type == "grid":
-                is_subclass = is_subclass and other.grid_type == "grid"
-            elif self.grid_type == "rhs":
-                is_subclass = is_subclass and other.grid_type == "rhs"
-            elif self.grid_type == "correction":
-                is_subclass = is_subclass and other.grid_type == "correction"
+            if self.type == "grid":
+                is_subtype = is_subtype and other.type == "grid"
+            elif self.type == "rhs":
+                is_subtype = is_subtype and other.type == "rhs"
+            elif self.type == "correction":
+                is_subtype = is_subtype and other.type == "correction"
             else:
                 return False
-            return is_subclass
+            return is_subtype
         else:
             return False
 
     def __hash__(self):
-        return hash((*self.size, self.grid_type))
+        return hash((*self.size, self.type))
 
 
 def generate_grid_type(size):
-    return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "grid"})
+    return GridType(size, 'grid')
 
 
 def generate_correction_type(size):
-    return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "correction"})
+    return GridType(size, 'correction')
 
 
 def generate_rhs_type(size):
-    return GridTypeMetaClass("GridType", (), {"size": size, "grid_type": "rhs"})
+    return GridType(size, 'rhs')
+
 

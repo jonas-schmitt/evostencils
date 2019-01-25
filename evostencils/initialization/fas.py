@@ -2,7 +2,7 @@ from evostencils.expressions import multigrid as mg
 from evostencils.expressions import fas
 from evostencils.expressions import base
 from evostencils.expressions import partitioning as part
-from evostencils.types import matrix as matrix_types
+from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
 from evostencils.types import multiple
 from deap import gp
@@ -35,13 +35,13 @@ class Terminals:
 class Types:
     def __init__(self, terminals: Terminals):
         self.Operator = matrix_types.generate_matrix_type(terminals.operator.shape)
-        self.LowerTriangularOperator = matrix_types.generate_lower_triangular_matrix_type(terminals.lower.shape)
-        self.UpperTriangularOperator = matrix_types.generate_upper_triangular_matrix_type(terminals.lower.shape)
+        self.LowerTriangularOperator = matrix_types.generate_lower_triangular_operator_type(terminals.lower.shape)
+        self.UpperTriangularOperator = matrix_types.generate_upper_triangular_operator_type(terminals.lower.shape)
         self.Grid = grid_types.generate_grid_type(terminals.grid.size)
         self.Correction = grid_types.generate_correction_type(terminals.grid.size)
         self.RHS = grid_types.generate_rhs_type(terminals.grid.size)
-        self.DiagonalOperator = matrix_types.generate_diagonal_matrix_type(terminals.diagonal.shape)
-        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_matrix_type(terminals.block_diagonal.shape)
+        self.DiagonalOperator = matrix_types.generate_diagonal_operator_type(terminals.diagonal.shape)
+        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_operator_type(terminals.block_diagonal.shape)
         self.Interpolation = matrix_types.generate_matrix_type(terminals.interpolation.shape)
         self.Restriction = matrix_types.generate_matrix_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_matrix_type(terminals.coarse_operator.shape)

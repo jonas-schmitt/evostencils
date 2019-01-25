@@ -1,5 +1,19 @@
 import random
 from inspect import isclass
+import deap.gp
+
+
+class AST(deap.gp.PrimitiveTree):
+    def __init__(self, content):
+        self._weights = None
+        super(AST, self).__init__(content)
+
+    @property
+    def weights(self):
+        return self._weights
+
+    def set_weights(self, weights):
+        self._weights = weights
 
 
 def generate(pset, min_height, max_height, condition, type_=None):
@@ -62,3 +76,33 @@ def genGrow(pset, min_height, max_height, type_=None):
            (depth >= min_height and random.random() < pset.terminalRatio)
     return generate(pset, min_height, max_height, condition, type_)
 
+
+class PrimitiveSetTyped(deap.gp.PrimitiveSetTyped):
+
+    def _add(self, prim):
+        def addType(dict_, ret_type):
+            if ret_type not in dict_:
+                new_list = []
+                for type_, list_ in dict_.items():
+                    # if type_.issubtype(ret_type):
+                    if ret_type.issubtype(type_):
+                        for item in list_:
+                            if item not in new_list:
+                                new_list.append(item)
+                dict_[ret_type] = new_list
+
+        addType(self.primitives, prim.ret)
+        addType(self.terminals, prim.ret)
+
+        self.mapping[prim.name] = prim
+        if isinstance(prim, deap.gp.Primitive):
+            for type_ in prim.args:
+                addType(self.primitives, type_)
+                addType(self.terminals, type_)
+            dict_ = self.primitives
+        else:
+            dict_ = self.terminals
+
+        for type_ in dict_:
+            if type_.issubtype(prim.ret):
+                dict_[type_].append(prim)

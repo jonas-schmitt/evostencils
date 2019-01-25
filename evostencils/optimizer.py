@@ -5,22 +5,9 @@ import random
 from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.deap_extension import genGrow
+from evostencils.deap_extension import genGrow, AST, PrimitiveSetTyped
 from evostencils.weight_optimizer import WeightOptimizer
-from evostencils.types import multiple
-
-
-class AST(gp.PrimitiveTree):
-    def __init__(self, content):
-        self._weights = None
-        super(AST, self).__init__(content)
-
-    @property
-    def weights(self):
-        return self._weights
-
-    def set_weights(self, weights):
-        self._weights = weights
+from evostencils.types import level_control
 
 
 class Optimizer:
@@ -41,8 +28,8 @@ class Optimizer:
         self._program_generator = program_generator
         self._epsilon = epsilon
         self._infinity = infinity
-        self._LevelFinishedType = multiple.generate_new_type('LevelFinishedType')
-        self._LevelNotFinishedType = multiple.generate_new_type('LevelNotFinishedType')
+        self._FinishedType = level_control.generate_finished_type()
+        self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
         self._weight_optimizer = WeightOptimizer(self)
 
@@ -298,8 +285,8 @@ class Optimizer:
             pset = multigrid.generate_primitive_set(operator, grid, rhs, self.dimension, self.coarsening_factor,
                                                     interpolation, restriction,
                                                     coarse_grid_solver_expression=cgs_expression,
-                                                    depth=levels_per_run, LevelFinishedType=self._LevelFinishedType,
-                                                    LevelNotFinishedType=self._LevelNotFinishedType)
+                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
+                                                    LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                         gp_crossover_probability, gp_mutation_probability)
@@ -414,7 +401,11 @@ class Optimizer:
         plt.axis("tight")
         plt.show()
 
-
+    @staticmethod
+    def dump_population(pop, file_name):
+        import pickle
+        with open(file_name, 'wb') as file:
+            pickle.dump(pop, file)
 
 
 
