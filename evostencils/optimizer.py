@@ -280,7 +280,8 @@ class Optimizer:
             hof.update(pop)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
-                    transformations.invalidate_lfa_symbol(solver.iteration_matrix)
+                    transformations.invalidate_expression(solver.iteration_matrix)
+                    transformations.invalidate_expression(solver)
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop)
                 checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
             # Select the next generation population

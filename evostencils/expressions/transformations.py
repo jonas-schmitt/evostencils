@@ -287,9 +287,11 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
     return recursive_descent(cycle, cycle.grid.size, 0) + 1
 
 
-def invalidate_lfa_symbol(expression: base.Expression):
+def invalidate_expression(expression: base.Expression):
     def f(expr):
         expr.lfa_symbol = None
+        expr.program = None
+        expr.iteration_matrix = None
     if expression is not None:
         f(expression)
-        expression.mutate(invalidate_lfa_symbol)
+        expression.mutate(invalidate_expression)

@@ -372,7 +372,7 @@ class ProgramGenerator:
         for j in range(1, expression.grid.dimension):
             program += f' + i{j}'
         program += f') % 2) == 0)\n'
-        program += '\n\t}\n'
+        program += '\t}\n'
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         return program
 

@@ -75,8 +75,8 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     restart_from_checkpoint = True
     # program, pops, stats = optimizer.default_optimization()
-    program, pops, stats = optimizer.default_optimization(gp_mu=50, gp_lambda=50, gp_generations=10, es_lambda=20,
-                                                          es_generations=20, restart_from_checkpoint=restart_from_checkpoint)
+    program, pops, stats = optimizer.default_optimization(gp_mu=10, gp_lambda=10, gp_generations=10, es_lambda=10,
+                                                          es_generations=10, restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}/data'
