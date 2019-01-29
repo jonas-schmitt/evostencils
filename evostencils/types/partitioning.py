@@ -3,13 +3,13 @@ class PartitioningType:
         self.partitioning = partitioning
 
     def __eq__(self, other):
-        if hasattr(other, 'partitioning'):
+        if isinstance(other, type(self)):
             return self.partitioning == other.partitioning
         else:
             return False
 
     def issubtype(self, other):
-        if hasattr(other, 'partitioning'):
+        if isinstance(other, type(self)):
             is_subtype = True
             if self.partitioning == "any":
                 return True
@@ -24,7 +24,8 @@ class PartitioningType:
             return False
 
     def __hash__(self):
-        return hash(self.partitioning)
+        return hash((type(self), self.partitioning))
+
 
 def generate_any_partitioning_type():
     return PartitioningType('any')

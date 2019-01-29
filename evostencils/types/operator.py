@@ -7,9 +7,7 @@ class OperatorType:
         self.upper_triangle = upper_triangle
 
     def __eq__(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'block_diagonal') \
-                and hasattr(other, 'lower_triangle') \
-                and hasattr(other, 'upper_triangle'):
+        if isinstance(other, type(self)):
             return self.shape == other.shape and self.diagonal == other.diagonal and \
                    self.block_diagonal == other.block_diagonal and self.lower_triangle == other.lower_triangle and \
                    self.upper_triangle == other.upper_triangle
@@ -17,9 +15,7 @@ class OperatorType:
             return False
 
     def issubtype(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'diagonal') and hasattr(other, 'block_diagonal') \
-                and hasattr(other, 'lower_triangle') \
-                and hasattr(other, 'upper_triangle'):
+        if isinstance(other, type(self)):
             is_subtype = True
             if self.shape != other.shape:
                 return False
@@ -36,7 +32,7 @@ class OperatorType:
             return False
 
     def __hash__(self):
-        return hash((*self.shape, self.diagonal, self.block_diagonal, self.lower_triangle, self.upper_triangle))
+        return hash((type(self), *self.shape, self.diagonal, self.block_diagonal, self.lower_triangle, self.upper_triangle))
 
 
 def generate_operator_type(shape):
@@ -74,23 +70,21 @@ def generate_zero_operator_type(shape):
 class SolverType:
     def __init__(self, shape):
         self.shape = shape
-        self.is_solver = True
 
     def __eq__(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'is_solver'):
-            return self.shape == other.shape and self.is_solver == other.is_solver
+        if isinstance(other, type(self)):
+            return self.shape == other.shape
         else:
             return False
 
     def issubtype(self, other):
-        if hasattr(other, 'shape') and hasattr(other, 'is_solver'):
-            return self.shape == other.shape and self.is_solver == other.is_solver
+        if isinstance(other, type(self)):
+            return self.shape == other.shape
         else:
             return False
 
-        # TODO be careful. Could collide with other types!
     def __hash__(self):
-        return hash((*self.shape, self.is_solver))
+        return hash((type(self), *self.shape))
 
 
 def generate_solver_type(shape):
