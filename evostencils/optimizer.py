@@ -2,6 +2,8 @@ import numpy as np
 import deap.base
 from deap import gp, creator, tools, algorithms
 import random
+import pickle
+import os.path
 from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
@@ -10,10 +12,29 @@ from evostencils.weight_optimizer import WeightOptimizer
 from evostencils.types import level_control
 
 
+class CheckPoint:
+    def __init__(self, min_level, max_level, generation, program, solver, population):
+        self.min_level = min_level
+        self.max_level = max_level
+        self.generation = generation
+        self.program = program
+        self.solver = solver
+        self.population = population
+
+    def dump_to_file(self, filename):
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
+
+
+def load_checkpoint_from_file(filename):
+    with open(filename, 'rb') as file:
+        return pickle.load(file)
+
+
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
                  interpolation, restriction, levels, convergence_evaluator=None, performance_evaluator=None,
-                 program_generator=None, epsilon=1e-20, infinity=1e100):
+                 program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
         self._grid = grid
@@ -28,6 +49,7 @@ class Optimizer:
         self._program_generator = program_generator
         self._epsilon = epsilon
         self._infinity = infinity
+        self._checkpoint_directory_path = checkpoint_directory_path
         self._FinishedType = level_control.generate_finished_type()
         self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
@@ -191,9 +213,13 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability):
+    def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+               min_level, max_level, program, solver, checkpoint_frequency=5, initial_population=None):
         random.seed()
-        pop = self._toolbox.population(n=initial_population_size)
+        if initial_population is None:
+            pop = self._toolbox.population(n=initial_population_size)
+        else:
+            pop = initial_population
         hof = tools.ParetoFront()
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
@@ -252,7 +278,11 @@ class Optimizer:
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             hof.update(pop)
-
+            if gen % checkpoint_frequency == 0:
+                if solver is not None:
+                    transformations.invalidate_lfa_symbol(solver.iteration_matrix)
+                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop)
+                checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
             # Select the next generation population
             pop = toolbox.select(pop + offspring, mu_)
             record = mstats.compile(pop)
@@ -261,10 +291,13 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def default_optimization(self, gp_mu=500, gp_lambda=500, gp_generations=100, gp_crossover_probability=0.7, gp_mutation_probability=0.3,
-                             es_lambda=50, es_generations=200):
+    def default_optimization(self, gp_mu=500, gp_lambda=500, gp_generations=100, gp_crossover_probability=0.7,
+                             gp_mutation_probability=0.3, es_lambda=50, es_generations=200,
+                             restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
         import math
+
+        gp_generations_remaining = gp_generations
         levels_per_run = 2
         grids = [self.grid]
         right_hand_sides = [self.rhs]
@@ -273,23 +306,48 @@ class Optimizer:
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
         storages = self._program_generator.generate_storage(self.levels)
-        program = self._program_generator.generate_boilerplate(storages, self.dimension, 1e-10)
+        checkpoint = None
+        checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
+        if restart_from_checkpoint and os.path.isfile(checkpoint_file_path):
+            try:
+                checkpoint = load_checkpoint_from_file(checkpoint_file_path)
+                program = checkpoint.program
+            except pickle.PickleError as _:
+                program = self._program_generator.generate_boilerplate(storages, self.dimension, 1e-10)
+                restart_from_checkpoint = False
+        else:
+            program = self._program_generator.generate_boilerplate(storages, self.dimension, 1e-10)
+            restart_from_checkpoint = False
         pops = []
         stats = []
         for i in range(self.levels - levels_per_run, -1, -levels_per_run):
+            min_level = i
+            max_level = i + levels_per_run - 1
+            initial_population = None
+            if restart_from_checkpoint:
+                if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
+                    initial_population = checkpoint.population
+                    cgs_expression = checkpoint.solver
+                    gp_generations_remaining = gp_generations - checkpoint.generation
+                elif min_level > checkpoint.min_level:
+                    continue
+                else:
+                    initial_population = None
+                    gp_generations_remaining = gp_generations
             grid = grids[i]
             rhs = right_hand_sides[i]
             operator = mg_exp.get_coarse_operator(self.operator, grid)
-            interpolation = mg_exp.get_interpolation(grids[i], grids[i+1], self.interpolation.stencil_generator)
-            restriction = mg_exp.get_restriction(grids[i], grids[i+1], self.restriction.stencil_generator)
+            interpolation = mg_exp.get_interpolation(grids[i], grids[i+levels_per_run-1], self.interpolation.stencil_generator)
+            restriction = mg_exp.get_restriction(grids[i], grids[i+levels_per_run-1], self.restriction.stencil_generator)
             pset = multigrid.generate_primitive_set(operator, grid, rhs, self.dimension, self.coarsening_factor,
                                                     interpolation, restriction,
                                                     coarse_grid_solver_expression=cgs_expression,
                                                     depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                     LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
-            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda,
-                                        gp_crossover_probability, gp_mutation_probability)
+            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations_remaining, gp_mu, gp_lambda, gp_crossover_probability,
+                                        gp_mutation_probability, min_level, max_level, program, cgs_expression, checkpoint_frequency=5,
+                                        initial_population=initial_population)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
             stats.append(log)

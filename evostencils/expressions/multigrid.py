@@ -182,6 +182,8 @@ class Cycle(base.Expression):
         return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
     def mutate(self, f: callable, *args):
+        f(self.iterate, *args)
+        f(self.rhs)
         f(self.correction, *args)
 
 

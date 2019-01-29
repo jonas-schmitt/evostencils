@@ -1,4 +1,4 @@
-from evostencils.optimizer import Optimizer
+from evostencils.optimizer import Optimizer, load_checkpoint_from_file
 from evostencils.expressions import multigrid
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
@@ -64,13 +64,22 @@ def main():
     program_generator = ProgramGenerator(problem_name, exastencils_path, A, u, b, I, P, R,
                                          dimension, coarsening_factor,
                                          initialization_information=InitializationInformation)
+
+    if not os.path.exists(problem_name):
+        os.makedirs(problem_name)
+    checkpoint_directory_path = f'{problem_name}/checkpoints'
+    if not os.path.exists(checkpoint_directory_path):
+        os.makedirs(checkpoint_directory_path)
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator, program_generator=program_generator, epsilon=epsilon, infinity=infinity)
+                          performance_evaluator=performance_evaluator, program_generator=program_generator,
+                          epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
+    restart_from_checkpoint = True
     # program, pops, stats = optimizer.default_optimization()
-    program, pops, stats = optimizer.default_optimization(gp_mu=50, gp_lambda=50, gp_generations=10, es_lambda=20, es_generations=20)
+    program, pops, stats = optimizer.default_optimization(gp_mu=50, gp_lambda=50, gp_generations=10, es_lambda=20,
+                                                          es_generations=20, restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)
-    log_dir_name = f'{problem_name}_data'
+    log_dir_name = f'{problem_name}/data'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
     i = 1

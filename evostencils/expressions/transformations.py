@@ -285,3 +285,11 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
         else:
             raise RuntimeError("Unexpected expression")
     return recursive_descent(cycle, cycle.grid.size, 0) + 1
+
+
+def invalidate_lfa_symbol(expression: base.Expression):
+    def f(expr):
+        expr.lfa_symbol = None
+    if expression is not None:
+        f(expression)
+        expression.mutate(invalidate_lfa_symbol)

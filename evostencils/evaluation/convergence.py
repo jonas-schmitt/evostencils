@@ -161,5 +161,3 @@ class ConvergenceEvaluator:
             return result
         except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
             return 0.0
-
-
