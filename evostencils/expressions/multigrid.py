@@ -262,4 +262,3 @@ def determine_maximum_tree_depth(expression: base.Expression) -> int:
         return max(determine_maximum_tree_depth(expression.iterate), determine_maximum_tree_depth(expression.correction) + 1) + 1
     else:
         raise RuntimeError("Case not implemented")
-

@@ -18,14 +18,14 @@ import lfa_lab as lfa
 def main():
     dimension = 2
     # dimension = 3
-    levels = 8
-    max_levels = 8
-    # levels = 4
-    # max_levels = 6
-    size = 2**max_levels
+    min_level = 0
+    max_level = 8
+    # min_level = 2
+    # max_level = 6
+    size = 2**max_level
     grid_size = (size, size)
     # grid_size = (size, size, size)
-    h = 1/(2**max_levels)
+    h = 1/(2**max_level)
     step_size = (h, h)
     # step_size = (h, h, h)
     coarsening_factor = (2, 2)
@@ -53,7 +53,8 @@ def main():
     lfa_grid = lfa.Grid(dimension, step_size)
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e100
-    epsilon = 1e-20
+    epsilon = 1e-10
+    required_convergence = 0.2
 
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
@@ -62,7 +63,7 @@ def main():
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     exastencils_path = ''
     program_generator = ProgramGenerator(problem_name, exastencils_path, A, u, b, I, P, R,
-                                         dimension, coarsening_factor,
+                                         dimension, coarsening_factor, min_level, max_level,
                                          initialization_information=InitializationInformation)
 
     if not os.path.exists(problem_name):
@@ -70,13 +71,15 @@ def main():
     checkpoint_directory_path = f'{problem_name}/checkpoints'
     if not os.path.exists(checkpoint_directory_path):
         os.makedirs(checkpoint_directory_path)
-    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, levels, convergence_evaluator=convergence_evaluator,
+    optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     restart_from_checkpoint = True
-    # program, pops, stats = optimizer.default_optimization()
-    program, pops, stats = optimizer.default_optimization(gp_mu=10, gp_lambda=10, gp_generations=10, es_lambda=10,
-                                                          es_generations=10, restart_from_checkpoint=restart_from_checkpoint)
+    program, pops, stats = optimizer.default_optimization()
+    # program, pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100,
+    #                                                       es_lambda=50, es_generations=200,
+    #                                                       required_convergence=required_convergence,
+    #                                                       restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}/data'

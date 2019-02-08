@@ -33,7 +33,7 @@ def load_checkpoint_from_file(filename):
 
 class Optimizer:
     def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
-                 interpolation, restriction, levels, convergence_evaluator=None, performance_evaluator=None,
+                 interpolation, restriction, min_level, max_level, convergence_evaluator=None, performance_evaluator=None,
                  program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
@@ -43,7 +43,8 @@ class Optimizer:
         self._coarsening_factor = coarsening_factor
         self._interpolation = interpolation
         self._restriction = restriction
-        self._levels = levels
+        self._max_level = max_level
+        self._min_level = min_level
         self._convergence_evaluator = convergence_evaluator
         self._performance_evaluator = performance_evaluator
         self._program_generator = program_generator
@@ -102,8 +103,12 @@ class Optimizer:
         return self._restriction
 
     @property
-    def levels(self):
-        return self._levels
+    def min_level(self):
+        return self._min_level
+
+    @property
+    def max_level(self):
+        return self._max_level
 
     @property
     def convergence_evaluator(self):
@@ -292,21 +297,22 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def default_optimization(self, gp_mu=500, gp_lambda=500, gp_generations=100, gp_crossover_probability=0.7,
-                             gp_mutation_probability=0.3, es_lambda=50, es_generations=200,
+    def default_optimization(self, gp_mu=50, gp_lambda=50, gp_generations=20, gp_crossover_probability=0.7,
+                             gp_mutation_probability=0.3, es_lambda=10, es_generations=50, required_convergence=0.2,
                              restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
         import math
 
         gp_generations_remaining = gp_generations
+        levels = self.max_level - self.min_level
         levels_per_run = 2
         grids = [self.grid]
         right_hand_sides = [self.rhs]
-        for i in range(1, self.levels+1):
+        for i in range(1, levels + 1):
             grids.append(mg_exp.get_coarse_grid(grids[-1], self.coarsening_factor))
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         cgs_expression = None
-        storages = self._program_generator.generate_storage(self.levels)
+        storages = self._program_generator.generate_storage(levels)
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         if restart_from_checkpoint and os.path.isfile(checkpoint_file_path):
@@ -321,7 +327,7 @@ class Optimizer:
             restart_from_checkpoint = False
         pops = []
         stats = []
-        for i in range(self.levels - levels_per_run, -1, -levels_per_run):
+        for i in range(levels - levels_per_run, -1, -levels_per_run):
             min_level = i
             max_level = i + levels_per_run - 1
             initial_population = None
@@ -355,7 +361,7 @@ class Optimizer:
 
             def key_function(ind):
                 spectral_radius = ind.fitness.values[0]
-                if spectral_radius < 0.1:
+                if spectral_radius < required_convergence:
                     tmp = math.log(self.epsilon) / math.log(spectral_radius)
                     tmp = tmp * ind.fitness.values[1]
                     return tmp

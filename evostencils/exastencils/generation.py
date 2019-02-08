@@ -33,7 +33,7 @@ class Field:
 class ProgramGenerator:
     def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Grid, rhs: base.Grid,
                  identity: base.Identity, interpolation: mg.Interpolation, restriction: mg.Restriction,
-                 dimension, coarsening_factor, initialization_information, output_path="./execution"):
+                 dimension, coarsening_factor, min_level, max_level, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
         self._output_path = output_path
@@ -45,6 +45,8 @@ class ProgramGenerator:
         self._restriction = restriction
         self._dimension = dimension
         self._coarsening_factor = coarsening_factor
+        self._min_level = min_level
+        self._max_level = max_level
         self._initialization_information = initialization_information
         if not os.path.exists(output_path):
             os.makedirs(output_path)
@@ -81,6 +83,14 @@ class ProgramGenerator:
         return self._coarsening_factor
 
     @property
+    def min_level(self):
+        return self._min_level
+
+    @property
+    def max_level(self):
+        return self._max_level
+
+    @property
     def identity(self):
         return self._identity
 
@@ -106,11 +116,11 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.settings', "w") as file:
             print(tmp, file=file)
 
-    def generate_knowledge_file(self, min_level=0, max_level=8, discretization_type="FiniteDifferences",
+    def generate_knowledge_file(self, discretization_type="FiniteDifferences",
                                 domain="domain_onePatch", parallelization="parallelization_pureOmp"):
         tmp = f'dimensionality\t= {self.dimension}\n\n'
-        tmp += f'minLevel\t= {min_level}\n'
-        tmp += f'maxLevel\t= {max_level}\n\n'
+        tmp += f'minLevel\t= {self.min_level}\n'
+        tmp += f'maxLevel\t= {self.max_level}\n\n'
         tmp += f'discr_type\t= "{discretization_type}"\n\n'
         tmp += f'import "lib/{domain}.knowledge"\n'
         tmp += f'import "lib/{parallelization}.knowledge"\n'
@@ -371,7 +381,7 @@ class ProgramGenerator:
         program += f'where (((i0'
         for j in range(1, expression.grid.dimension):
             program += f' + i{j}'
-        program += f') % 2) == 0)\n'
+        program += f') % 2) == 1)\n'
         program += '\t}\n'
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         return program
