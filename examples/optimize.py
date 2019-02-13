@@ -54,14 +54,14 @@ def main():
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e100
     epsilon = 1e-10
-    required_convergence = 0.2
+    required_convergence = 0.5
 
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     runtime_cgs = 1e-3 # example value
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
-    exastencils_path = ''
+    exastencils_path = '/local/ja42rica/ScalaExaStencil'
     program_generator = ProgramGenerator(problem_name, exastencils_path, A, u, b, I, P, R,
                                          dimension, coarsening_factor, min_level, max_level,
                                          initialization_information=InitializationInformation)
@@ -75,7 +75,11 @@ def main():
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     restart_from_checkpoint = True
-    program, pops, stats = optimizer.default_optimization()
+    # program, pops, stats = optimizer.default_optimization()
+    program, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20,
+                                                          es_lambda=10, es_generations=50,
+                                                          required_convergence=required_convergence,
+                                                          restart_from_checkpoint=restart_from_checkpoint)
     # program, pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100,
     #                                                       es_lambda=50, es_generations=200,
     #                                                       required_convergence=required_convergence,

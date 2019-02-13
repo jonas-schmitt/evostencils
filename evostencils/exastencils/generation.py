@@ -2,6 +2,7 @@ from evostencils.expressions import base, multigrid as mg, partitioning as part
 from evostencils.stencils import constant, periodic
 import os
 import subprocess
+import time
 
 
 class CycleStorage:
@@ -127,7 +128,7 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
 
-    def generate_boilerplate(self, storages, dimension, epsilon=1e-10):
+    def generate_boilerplate(self, storages, dimension, epsilon=1e-10, level=0):
         if dimension == 1:
             program = "Domain global < [0.0] to [1.0] >\n"
         elif dimension == 2:
@@ -136,11 +137,11 @@ class ProgramGenerator:
             program = "Domain global < [0.0, 0.0, 0.0] to [1.0, 1.0, 1.0] >\n"
         else:
             raise RuntimeError("Only 1-3D currently supported")
-        program += self.add_field_declarations_to_program_string(storages)
+        program += self.add_field_declarations_to_program_string(storages, level)
         program += '\n'
         program += self.add_operator_declarations_to_program_string()
         program += '\n'
-        program += self.generate_solver_function("gen_solve", storages, epsilon=epsilon)
+        program += self.generate_solver_function("gen_solve", storages, epsilon=epsilon, level=level)
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
@@ -177,8 +178,7 @@ class ProgramGenerator:
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
-    def execute(self, platform='linux', infinity=1e6):
-        import subprocess
+    def execute(self, platform='linux', infinity=1e100):
         result = subprocess.run(['java', '-cp',
                         f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
                         f'{self.output_path}/{self.problem_name}.settings',
@@ -191,14 +191,16 @@ class ProgramGenerator:
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
             return infinity
-        import time
-        start = time.time()
-        result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if not result.returncode == 0:
-            return infinity
-        end = time.time()
-        return end - start
+        time_to_solution = 0
+        for i in range(5):
+            start = time.time()
+            result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            if not result.returncode == 0:
+                return infinity
+            end = time.time()
+            time_to_solution += end - start
+        return time_to_solution / 5
 
     @staticmethod
     def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:
@@ -289,7 +291,7 @@ class ProgramGenerator:
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].solution
 
-    def add_field_declarations_to_program_string(self, storages: [CycleStorage]):
+    def add_field_declarations_to_program_string(self, storages: [CycleStorage], level=0):
         program_string = ''
         for i, storage in enumerate(storages):
             solution = storage.solution.to_exa3()
@@ -299,13 +301,13 @@ class ProgramGenerator:
             residual = storage.residual.to_exa3()
             correction = storage.correction.to_exa3()
             program_string += f'Field {solution} with Real on Node of global = 0.0\n'
-            if i == 0:
+            if i == level:
                 program_string += f'Field {solution} on boundary = ' \
                                   f'{self._initialization_information.get_boundary_as_str()}\n'
             else:
                 program_string += f'Field {solution} on boundary = 0.0\n'
 
-            if i == 0:
+            if i == level:
                 program_string += f'Field {rhs} with Real on Node of global = ' \
                                 f'{self._initialization_information.get_rhs_as_str()}\n'
             else:
@@ -538,10 +540,10 @@ class ProgramGenerator:
         return program
 
     @staticmethod
-    def generate_l2_norm_residual(function_name: str, storages: [CycleStorage]) -> str:
-        residual = storages[0].residual.to_exa3()
+    def generate_l2_norm_residual(function_name: str, storages: [CycleStorage], level=0) -> str:
+        residual = storages[level].residual.to_exa3()
         program = ""
-        program += f"Function {function_name}@finest : Real {{\n"
+        program += f"Function {function_name}@(finest - {level}) : Real {{\n"
         program += f"\tVar gen_resNorm : Real = 0.0\n"
         program += f"\tgen_resNorm += dot ( {residual}, {residual} )\n"
         program += f"\treturn sqrt ( gen_resNorm )\n"
@@ -549,17 +551,17 @@ class ProgramGenerator:
         return program
 
     def generate_solver_function(self, function_name: str, storages: [CycleStorage], epsilon=1e-10,
-                                 maximum_number_of_iterations=100) -> str:
+                                 maximum_number_of_iterations=100, level=0) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
-        operator = f"{self.operator.name}@finest"
-        solution = storages[0].solution.to_exa3()
-        rhs = storages[0].rhs.to_exa3()
-        residual = storages[0].residual.to_exa3()
+        operator = f"{self.operator.name}@(finest - {level})"
+        solution = storages[level].solution.to_exa3()
+        rhs = storages[level].rhs.to_exa3()
+        residual = storages[level].residual.to_exa3()
         compute_residual_norm = "gen_resNorm"
-        program = self.generate_l2_norm_residual(compute_residual_norm, storages)
+        program = self.generate_l2_norm_residual(compute_residual_norm, storages, level)
         program += f"\nFunction {function_name}@finest {{\n"
         program += f"\t{residual} = ({rhs} - ({operator} * {solution}))\n"
-        program += f"\tVar gen_initRes: Real = {compute_residual_norm}@finest()\n"
+        program += f"\tVar gen_initRes: Real = {compute_residual_norm}@(finest - {level})()\n"
         program += f"\tVar gen_curRes: Real = gen_initRes\n"
         program += f"\tVar gen_prevRes: Real = gen_curRes\n"
         program += f'\tprint("Starting residual:", gen_initRes)\n'
@@ -567,10 +569,10 @@ class ProgramGenerator:
         program += f"\trepeat until(((gen_curIt >= {maximum_number_of_iterations}) " \
                    f"|| (gen_curRes <= ({epsilon} * gen_initRes))) || (gen_curRes <= 0.0)) {{\n"
         program += f"\t\tgen_curIt += 1\n" \
-                   f"\t\tCycle@finest()\n"
+                   f"\t\tCycle@(finest - {level})()\n"
         program += f"\t\t{residual} = ({rhs} - ({operator} * {solution}))\n"
         program += f"\t\tgen_prevRes = gen_curRes\n"
-        program += f"\t\tgen_curRes = {compute_residual_norm}@finest()\n"
+        program += f"\t\tgen_curRes = {compute_residual_norm}@(finest - {level})()\n"
         program += f'\t\tprint("Residual after", gen_curIt, "iterations is", gen_curRes, ' \
                    f'"--- convergence factor is", (gen_curRes / gen_prevRes))'
         program += "\t}\n"
