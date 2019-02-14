@@ -362,28 +362,38 @@ class Optimizer:
 
             def key_function(ind):
                 spectral_radius = ind.fitness.values[0]
-                if spectral_radius < required_convergence:
-                    expression = self.compile_expression(ind, pset)[0]
-                    evaluation_program = evaluation_boilerplate + solver_program + self._program_generator.generate_cycle_function(expression, storages)
-                    # print(evaluation_program)
-                    self._program_generator.write_program_to_file(evaluation_program)
-                    time_to_solution = self._program_generator.execute()
-                    print(f'Time to solution: {time_to_solution}')
-                    self._program_generator.invalidate_storages(storages)
-                    return time_to_solution
+                if spectral_radius <= required_convergence:
+                    tmp = math.log(self.epsilon) / math.log(spectral_radius)
+                    tmp = tmp * ind.fitness.values[1]
+                    return tmp
                 else:
                     return spectral_radius * self.infinity
-                # spectral_radius = ind.fitness.values[0]
-                # if spectral_radius < required_convergence:
-                #     tmp = math.log(self.epsilon) / math.log(spectral_radius)
-                #     tmp = tmp * ind.fitness.values[1]
-                #     return tmp
-                # else:
-                #     return spectral_radius * self.infinity
             hof = sorted(hof, key=key_function)
-            for j in range(0, min(5, len(hof))):
-                print(f"Individual with rank {j}: ({hof[j].fitness.values[0]}), ({hof[j].fitness.values[1]})")
+            best_time = self.infinity
             best_individual = hof[0]
+            count = 0
+            for j in range(len(hof)):
+                spectral_radius = hof[j].fitness.values[0]
+                if spectral_radius > required_convergence or count == 50:
+                    break
+                if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon and \
+                        abs(hof[j].fitness.values[1] - hof[j+1].fitness.values[1] < self.epsilon):
+                    continue
+                ind = hof[j]
+                expression = self.compile_expression(ind, pset)[0]
+                evaluation_program = evaluation_boilerplate + solver_program + self._program_generator.generate_cycle_function(expression, storages)
+                # print(evaluation_program)
+                self._program_generator.write_program_to_file(evaluation_program)
+                time_to_solution = self._program_generator.execute()
+                print(f'Time to solution: {time_to_solution}')
+                self._program_generator.invalidate_storages(storages)
+                if time_to_solution < best_time:
+                    best_time = time_to_solution
+                    best_individual = ind
+                count += 1
+
+            print(f"Best individual: ({best_individual.fitness.values[0]}), ({best_individual.fitness.values[1]})")
+            print(f"Average time to solution: {best_time}")
             best_expression = self.compile_expression(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False

@@ -3,6 +3,7 @@ from evostencils.stencils import constant, periodic
 import os
 import subprocess
 import time
+import math
 
 
 class CycleStorage:
@@ -166,42 +167,59 @@ class ProgramGenerator:
     def run_exastencils_compiler(self, platform='linux'):
         import subprocess
         result = subprocess.run(['java', '-cp',
-                        f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
-                        f'{self.output_path}/{self.problem_name}.settings',
-                        f'{self.output_path}/{self.problem_name}.knowledge',
-                        f'{self.output_path}/lib/{platform}.platform'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                 f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
+                                 f'{self.output_path}/{self.problem_name}.settings',
+                                 f'{self.output_path}/{self.problem_name}.knowledge',
+                                 f'{self.output_path}/lib/{platform}.platform'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
             return result.returncode
 
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
     def execute(self, platform='linux', infinity=1e100):
         result = subprocess.run(['java', '-cp',
-                        f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
-                        f'{self.output_path}/{self.problem_name}.settings',
-                        f'{self.output_path}/{self.problem_name}.knowledge',
-                        f'{self.output_path}/lib/{platform}.platform'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                 f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
+                                 f'{self.output_path}/{self.problem_name}.settings',
+                                 f'{self.output_path}/{self.problem_name}.knowledge',
+                                 f'{self.output_path}/lib/{platform}.platform'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
             return infinity
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
             return infinity
-        runtime = 0
+        total_time = 0
         number_of_samples = 10
         for i in range(number_of_samples):
-            start = time.time()
             result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not result.returncode == 0:
                 return infinity
-            end = time.time()
-            runtime += end - start
-        return runtime / number_of_samples
+            output = result.stdout.decode('utf8')
+            convergence_factor, time_to_solution = self.parse_output(output)
+            if math.isinf(convergence_factor) or math.isnan(convergence_factor) or not convergence_factor < 1:
+                return infinity
+            total_time += time_to_solution
+        return total_time / number_of_samples
+
+    @staticmethod
+    def parse_output(output: str):
+        lines = output.splitlines()
+        convergence_factor = 1
+        count = 0
+        for line in lines:
+            if 'convergence factor' in line:
+                tmp = line.split('convergence factor is ')
+                convergence_factor *= float(tmp[-1])
+                count += 1
+        convergence_factor = math.pow(convergence_factor, 1/count)
+        tmp = lines[-1].split(' ')
+        time_to_solution = float(tmp[-2])
+        return convergence_factor, time_to_solution
 
     @staticmethod
     def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:
