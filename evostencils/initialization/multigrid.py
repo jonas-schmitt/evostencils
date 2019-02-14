@@ -127,7 +127,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       f"apply_{level}")
     if not coarsest:
 
-        pset.addPrimitive(coarse_grid_correction, [types.Interpolation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"move_up_{level}")
+        pset.addPrimitive(coarse_grid_correction, [types.Interpolation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
                           [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished),

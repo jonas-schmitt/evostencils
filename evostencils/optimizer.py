@@ -365,10 +365,11 @@ class Optimizer:
                 if spectral_radius < required_convergence:
                     expression = self.compile_expression(ind, pset)[0]
                     evaluation_program = evaluation_boilerplate + solver_program + self._program_generator.generate_cycle_function(expression, storages)
-                    #print(evaluation_program)
+                    # print(evaluation_program)
                     self._program_generator.write_program_to_file(evaluation_program)
                     time_to_solution = self._program_generator.execute()
                     print(f'Time to solution: {time_to_solution}')
+                    self._program_generator.invalidate_storages(storages)
                     return time_to_solution
                 else:
                     return spectral_radius * self.infinity

@@ -191,16 +191,17 @@ class ProgramGenerator:
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
             return infinity
-        time_to_solution = 0
-        for i in range(5):
+        runtime = 0
+        number_of_samples = 10
+        for i in range(number_of_samples):
             start = time.time()
             result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             if not result.returncode == 0:
                 return infinity
             end = time.time()
-            time_to_solution += end - start
-        return time_to_solution / 5
+            runtime += end - start
+        return runtime / number_of_samples
 
     @staticmethod
     def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:
@@ -393,7 +394,7 @@ class ProgramGenerator:
         if expression.program is not None:
             return expression.program
         program = ''
-        if expression.storage is not None and expression.storage.valid:
+        if expression.storage is not None:
             expression.storage.valid = False
 
         if isinstance(expression, mg.Cycle):
@@ -412,6 +413,7 @@ class ProgramGenerator:
                     if not residual.rhs.storage.valid:
                         program += self.generate_multigrid(residual.rhs, storages)
                         residual.rhs.storage.valid = True
+
                     if isinstance(residual.iterate, base.ZeroGrid):
                         program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
                     if isinstance(expression.correction.operand1, base.Operator):
@@ -455,6 +457,7 @@ class ProgramGenerator:
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages)
                 expression.rhs.storage.valid = True
+
             if isinstance(expression.iterate, base.ZeroGrid):
                 program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
@@ -551,7 +554,7 @@ class ProgramGenerator:
         return program
 
     def generate_solver_function(self, function_name: str, storages: [CycleStorage], epsilon=1e-10,
-                                 maximum_number_of_iterations=100, level=0) -> str:
+                                 maximum_number_of_iterations=1000, level=0) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@(finest - {level})"
         solution = storages[level].solution.to_exa3()
@@ -579,4 +582,11 @@ class ProgramGenerator:
         program += "}\n"
         return program
 
+    @staticmethod
+    def invalidate_storages(storages: [CycleStorage]):
+        for storage in storages:
+            storage.residual.valid = False
+            storage.rhs.valid = False
+            storage.solution.valid = False
+            storage.correction.valid = False
 
