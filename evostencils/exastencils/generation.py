@@ -195,24 +195,26 @@ class ProgramGenerator:
                                  f'{self.output_path}/lib/{platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
-            return infinity
+            return infinity, infinity
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not result.returncode == 0:
-            return infinity
+            return infinity, infinity
         total_time = 0
+        sum_of_convergence_factors = infinity
         number_of_samples = 10
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not result.returncode == 0:
-                return infinity
+                return infinity, infinity
             output = result.stdout.decode('utf8')
-            convergence_factor, time_to_solution = self.parse_output(output)
+            time_to_solution, convergence_factor = self.parse_output(output)
             if math.isinf(convergence_factor) or math.isnan(convergence_factor) or not convergence_factor < 1:
-                return infinity
+                return infinity, infinity
             total_time += time_to_solution
-        return total_time / number_of_samples
+            sum_of_convergence_factors += convergence_factor
+        return total_time / number_of_samples, convergence_factor / number_of_samples
 
     @staticmethod
     def parse_output(output: str):
@@ -227,7 +229,7 @@ class ProgramGenerator:
         convergence_factor = math.pow(convergence_factor, 1/count)
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
-        return convergence_factor, time_to_solution
+        return time_to_solution, convergence_factor
 
     @staticmethod
     def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:

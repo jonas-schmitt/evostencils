@@ -373,6 +373,7 @@ class Optimizer:
                     return rho * self.infinity
             hof = sorted(hof, key=key_function)
             best_time = self.infinity
+            best_convergence_factor = self.infinity
             best_individual = hof[0]
             base_program = evaluation_boilerplate + solver_program
             if self._program_generator.compiler_available:
@@ -389,24 +390,24 @@ class Optimizer:
                     evaluation_program = base_program + self._program_generator.generate_cycle_function(expression, storages)
                     # print(evaluation_program)
                     self._program_generator.write_program_to_file(evaluation_program)
-                    time_to_solution = self._program_generator.execute()
+                    time_to_solution, convergence_factor = self._program_generator.execute()
                     print(f'Time to solution: {time_to_solution}')
                     self._program_generator.invalidate_storages(storages)
                     if time_to_solution < best_time:
                         best_time = time_to_solution
+                        best_convergence_factor = convergence_factor
                         best_individual = ind
                     count += 1
-
-            print(f"Best individual: ({best_individual.fitness.values[0]}), ({best_individual.fitness.values[1]})")
+            print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, es_lambda,
+            optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_lambda,
                                                                                  es_generations, base_program, storages)
-            if optimized_spectral_radius < best_individual.fitness.values[0]:
+            if optimized_convergence_factor < best_convergence_factor:
                 self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
                 transformations.set_weights(cgs_expression, optimized_weights)
-                print(f"Best individual: ({optimized_spectral_radius}), ({best_individual.fitness.values[1]})")
+                print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)

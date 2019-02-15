@@ -29,9 +29,9 @@ class WeightOptimizer:
                     storages is not None:
                 evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
                 generator.write_program_to_file(evaluation_program)
-                time_to_solution = generator.execute()
+                _, convergence_factor = generator.execute()
                 generator.invalidate_storages(storages)
-                return time_to_solution,
+                return convergence_factor,
             else:
                 iteration_matrix = transformations.get_iteration_matrix(expression)
                 spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
