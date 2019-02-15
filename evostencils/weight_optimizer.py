@@ -18,18 +18,27 @@ class WeightOptimizer:
             elif w > maximum:
                 weights[i] = maximum
 
-    def optimize(self, expression: base.Expression, problem_size, lambda_, generations):
+    def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
         def evaluate(weights):
             self.restrict_weights(weights, 0.0, 2.0)
             tail = transformations.set_weights(expression, weights)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
-            iteration_matrix = transformations.get_iteration_matrix(expression)
-            spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-            if spectral_radius == 0.0:
-                return self._gp_optimizer.infinity,
+            generator = self._gp_optimizer.program_generator
+            if generator is not None and generator.compiler_available and base_program is not None and \
+                    storages is not None:
+                evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
+                generator.write_program_to_file(evaluation_program)
+                time_to_solution = generator.execute()
+                generator.invalidate_storages(storages)
+                return time_to_solution,
             else:
-                return spectral_radius,
+                iteration_matrix = transformations.get_iteration_matrix(expression)
+                spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+                if spectral_radius == 0.0:
+                    return self._gp_optimizer.infinity,
+                else:
+                    return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
         parent = creator.Weights([1.0] * problem_size)
         parent.fitness.values = self._toolbox.evaluate(parent)

@@ -2,7 +2,7 @@ from evostencils.expressions import base, multigrid as mg, partitioning as part
 from evostencils.stencils import constant, periodic
 import os
 import subprocess
-import time
+from pathlib import Path
 import math
 
 
@@ -50,15 +50,23 @@ class ProgramGenerator:
         self._min_level = min_level
         self._max_level = max_level
         self._initialization_information = initialization_information
+        self._compiler_available = False
         if not os.path.exists(output_path):
             os.makedirs(output_path)
-        subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
+        if os.path.exists(exastencils_path):
+            subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
+            if os.path.isfile(f'{exastencils_path}/Compiler/Compiler.jar'):
+                self._compiler_available = True
         self.generate_settings_file()
         self.generate_knowledge_file()
 
     @property
     def exastencils_path(self):
         return self._exastencils_path
+
+    @property
+    def compiler_available(self):
+        return self._compiler_available
 
     @property
     def output_path(self):
@@ -572,7 +580,7 @@ class ProgramGenerator:
         return program
 
     def generate_solver_function(self, function_name: str, storages: [CycleStorage], epsilon=1e-10,
-                                 maximum_number_of_iterations=1000, level=0) -> str:
+                                 maximum_number_of_iterations=100, level=0) -> str:
         assert maximum_number_of_iterations >= 1, "At least one iteration required"
         operator = f"{self.operator.name}@(finest - {level})"
         solution = storages[level].solution.to_exa3()

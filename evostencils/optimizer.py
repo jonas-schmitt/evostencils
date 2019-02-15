@@ -119,6 +119,10 @@ class Optimizer:
         return self._performance_evaluator
 
     @property
+    def program_generator(self):
+        return self._program_generator
+
+    @property
     def epsilon(self):
         return self._epsilon
 
@@ -129,15 +133,15 @@ class Optimizer:
     def generate_individual(self):
         return self._toolbox.individual()
 
-    def compile_expression(self, expression, pset):
-        return gp.compile(expression, pset)
+    def compile_individual(self, individual, pset):
+        return gp.compile(individual, pset)
 
     def evaluate(self, individual, pset):
         import numpy, math
         if len(individual) > 150:
             return self.infinity, self.infinity
         try:
-            expression1, expression2 = self.compile_expression(individual, pset)
+            expression1, expression2 = self.compile_individual(individual, pset)
         except MemoryError:
             return self.infinity, self.infinity
 
@@ -298,11 +302,10 @@ class Optimizer:
         return pop, logbook, hof
 
     def default_optimization(self, gp_mu=100, gp_lambda=100, gp_generations=20, gp_crossover_probability=0.7,
-                             gp_mutation_probability=0.3, es_lambda=20, es_generations=100, required_convergence=0.2,
+                             gp_mutation_probability=0.3, es_lambda=10, es_generations=50, required_convergence=0.5,
                              restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
         import math
-
         gp_generations_remaining = gp_generations
         levels = self.max_level - self.min_level
         levels_per_run = 2
@@ -361,43 +364,45 @@ class Optimizer:
             stats.append(log)
 
             def key_function(ind):
-                spectral_radius = ind.fitness.values[0]
-                if spectral_radius <= required_convergence:
-                    tmp = math.log(self.epsilon) / math.log(spectral_radius)
+                rho = ind.fitness.values[0]
+                if rho <= required_convergence:
+                    tmp = math.log(self.epsilon) / math.log(rho)
                     tmp = tmp * ind.fitness.values[1]
                     return tmp
                 else:
-                    return spectral_radius * self.infinity
+                    return rho * self.infinity
             hof = sorted(hof, key=key_function)
             best_time = self.infinity
             best_individual = hof[0]
-            count = 0
-            for j in range(len(hof)):
-                spectral_radius = hof[j].fitness.values[0]
-                if spectral_radius > required_convergence or count == 50:
-                    break
-                if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon and \
-                        abs(hof[j].fitness.values[1] - hof[j+1].fitness.values[1] < self.epsilon):
-                    continue
-                ind = hof[j]
-                expression = self.compile_expression(ind, pset)[0]
-                evaluation_program = evaluation_boilerplate + solver_program + self._program_generator.generate_cycle_function(expression, storages)
-                # print(evaluation_program)
-                self._program_generator.write_program_to_file(evaluation_program)
-                time_to_solution = self._program_generator.execute()
-                print(f'Time to solution: {time_to_solution}')
-                self._program_generator.invalidate_storages(storages)
-                if time_to_solution < best_time:
-                    best_time = time_to_solution
-                    best_individual = ind
-                count += 1
+            base_program = evaluation_boilerplate + solver_program
+            if self._program_generator.compiler_available:
+                count = 0
+                for j in range(len(hof)):
+                    spectral_radius = hof[j].fitness.values[0]
+                    if spectral_radius > required_convergence or count == 50:
+                        break
+                    if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon and \
+                            abs(hof[j].fitness.values[1] - hof[j+1].fitness.values[1] < self.epsilon):
+                        continue
+                    ind = hof[j]
+                    expression = self.compile_individual(ind, pset)[0]
+                    evaluation_program = base_program + self._program_generator.generate_cycle_function(expression, storages)
+                    # print(evaluation_program)
+                    self._program_generator.write_program_to_file(evaluation_program)
+                    time_to_solution = self._program_generator.execute()
+                    print(f'Time to solution: {time_to_solution}')
+                    self._program_generator.invalidate_storages(storages)
+                    if time_to_solution < best_time:
+                        best_time = time_to_solution
+                        best_individual = ind
+                    count += 1
 
             print(f"Best individual: ({best_individual.fitness.values[0]}), ({best_individual.fitness.values[1]})")
-            print(f"Average time to solution: {best_time}")
-            best_expression = self.compile_expression(best_individual, pset)[0]
+            best_expression = self.compile_individual(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
-            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, es_lambda, es_generations)
+            optimized_weights, optimized_spectral_radius = self.optimize_weights(cgs_expression, es_lambda,
+                                                                                 es_generations, base_program, storages)
             if optimized_spectral_radius < best_individual.fitness.values[0]:
                 self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
                 transformations.set_weights(cgs_expression, optimized_weights)
@@ -414,10 +419,10 @@ class Optimizer:
 
         return boilerplate_program + solver_program, pops, stats
 
-    def optimize_weights(self, expression, lambda_, generations):
+    def optimize_weights(self, expression, lambda_, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
         weights = transformations.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(weights), lambda_, generations)
+        best_individual = self._weight_optimizer.optimize(expression, len(weights), lambda_, generations, base_program, storages)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
         # print(best_weights)
