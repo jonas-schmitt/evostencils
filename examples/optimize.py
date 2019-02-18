@@ -13,6 +13,7 @@ from evostencils.exastencils.gallery.finite_differences.poisson_2D import Initia
 #    import InitializationInformation
 import pickle
 import lfa_lab as lfa
+import sys
 
 
 def main():
@@ -61,7 +62,10 @@ def main():
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     runtime_cgs = 1e-3 # example value
     performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
-    exastencils_path = '/local/ja42rica/ScalaExaStencil'
+    # pass path to exa
+    exastencils_path = ''
+    if len(sys.argv[1:]) > 0 and os.path.exists(sys.argv[1]):
+        exastencils_path = sys.argv[1]
     program_generator = ProgramGenerator(problem_name, exastencils_path, A, u, b, I, P, R,
                                          dimension, coarsening_factor, min_level, max_level,
                                          initialization_information=InitializationInformation)
