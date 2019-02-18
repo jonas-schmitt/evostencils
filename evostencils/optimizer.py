@@ -413,7 +413,7 @@ class Optimizer:
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
             self.performance_evaluator.estimate_runtime(cgs_expression)
             try:
-                solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
+                solver_program += self._program_generator.generate_cycle_function(cgs_expression, storages)
             except Exception as e:
                 print('Ungeneratable program')
                 print(e)

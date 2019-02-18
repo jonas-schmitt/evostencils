@@ -419,8 +419,8 @@ class ProgramGenerator:
 
     def generate_multigrid(self, expression: base.Expression, storages) -> str:
         # import decimal
-        if expression.program is not None:
-            return expression.program
+        # if expression.program is not None:
+        #     return expression.program
         program = ''
         if expression.storage is not None:
             expression.storage.valid = False
