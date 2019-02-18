@@ -393,7 +393,7 @@ class Optimizer:
                     time_to_solution, convergence_factor = self._program_generator.execute()
                     print(f'Time to solution: {time_to_solution}')
                     self._program_generator.invalidate_storages(storages)
-                    if time_to_solution < best_time:
+                    if time_to_solution < best_time and convergence_factor < 1:
                         best_time = time_to_solution
                         best_convergence_factor = convergence_factor
                         best_individual = ind
@@ -403,9 +403,9 @@ class Optimizer:
             cgs_expression = best_expression
             cgs_expression.evaluate = False
             optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_lambda,
-                                                                                 es_generations, base_program, storages)
+                                                                                    es_generations, base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
+                # self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
                 transformations.set_weights(cgs_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
