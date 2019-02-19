@@ -202,7 +202,7 @@ class ProgramGenerator:
             return infinity, infinity
         total_time = 0
         sum_of_convergence_factors = 0
-        number_of_samples = 10
+        number_of_samples = 5
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -158,15 +158,10 @@ def set_weights(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, mg.Cycle):
         if expression.iteration_matrix is not None:
             expression.iteration_matrix = None
-        if isinstance(expression.correction, mg.Residual) \
-                or (isinstance(expression.correction, base.Multiplication)
-                    and part.can_be_partitioned(expression.correction.operand1)):
-            if len(weights) == 0:
-                raise RuntimeError("Too few weights have been supplied")
-            head, *tail = weights
-            expression._weight = head
-        else:
-            tail = weights
+        if len(weights) == 0:
+            raise RuntimeError("Too few weights have been supplied")
+        head, *tail = weights
+        expression._weight = head
         return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)
@@ -183,10 +178,7 @@ def set_weights(expression: base.Expression, weights: list) -> list:
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, mg.Cycle):
-        if isinstance(expression.correction, mg.Residual) \
-                or (isinstance(expression.correction, base.Multiplication)
-                    and part.can_be_partitioned(expression.correction.operand1)):
-            weights.append(expression.weight)
+        weights.append(expression.weight)
         weights.extend(obtain_weights(expression.correction))
         return weights
     elif isinstance(expression, mg.Residual):

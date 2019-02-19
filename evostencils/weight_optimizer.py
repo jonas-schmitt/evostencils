@@ -20,7 +20,7 @@ class WeightOptimizer:
 
     def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
         def evaluate(weights):
-            # self.restrict_weights(weights, 0.0, 2.0)
+            self.restrict_weights(weights, 0.0, 2.0)
             tail = transformations.set_weights(expression, weights)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
