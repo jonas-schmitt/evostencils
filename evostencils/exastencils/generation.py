@@ -154,7 +154,41 @@ class ProgramGenerator:
         program += "\nApplicationHint {\n\tl4_genDefaultApplication = true\n}\n"
         return program
 
-    def generate_cycle_function(self, expression, storages):
+    @staticmethod
+    def generate_global_weights(n):
+        # Hack to change the weights after generation
+        program = 'Globals {\n'
+        for i in range(0, n):
+            program += f'\tVar omega_{i} : Real = 1.0\n'
+        program += '}\n'
+        return program
+
+    def generate_global_weight_initializations(self, weights):
+        # Hack to change the weights after generation
+        path_to_file = f'{self.output_path}/generated/{self.problem_name}/Globals/Globals_initGlobals.cpp'
+        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with open(path_to_file, 'r') as file:
+            lines = file.readlines()
+            last_line = lines[-1]
+            lines = lines[:-1]
+        content = ''
+        for line in lines:
+            content += line
+        for i, weight in enumerate(weights):
+            lines.append(f'\tomega_{i} = {weight};\n')
+            content += lines[-1]
+        content += last_line
+        with open(path_to_file, 'w') as file:
+            file.write(content)
+
+    def restore_global_initializations(self):
+        # Hack to change the weights after generation
+        path_to_file = f'{self.output_path}/generated/{self.problem_name}/Globals/Globals_initGlobals.cpp'
+        subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def generate_cycle_function(self, expression, storages, use_global_weights=False):
         base_level = 0
         for i, storage in enumerate(storages):
             if expression.grid.size == storage.grid.size:
@@ -162,10 +196,9 @@ class ProgramGenerator:
                 base_level = i
                 break
         self.assign_storage_to_subexpressions(expression, storages, base_level)
-        program = ''
-        program += f'Function Cycle@(finest - {base_level}) {{\n'
-        program += self.generate_multigrid(expression, storages)
-        program += f'}}\n'
+        program = f'Function Cycle@(finest - {base_level}) {{\n'
+        program += self.generate_multigrid(expression, storages, use_global_weights)
+        program += '}\n'
         return program
 
     def write_program_to_file(self, program: str):
@@ -180,29 +213,23 @@ class ProgramGenerator:
                                  f'{self.output_path}/{self.problem_name}.knowledge',
                                  f'{self.output_path}/lib/{platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if not result.returncode == 0:
-            return result.returncode
+        return result.returncode
 
+    def run_c_compiler(self):
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
-    def execute(self, platform='linux', infinity=1e100):
-        result = subprocess.run(['java', '-cp',
-                                 f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
-                                 f'{self.output_path}/{self.problem_name}.settings',
-                                 f'{self.output_path}/{self.problem_name}.knowledge',
-                                 f'{self.output_path}/lib/{platform}.platform'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if not result.returncode == 0:
-            return infinity, infinity
-        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if not result.returncode == 0:
+    def evaluate(self, platform='linux', infinity=1e100, number_of_samples=1, only_weights_adapted=False):
+        if not only_weights_adapted:
+            return_code = self.run_exastencils_compiler(platform)
+            if not return_code == 0:
+                return infinity, infinity
+        return_code = self.run_c_compiler()
+        if not return_code == 0:
             return infinity, infinity
         total_time = 0
         sum_of_convergence_factors = 0
-        number_of_samples = 5
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -396,7 +423,6 @@ class ProgramGenerator:
         n = 1000
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
-        # TODO currently hard coded for two dimensions
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
                    f'+= ((0.8 * diag_inv({self.operator.name}@(finest - {i}))) * ' \
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
@@ -417,7 +443,7 @@ class ProgramGenerator:
         program += f'\t{expression.storage.to_exa3()} = {storages[i].solution.to_exa3()}\n'
         return program
 
-    def generate_multigrid(self, expression: base.Expression, storages) -> str:
+    def generate_multigrid(self, expression: base.Expression, storages, use_global_weights=False) -> str:
         # import decimal
         # if expression.program is not None:
         #     return expression.program
@@ -430,6 +456,9 @@ class ProgramGenerator:
             # decimal.getcontext().prec = 14
             # weight = decimal.Decimal(expression.weight)
             weight = expression.weight
+            # Hack to change the weights after generation
+            if use_global_weights and hasattr(expression, 'global_id'):
+                weight = f'omega_{expression.global_id}'
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
@@ -437,26 +466,26 @@ class ProgramGenerator:
                 stencil = expression.correction.operand1.generate_stencil()
                 if isinstance(expression.correction.operand2, mg.Residual) and periodic.is_diagonal(stencil):
                     residual = expression.correction.operand2
-                    program += self.generate_multigrid(residual.iterate, storages)
+                    program += self.generate_multigrid(residual.iterate, storages, use_global_weights)
                     if not residual.rhs.storage.valid:
-                        program += self.generate_multigrid(residual.rhs, storages)
+                        program += self.generate_multigrid(residual.rhs, storages, use_global_weights)
                         residual.rhs.storage.valid = True
 
                     if isinstance(residual.iterate, base.ZeroGrid):
                         program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
                     if isinstance(expression.correction.operand1, base.Operator):
-                        operator_str = f'diag({self.generate_multigrid(expression.correction.operand1, storages)})'
+                        operator_str = f'diag({self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)})'
                     else:
-                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages)})'
+                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)})'
                     correction_str = f'({residual.rhs.storage.to_exa3()} - ' \
-                                     f'{self.generate_multigrid(residual.operator, storages)} * ' \
+                                     f'{self.generate_multigrid(residual.operator, storages, use_global_weights)} * ' \
                                      f'{residual.iterate.storage.to_exa3()})'
                 else:
-                    program += self.generate_multigrid(expression.correction.operand2, storages)
+                    program += self.generate_multigrid(expression.correction.operand2, storages, use_global_weights)
                     if isinstance(expression.correction.operand1, base.BinaryExpression) or isinstance(expression.correction.operand1, base.Scaling):
-                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages)})'
+                        operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)})'
                     else:
-                        operator_str = f'{self.generate_multigrid(expression.correction.operand1, storages)}'
+                        operator_str = f'{self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)}'
                     correction_str = f'{expression.correction.operand2.storage.to_exa3()}'
 
                 smoother = f'{new_iterate_str} = {iterate_str} + ({weight}) ' \
@@ -476,20 +505,20 @@ class ProgramGenerator:
                     raise RuntimeError(f"Partitioning {expression.partitioning} not supported")
 
             else:
-                program += self.generate_multigrid(expression.correction, storages)
+                program += self.generate_multigrid(expression.correction, storages, use_global_weights)
                 program += f'\t{field.to_exa3()} = ' \
                            f'{expression.iterate.storage.to_exa3()} + ' \
                            f'({weight}) * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
-            program += self.generate_multigrid(expression.iterate, storages)
+            program += self.generate_multigrid(expression.iterate, storages, use_global_weights)
             if not expression.rhs.storage.valid:
-                program += self.generate_multigrid(expression.rhs, storages)
+                program += self.generate_multigrid(expression.rhs, storages, use_global_weights)
                 expression.rhs.storage.valid = True
 
             if isinstance(expression.iterate, base.ZeroGrid):
                 program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
-                       f'{self.generate_multigrid(expression.operator, storages)} * ' \
+                       f'{self.generate_multigrid(expression.operator, storages, use_global_weights)} * ' \
                        f'{expression.iterate.storage.to_exa3()}\n'
         elif isinstance(expression, base.BinaryExpression):
             if isinstance(expression, base.Multiplication):
@@ -502,15 +531,15 @@ class ProgramGenerator:
                 raise RuntimeError("Unexpected branch")
 
             if expression.storage is None:
-                return f'{self.generate_multigrid(expression.operand1, storages)} ' \
+                return f'{self.generate_multigrid(expression.operand1, storages, use_global_weights)} ' \
                        f'{operator_str} ' \
-                       f'{self.generate_multigrid(expression.operand2, storages)}'
+                       f'{self.generate_multigrid(expression.operand2, storages, use_global_weights)}'
             else:
                 operand1 = expression.operand1
                 operand2 = expression.operand2
                 if expression.operand1.storage is None:
                     if isinstance(operand1, mg.CoarseGridSolver):
-                        program += self.generate_multigrid(operand2, storages)
+                        program += self.generate_multigrid(operand2, storages, use_global_weights)
                         if operand1.expression is not None:
                             level = expression.operand2.storage.level
                             program += f'\t{storages[level].solution.to_exa3()} = 0\n'
@@ -523,15 +552,15 @@ class ProgramGenerator:
                             program += self.generate_coarse_grid_solver(expression, storages)
                         return program
                     else:
-                        tmp1 = f'({self.generate_multigrid(operand1, storages)})'
+                        tmp1 = f'({self.generate_multigrid(operand1, storages, use_global_weights)})'
                 else:
-                    program += self.generate_multigrid(operand1, storages)
+                    program += self.generate_multigrid(operand1, storages, use_global_weights)
                     tmp1 = f'{operand1.storage.to_exa3()}'
 
                 if expression.operand2.storage is None:
-                    tmp2 = self.generate_multigrid(operand2, storages)
+                    tmp2 = self.generate_multigrid(operand2, storages, use_global_weights)
                 else:
-                    program += self.generate_multigrid(operand2, storages)
+                    program += self.generate_multigrid(operand2, storages, use_global_weights)
                     tmp2 = f'{operand2.storage.to_exa3()}'
                 program += f'\t{expression.storage.to_exa3()} = {tmp1} {operator_str} {tmp2}\n'
         elif isinstance(expression, base.Scaling):
@@ -539,18 +568,18 @@ class ProgramGenerator:
             operand = expression.operand
             field = expression.storage
             if field is None:
-                tmp = self.generate_multigrid(expression.operand, storages)
+                tmp = self.generate_multigrid(expression.operand, storages, use_global_weights)
             else:
-                program += self.generate_multigrid(expression.operand, storages)
+                program += self.generate_multigrid(expression.operand, storages, use_global_weights)
                 tmp = f'{operand.storage.to_exa()}'
             program += f'({expression.factor}) * {tmp}'
         elif isinstance(expression, base.Inverse):
             if isinstance(expression.operand, base.Inverse) or isinstance(expression.operand, base.Identity):
-                program = self.generate_multigrid(expression.operand, storages)
+                program = self.generate_multigrid(expression.operand, storages, use_global_weights)
             else:
-                program = f'inverse({self.generate_multigrid(expression.operand, storages)})'
+                program = f'inverse({self.generate_multigrid(expression.operand, storages, use_global_weights)})'
         elif isinstance(expression, base.Diagonal):
-            program = f'diag({self.generate_multigrid(expression.operand, storages)})'
+            program = f'diag({self.generate_multigrid(expression.operand, storages, use_global_weights)})'
         elif isinstance(expression, mg.Restriction):
             level_offset = self.determine_operator_level(expression, storages) - 1
             program = f'{expression.name}@(finest - {level_offset})'

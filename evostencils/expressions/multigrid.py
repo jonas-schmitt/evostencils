@@ -131,6 +131,9 @@ class Cycle(base.Expression):
         self._weight = weight
         self._partitioning = partitioning
         self.predecessor = predecessor
+        self.global_id = None
+        self.weight_obtained = False
+        self.weight_set = False
         super().__init__()
 
     @property

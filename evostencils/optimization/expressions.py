@@ -301,7 +301,7 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def default_optimization(self, gp_mu=100, gp_lambda=100, gp_generations=20, gp_crossover_probability=0.7,
+    def default_optimization(self, gp_mu=20, gp_lambda=20, gp_generations=20, gp_crossover_probability=0.7,
                              gp_mutation_probability=0.3, es_lambda=10, es_generations=50, required_convergence=0.5,
                              restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
@@ -373,8 +373,8 @@ class Optimizer:
                     return rho * self.infinity
             hof = sorted(hof, key=key_function)
             best_time = self.infinity
-            best_convergence_factor = self.infinity
             best_individual = hof[0]
+            best_convergence_factor = best_individual.fitness.values[0]
             base_program = evaluation_boilerplate + solver_program
             if self._program_generator.compiler_available:
                 count = 0
@@ -390,7 +390,7 @@ class Optimizer:
                     evaluation_program = base_program + self._program_generator.generate_cycle_function(expression, storages)
                     # print(evaluation_program)
                     self._program_generator.write_program_to_file(evaluation_program)
-                    time_to_solution, convergence_factor = self._program_generator.execute()
+                    time_to_solution, convergence_factor = self._program_generator.evaluate(number_of_samples=10)
                     print(f'Time to solution: {time_to_solution}')
                     self._program_generator.invalidate_storages(storages)
                     if time_to_solution < best_time and convergence_factor < 1:
@@ -402,10 +402,11 @@ class Optimizer:
             best_expression = self.compile_individual(best_individual, pset)[0]
             cgs_expression = best_expression
             cgs_expression.evaluate = False
+
             optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_lambda,
                                                                                     es_generations, base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                weights.restrict_weights(optimized_weights, 0.0, 2.0)
+                # weights.restrict_weights(optimized_weights, 0.0, 2.0)
                 weights.set_weights(cgs_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
@@ -423,7 +424,16 @@ class Optimizer:
     def optimize_weights(self, expression, lambda_, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
         initial_weights = weights.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(initial_weights), lambda_, generations, base_program, storages)
+        weights.set_weights(expression, initial_weights)
+        weights.reset_status(expression)
+        n = len(initial_weights)
+        if base_program is not None and storages is not None:
+            tmp = base_program + self.program_generator.generate_global_weights(n)
+            evaluation_program = tmp + self.program_generator.generate_cycle_function(expression, storages,
+                                                                                      use_global_weights=True)
+            self.program_generator.write_program_to_file(evaluation_program)
+            self.program_generator.run_exastencils_compiler()
+        best_individual = self._weight_optimizer.optimize(expression, n, lambda_, generations, base_program, storages)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
         # print(best_weights)

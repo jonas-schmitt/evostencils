@@ -78,13 +78,10 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
-    # program, pops, stats = optimizer.default_optimization(es_lambda=4, es_generations=5, restart_from_checkpoint=True)
-    program, pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100,
-                                                          es_lambda=10, es_generations=100,
-                                                          required_convergence=required_convergence,
-                                                          restart_from_checkpoint=restart_from_checkpoint)
+    restart_from_checkpoint = True
+    # restart_from_checkpoint = False
+    program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3, restart_from_checkpoint=restart_from_checkpoint)
+    # program, pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100, es_lambda=20, es_generations=200, required_convergence=required_convergence, restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)
     log_dir_name = f'{problem_name}/data'

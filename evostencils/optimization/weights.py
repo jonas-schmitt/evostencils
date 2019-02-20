@@ -3,15 +3,35 @@ from evostencils.expressions import base, multigrid as mg, transformations
 import deap
 
 
+def reset_status(expression: base.Expression):
+    if isinstance(expression, mg.Cycle):
+        expression.iteration_matrix = None
+        expression.weight_obtained = False
+        expression.weight_set = False
+        return reset_status(expression.correction)
+    elif isinstance(expression, mg.Residual):
+        reset_status(expression.rhs)
+        reset_status(expression.iterate)
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        reset_status(expression.operand)
+    elif isinstance(expression, base.BinaryExpression):
+        reset_status(expression.operand1)
+        reset_status(expression.operand2)
+
+
 def set_weights(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, mg.Cycle):
         if expression.iteration_matrix is not None:
             expression.iteration_matrix = None
-        if len(weights) == 0:
-            raise RuntimeError("Too few weights have been supplied")
-        head, *tail = weights
-        expression._weight = head
-        return set_weights(expression.correction, tail)
+        # if len(weights) == 0:
+        #     raise RuntimeError("Too few weights have been supplied")
+        if not expression.weight_set:
+            head, *tail = weights
+            expression._weight = head
+            expression.weight_set = True
+            expression.global_id = len(tail)
+            return set_weights(expression.correction, tail)
+        return set_weights(expression.correction, weights)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)
         return set_weights(expression.iterate, tail)
@@ -27,8 +47,10 @@ def set_weights(expression: base.Expression, weights: list) -> list:
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, mg.Cycle):
-        expression.global_id = len(weights)
-        weights.append(expression.weight)
+        # Hack to change the weights after generation
+        if not expression.weight_obtained:
+            weights.append(expression.weight)
+            expression.weight_obtained = True
         weights.extend(obtain_weights(expression.correction))
         return weights
     elif isinstance(expression, mg.Residual):
@@ -63,16 +85,19 @@ class Optimizer:
 
     def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
         def evaluate(weights):
-            restrict_weights(weights, 0.0, 2.0)
+            # restrict_weights(weights, 0.0, 2.0)
             tail = set_weights(expression, weights)
+            reset_status(expression)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
             generator = self._gp_optimizer.program_generator
             if generator is not None and generator.compiler_available and base_program is not None and \
                     storages is not None:
-                evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
-                generator.write_program_to_file(evaluation_program)
-                _, convergence_factor = generator.execute()
+                # evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
+                # generator.write_program_to_file(evaluation_program)
+                generator.generate_global_weight_initializations(weights)
+                _, convergence_factor = generator.evaluate(only_weights_adapted=True)
+                generator.restore_global_initializations()
                 generator.invalidate_storages(storages)
                 return convergence_factor,
             else:
