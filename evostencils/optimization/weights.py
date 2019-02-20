@@ -1,27 +1,70 @@
-from deap import creator, tools, algorithms, gp, cma
-from evostencils.expressions import base, multigrid, transformations
+from deap import creator, tools, algorithms, cma
+from evostencils.expressions import base, multigrid as mg, transformations
 import deap
 
 
-class WeightOptimizer:
+def set_weights(expression: base.Expression, weights: list) -> list:
+    if isinstance(expression, mg.Cycle):
+        if expression.iteration_matrix is not None:
+            expression.iteration_matrix = None
+        if len(weights) == 0:
+            raise RuntimeError("Too few weights have been supplied")
+        head, *tail = weights
+        expression._weight = head
+        return set_weights(expression.correction, tail)
+    elif isinstance(expression, mg.Residual):
+        tail = set_weights(expression.rhs, weights)
+        return set_weights(expression.iterate, tail)
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        return set_weights(expression.operand, weights)
+    elif isinstance(expression, base.BinaryExpression):
+        tail = set_weights(expression.operand1, weights)
+        return set_weights(expression.operand2, tail)
+    else:
+        return weights
+
+
+def obtain_weights(expression: base.Expression) -> list:
+    weights = []
+    if isinstance(expression, mg.Cycle):
+        expression.global_id = len(weights)
+        weights.append(expression.weight)
+        weights.extend(obtain_weights(expression.correction))
+        return weights
+    elif isinstance(expression, mg.Residual):
+        weights.extend(obtain_weights(expression.rhs))
+        weights.extend(obtain_weights(expression.iterate))
+        return weights
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+        weights.extend(obtain_weights(expression.operand))
+        return weights
+    elif isinstance(expression, base.BinaryExpression):
+        weights.extend(obtain_weights(expression.operand1))
+        weights.extend(obtain_weights(expression.operand2))
+        return weights
+    else:
+        return weights
+
+
+def restrict_weights(weights, minimum, maximum):
+    for i, w in enumerate(weights):
+        if w < minimum:
+            weights[i] = minimum
+        elif w > maximum:
+            weights[i] = maximum
+
+
+class Optimizer:
     def __init__(self, gp_optimizer):
         creator.create("FitnessMin", deap.base.Fitness, weights=(-1.0,))
         creator.create("Weights", list, fitness=creator.FitnessMin)
         self._toolbox = deap.base.Toolbox()
         self._gp_optimizer = gp_optimizer
 
-    @staticmethod
-    def restrict_weights(weights, minimum, maximum):
-        for i, w in enumerate(weights):
-            if w < minimum:
-                weights[i] = minimum
-            elif w > maximum:
-                weights[i] = maximum
-
     def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
         def evaluate(weights):
-            self.restrict_weights(weights, 0.0, 2.0)
-            tail = transformations.set_weights(expression, weights)
+            restrict_weights(weights, 0.0, 2.0)
+            tail = set_weights(expression, weights)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
             generator = self._gp_optimizer.program_generator

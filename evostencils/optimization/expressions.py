@@ -1,14 +1,14 @@
 import numpy as np
 import deap.base
-from deap import gp, creator, tools, algorithms
+from deap import gp, creator, tools
 import random
 import pickle
 import os.path
 from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.deap_extension import genGrow, AST, PrimitiveSetTyped
-from evostencils.weight_optimizer import WeightOptimizer
+from evostencils.optimization.deap_extension import genGrow, AST
+import evostencils.optimization.weights as weights
 from evostencils.types import level_control
 
 
@@ -54,7 +54,7 @@ class Optimizer:
         self._FinishedType = level_control.generate_finished_type()
         self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
-        self._weight_optimizer = WeightOptimizer(self)
+        self._weight_optimizer = weights.Optimizer(self)
 
     @staticmethod
     def _init_creator():
@@ -405,8 +405,8 @@ class Optimizer:
             optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_lambda,
                                                                                     es_generations, base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                self._weight_optimizer.restrict_weights(optimized_weights, 0.0, 2.0)
-                transformations.set_weights(cgs_expression, optimized_weights)
+                weights.restrict_weights(optimized_weights, 0.0, 2.0)
+                weights.set_weights(cgs_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
             # print(repr(iteration_matrix))
@@ -422,8 +422,8 @@ class Optimizer:
 
     def optimize_weights(self, expression, lambda_, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
-        weights = transformations.obtain_weights(expression)
-        best_individual = self._weight_optimizer.optimize(expression, len(weights), lambda_, generations, base_program, storages)
+        initial_weights = weights.obtain_weights(expression)
+        best_individual = self._weight_optimizer.optimize(expression, len(initial_weights), lambda_, generations, base_program, storages)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
         # print(best_weights)

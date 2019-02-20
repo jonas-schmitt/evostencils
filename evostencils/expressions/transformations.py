@@ -154,48 +154,6 @@ def get_iteration_matrix(expression: base.Expression):
     return iteration_matrix
 
 
-def set_weights(expression: base.Expression, weights: list) -> list:
-    if isinstance(expression, mg.Cycle):
-        if expression.iteration_matrix is not None:
-            expression.iteration_matrix = None
-        if len(weights) == 0:
-            raise RuntimeError("Too few weights have been supplied")
-        head, *tail = weights
-        expression._weight = head
-        return set_weights(expression.correction, tail)
-    elif isinstance(expression, mg.Residual):
-        tail = set_weights(expression.rhs, weights)
-        return set_weights(expression.iterate, tail)
-    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
-        return set_weights(expression.operand, weights)
-    elif isinstance(expression, base.BinaryExpression):
-        tail = set_weights(expression.operand1, weights)
-        return set_weights(expression.operand2, tail)
-    else:
-        return weights
-
-
-def obtain_weights(expression: base.Expression) -> list:
-    weights = []
-    if isinstance(expression, mg.Cycle):
-        weights.append(expression.weight)
-        weights.extend(obtain_weights(expression.correction))
-        return weights
-    elif isinstance(expression, mg.Residual):
-        weights.extend(obtain_weights(expression.rhs))
-        weights.extend(obtain_weights(expression.iterate))
-        return weights
-    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
-        weights.extend(obtain_weights(expression.operand))
-        return weights
-    elif isinstance(expression, base.BinaryExpression):
-        weights.extend(obtain_weights(expression.operand1))
-        weights.extend(obtain_weights(expression.operand2))
-        return weights
-    else:
-        return weights
-
-
 def obtain_iterate(expression: base.Expression):
     if isinstance(expression, base.BinaryExpression):
         return obtain_iterate(expression.operand2)
