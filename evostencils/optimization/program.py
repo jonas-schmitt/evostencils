@@ -7,7 +7,7 @@ import os.path
 from evostencils.initialization import multigrid
 import evostencils.expressions.base as base
 import evostencils.expressions.transformations as transformations
-from evostencils.optimization.deap_extension import genGrow, AST
+from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
 from evostencils.types import level_control
 

@@ -5,7 +5,7 @@ from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
 from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
-from evostencils.optimization.deap_extension import PrimitiveSetTyped
+from evostencils.deap_extension import PrimitiveSetTyped
 from deap import gp
 
 
