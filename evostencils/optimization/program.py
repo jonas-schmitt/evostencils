@@ -398,6 +398,8 @@ class Optimizer:
                         best_convergence_factor = convergence_factor
                         best_individual = ind
                     count += 1
+                    if best_convergence_factor >= 1 or math.isnan(best_convergence_factor) or math.isinf(best_convergence_factor):
+                        raise RuntimeError("None of the generated solvers did converge. Optimization failed.")
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             cgs_expression = best_expression
@@ -406,7 +408,7 @@ class Optimizer:
             optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_lambda,
                                                                                     es_generations, base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                # weights.restrict_weights(optimized_weights, 0.0, 2.0)
+                weights.restrict_weights(optimized_weights, 0.0, 2.0)
                 weights.set_weights(cgs_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)

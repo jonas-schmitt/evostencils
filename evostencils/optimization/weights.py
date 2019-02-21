@@ -1,5 +1,5 @@
 from deap import creator, tools, algorithms, cma
-from evostencils.expressions import base, multigrid as mg, transformations
+from evostencils.expressions import base, multigrid as mg, transformations, partitioning as part
 import deap
 
 
@@ -25,13 +25,16 @@ def set_weights(expression: base.Expression, weights: list) -> list:
             expression.iteration_matrix = None
         # if len(weights) == 0:
         #     raise RuntimeError("Too few weights have been supplied")
-        if not expression.weight_set:
+        if isinstance(expression.correction, mg.Residual) \
+                or (isinstance(expression.correction, base.Multiplication)
+                    and part.can_be_partitioned(expression.correction.operand1)) and not expression.weight_set:
             head, *tail = weights
             expression._weight = head
             expression.weight_set = True
             expression.global_id = len(tail)
-            return set_weights(expression.correction, tail)
-        return set_weights(expression.correction, weights)
+        else:
+            tail = weights
+        return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)
         return set_weights(expression.iterate, tail)
@@ -48,7 +51,9 @@ def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, mg.Cycle):
         # Hack to change the weights after generation
-        if not expression.weight_obtained:
+        if isinstance(expression.correction, mg.Residual) \
+                or (isinstance(expression.correction, base.Multiplication)
+                    and part.can_be_partitioned(expression.correction.operand1)) and not expression.weight_obtained:
             weights.append(expression.weight)
             expression.weight_obtained = True
         weights.extend(obtain_weights(expression.correction))
@@ -85,7 +90,7 @@ class Optimizer:
 
     def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
         def evaluate(weights):
-            # restrict_weights(weights, 0.0, 2.0)
+            restrict_weights(weights, 0.0, 2.0)
             tail = set_weights(expression, weights)
             reset_status(expression)
             if len(tail) > 0:
@@ -110,8 +115,9 @@ class Optimizer:
         self._toolbox.register("evaluate", evaluate)
         parent = creator.Weights([1.0] * problem_size)
         parent.fitness.values = self._toolbox.evaluate(parent)
-        strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=lambda_)
-        # strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=200)
+        # strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=lambda_)
+        # strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=lambda_)
+        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         import numpy
         stats.register("avg", numpy.mean)
