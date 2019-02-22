@@ -88,9 +88,9 @@ class Optimizer:
         self._toolbox = deap.base.Toolbox()
         self._gp_optimizer = gp_optimizer
 
-    def optimize(self, expression: base.Expression, problem_size, lambda_, generations, base_program=None, storages=None):
+    def optimize(self, expression: base.Expression, problem_size, generations, base_program=None, storages=None):
         def evaluate(weights):
-            restrict_weights(weights, 0.0, 2.0)
+            # restrict_weights(weights, 0.0, 2.0)
             tail = set_weights(expression, weights)
             reset_status(expression)
             if len(tail) > 0:
@@ -116,7 +116,6 @@ class Optimizer:
         parent = creator.Weights([1.0] * problem_size)
         parent.fitness.values = self._toolbox.evaluate(parent)
         # strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=lambda_)
-        # strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=lambda_)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         import numpy
