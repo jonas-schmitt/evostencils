@@ -165,6 +165,7 @@ class ProgramGenerator:
 
     def generate_global_weight_initializations(self, weights):
         # Hack to change the weights after generation
+        weights = reversed(weights)
         path_to_file = f'{self.output_path}/generated/{self.problem_name}/Globals/Globals_initGlobals.cpp'
         subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -457,10 +458,11 @@ class ProgramGenerator:
             # weight = decimal.Decimal(expression.weight)
             weight = expression.weight
             # Hack to change the weights after generation
+
+            if use_global_weights and hasattr(expression, 'global_id'):
+                weight = f'omega_{expression.global_id}'
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
-                if use_global_weights and hasattr(expression, 'global_id'):
-                    weight = f'omega_{expression.global_id}'
                 new_iterate_str = expression.storage.to_exa3()
                 iterate_str = expression.iterate.storage.to_exa3()
                 stencil = expression.correction.operand1.generate_stencil()
