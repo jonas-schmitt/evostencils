@@ -409,7 +409,7 @@ class Optimizer:
             optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_generations,
                                                                                     base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                # weights.restrict_weights(optimized_weights, 0.0, 2.0)
+                weights.restrict_weights(optimized_weights, 0.0, 2.0)
                 weights.set_weights(cgs_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             iteration_matrix = transformations.get_iteration_matrix(cgs_expression)

@@ -5,9 +5,9 @@ from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.exastencils.generation import ProgramGenerator
 import os
-from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
-# from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
-#    import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
+from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
+   import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D_variable_coefficients \
 #    import InitializationInformation
@@ -35,12 +35,12 @@ def main():
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    problem_name = 'poisson_2D_constant'
-    # problem_name = 'poisson_2D_variable'
+    # problem_name = 'poisson_2D_constant'
+    problem_name = 'poisson_2D_variable'
     # problem_name = 'poisson_3D_constant'
     # problem_name = 'poisson_3D_variable'
-    stencil_generator = Poisson2D()
-    # stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
+    # stencil_generator = Poisson2D()
+    stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
     # stencil_generator = Poisson3D()
     # stencil_generator = Poisson3DVariableCoefficients(get_coefficient_3D, (0.5, 0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
@@ -82,8 +82,8 @@ def main():
     # restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    program, pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=20,
-                                                          es_generations=50, required_convergence=required_convergence,
+    program, pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100,
+                                                          es_generations=200, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)

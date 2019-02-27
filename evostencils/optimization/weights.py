@@ -25,9 +25,9 @@ def set_weights(expression: base.Expression, weights: list) -> list:
             expression.iteration_matrix = None
         # if len(weights) == 0:
         #     raise RuntimeError("Too few weights have been supplied")
-        #if isinstance(expression.correction, mg.Residual) \
-        #        or (isinstance(expression.correction, base.Multiplication)
-        #            and part.can_be_partitioned(expression.correction.operand1)) and \
+        # if isinstance(expression.correction, mg.Residual) \
+        #         or (isinstance(expression.correction, base.Multiplication)
+        #             and part.can_be_partitioned(expression.correction.operand1)) and \
         if not expression.weight_set:
             head, *tail = weights
             expression._weight = head
@@ -52,9 +52,9 @@ def obtain_weights(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, mg.Cycle):
         # Hack to change the weights after generation
-        #if isinstance(expression.correction, mg.Residual) \
-        #        or (isinstance(expression.correction, base.Multiplication)
-        #            and part.can_be_partitioned(expression.correction.operand1)) and
+        # if isinstance(expression.correction, mg.Residual) \
+        #         or (isinstance(expression.correction, base.Multiplication)
+        #             and part.can_be_partitioned(expression.correction.operand1)) and
         if not expression.weight_obtained:
             weights.append(expression.weight)
             expression.weight_obtained = True
@@ -92,7 +92,7 @@ class Optimizer:
 
     def optimize(self, expression: base.Expression, problem_size, generations, base_program=None, storages=None):
         def evaluate(weights):
-            # restrict_weights(weights, 0.0, 2.0)
+            restrict_weights(weights, 0.0, 2.0)
             tail = set_weights(expression, weights)
             reset_status(expression)
             if len(tail) > 0:
