@@ -1,6 +1,8 @@
 from deap import creator, tools, algorithms, cma
 from evostencils.expressions import base, multigrid as mg, transformations, partitioning as part
 import deap
+import numpy
+from math import log
 
 
 def reset_status(expression: base.Expression):
@@ -92,7 +94,7 @@ class Optimizer:
 
     def optimize(self, expression: base.Expression, problem_size, generations, base_program=None, storages=None):
         def evaluate(weights):
-            restrict_weights(weights, 0.0, 2.0)
+            # restrict_weights(weights, 0.0, 2.0)
             tail = set_weights(expression, weights)
             reset_status(expression)
             if len(tail) > 0:
@@ -115,12 +117,9 @@ class Optimizer:
                 else:
                     return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        parent = creator.Weights([1.0] * problem_size)
-        parent.fitness.values = self._toolbox.evaluate(parent)
-        # strategy = cma.StrategyOnePlusLambda(parent, sigma=0.5, lambda_=lambda_)
-        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5)
+        lambda_ = int((4 + 3 * log(problem_size)) * 2)
+        strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.25, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
-        import numpy
         stats.register("avg", numpy.mean)
         stats.register("std", numpy.std)
         stats.register("min", numpy.min)
@@ -130,3 +129,4 @@ class Optimizer:
         hof = tools.HallOfFame(1)
         algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         return hof[0]
+
