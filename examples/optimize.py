@@ -5,9 +5,9 @@ from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.exastencils.generation import ProgramGenerator
 import os
-# from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
-from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
-   import InitializationInformation
+from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
+#    import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D_variable_coefficients \
 #    import InitializationInformation
@@ -35,12 +35,12 @@ def main():
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    # problem_name = 'poisson_2D_constant'
-    problem_name = 'poisson_2D_variable'
+    problem_name = 'poisson_2D_constant'
+    # problem_name = 'poisson_2D_variable'
     # problem_name = 'poisson_3D_constant'
     # problem_name = 'poisson_3D_variable'
-    # stencil_generator = Poisson2D()
-    stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
+    stencil_generator = Poisson2D()
+    # stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
     # stencil_generator = Poisson3D()
     # stencil_generator = Poisson3DVariableCoefficients(get_coefficient_3D, (0.5, 0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
@@ -55,7 +55,7 @@ def main():
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
     infinity = 1e100
     epsilon = 1e-10
-    required_convergence = 0.5
+    required_convergence = 0.9
 
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz

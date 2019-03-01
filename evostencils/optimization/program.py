@@ -302,7 +302,7 @@ class Optimizer:
         return pop, logbook, hof
 
     def default_optimization(self, gp_mu=20, gp_lambda=20, gp_generations=20, gp_crossover_probability=0.7,
-                             gp_mutation_probability=0.3, es_generations=50, required_convergence=0.5,
+                             gp_mutation_probability=0.3, es_generations=50, required_convergence=0.9,
                              restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
         import math
@@ -314,7 +314,7 @@ class Optimizer:
         for i in range(1, levels + 1):
             grids.append(mg_exp.get_coarse_grid(grids[-1], self.coarsening_factor))
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
-        cgs_expression = None
+        best_expression = None
         storages = self._program_generator.generate_storage(levels)
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
@@ -338,7 +338,7 @@ class Optimizer:
             if restart_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     initial_population = checkpoint.population
-                    cgs_expression = checkpoint.solver
+                    best_expression = checkpoint.solver
                     gp_generations_remaining = gp_generations - checkpoint.generation
                 elif min_level > checkpoint.min_level:
                     continue
@@ -352,12 +352,12 @@ class Optimizer:
             restriction = mg_exp.get_restriction(grids[i], grids[i+levels_per_run-1], self.restriction.stencil_generator)
             pset = multigrid.generate_primitive_set(operator, grid, rhs, self.dimension, self.coarsening_factor,
                                                     interpolation, restriction,
-                                                    coarse_grid_solver_expression=cgs_expression,
+                                                    coarse_grid_solver_expression=best_expression,
                                                     depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                     LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations_remaining, gp_mu, gp_lambda, gp_crossover_probability,
-                                        gp_mutation_probability, min_level, max_level, solver_program, cgs_expression,
+                                        gp_mutation_probability, min_level, max_level, solver_program, best_expression,
                                         checkpoint_frequency=5, initial_population=initial_population)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
@@ -365,7 +365,7 @@ class Optimizer:
 
             def key_function(ind):
                 rho = ind.fitness.values[0]
-                if rho <= required_convergence:
+                if rho < 1.0:
                     tmp = math.log(self.epsilon) / math.log(rho)
                     tmp = tmp * ind.fitness.values[1]
                     return tmp
@@ -379,7 +379,7 @@ class Optimizer:
             if self._program_generator.compiler_available:
                 count = 0
                 for j in range(len(hof)):
-                    if count == 100:
+                    if count == 50:
                         break
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon and \
                             abs(hof[j].fitness.values[1] - hof[j+1].fitness.values[1] < self.epsilon):
@@ -390,33 +390,32 @@ class Optimizer:
                     # print(evaluation_program)
                     self._program_generator.write_program_to_file(evaluation_program)
                     time_to_solution, convergence_factor = self._program_generator.evaluate(number_of_samples=10)
-                    print(f'Time to solution: {time_to_solution}')
+                    print(f'Time to solution: {time_to_solution}, Convergence factor: {convergence_factor}')
                     self._program_generator.invalidate_storages(storages)
-                    if time_to_solution < best_time and convergence_factor < 1:
+                    if time_to_solution < best_time and convergence_factor < required_convergence:
                         best_time = time_to_solution
                         best_convergence_factor = convergence_factor
                         best_individual = ind
                     count += 1
-                    if best_convergence_factor >= 1 or math.isnan(best_convergence_factor) \
-                            or math.isinf(best_convergence_factor):
-                        raise RuntimeError("None of the generated solvers did converge. Optimization failed.")
+                if not best_convergence_factor < required_convergence or math.isnan(best_convergence_factor) \
+                        or math.isinf(best_convergence_factor):
+                    raise RuntimeError("None of the generated solvers did achieve satisfactory convergence. "
+                                       "Optimization failed.")
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
-            cgs_expression = best_expression
-            cgs_expression.evaluate = False
+            best_expression.evaluate = False
 
-            optimized_weights, optimized_convergence_factor = self.optimize_weights(cgs_expression, es_generations,
+            optimized_weights, optimized_convergence_factor = self.optimize_weights(best_expression, es_generations,
                                                                                     base_program, storages)
             if optimized_convergence_factor < best_convergence_factor:
-                # weights.restrict_weights(optimized_weights, 0.0, 2.0)
-                weights.set_weights(cgs_expression, optimized_weights)
+                weights.set_weights(best_expression, optimized_weights)
                 print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
-            iteration_matrix = transformations.get_iteration_matrix(cgs_expression)
+            iteration_matrix = transformations.get_iteration_matrix(best_expression)
             # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-            self.performance_evaluator.estimate_runtime(cgs_expression)
+            self.performance_evaluator.estimate_runtime(best_expression)
             try:
-                solver_program += self._program_generator.generate_cycle_function(cgs_expression, storages)
+                solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
             except Exception as e:
                 print('Ungeneratable program')
                 print(e)
