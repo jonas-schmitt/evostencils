@@ -5,44 +5,44 @@ from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.exastencils.generation import ProgramGenerator
 import os
-from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
+# from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
 #    import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
-# from evostencils.exastencils.gallery.finite_differences.poisson_3D_variable_coefficients \
-#    import InitializationInformation
+from evostencils.exastencils.gallery.finite_differences.poisson_3D_variable_coefficients \
+   import InitializationInformation
 import pickle
 import lfa_lab as lfa
 import sys
 
 
 def main():
-    dimension = 2
-    # dimension = 3
-    min_level = 2
-    max_level = 10
-    # min_level = 3
-    # max_level = 7
+    # dimension = 2
+    dimension = 3
+    # min_level = 2
+    # max_level = 10
+    min_level = 3
+    max_level = 7
     size = 2**max_level
-    grid_size = (size, size)
-    # grid_size = (size, size, size)
+    # grid_size = (size, size)
+    grid_size = (size, size, size)
     h = 1/(2**max_level)
-    step_size = (h, h)
-    # step_size = (h, h, h)
-    coarsening_factor = (2, 2)
-    # coarsening_factor = (2, 2, 2)
+    # step_size = (h, h)
+    step_size = (h, h, h)
+    # coarsening_factor = (2, 2)
+    coarsening_factor = (2, 2, 2)
 
     u = base.generate_grid('u', grid_size, step_size)
     b = base.generate_rhs('f', grid_size, step_size)
 
-    problem_name = 'poisson_2D_constant'
+    # problem_name = 'poisson_2D_constant'
     # problem_name = 'poisson_2D_variable'
     # problem_name = 'poisson_3D_constant'
-    # problem_name = 'poisson_3D_variable'
-    stencil_generator = Poisson2D()
+    problem_name = 'poisson_3D_variable'
+    # stencil_generator = Poisson2D()
     # stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
     # stencil_generator = Poisson3D()
-    # stencil_generator = Poisson3DVariableCoefficients(get_coefficient_3D, (0.5, 0.5, 0.5))
+    stencil_generator = Poisson3DVariableCoefficients(get_coefficient_3D, (0.5, 0.5, 0.5))
     interpolation_generator = InterpolationGenerator(coarsening_factor)
     restriction_generator = RestrictionGenerator(coarsening_factor)
 

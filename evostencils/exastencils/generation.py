@@ -421,7 +421,7 @@ class ProgramGenerator:
     def generate_coarse_grid_solver(self, expression: base.Expression, storages: [CycleStorage]):
         # TODO replace hard coded RB-GS by generic implementation
         i = expression.storage.level
-        n = 1000
+        n = 100
         program = f'\t{storages[i].solution.to_exa3()} = 0\n'
         program += f'\trepeat {n} times {{\n'
         program += f'\t\t{storages[i].solution.to_exa3()} ' \

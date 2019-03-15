@@ -222,7 +222,7 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+    def nsgaII(self, initial_population_size, min_generation, max_generation, mu_, lambda_, crossover_probability, mutation_probability,
                min_level, max_level, program, solver, checkpoint_frequency=5, initial_population=None):
         random.seed()
         if initial_population is None:
@@ -267,7 +267,7 @@ class Optimizer:
         print(logbook.stream)
 
         # Begin the generational process
-        for gen in range(1, generations + 1):
+        for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
             offspring = tools.selTournamentDCD(pop, 4 * (lambda_ // 4))
             offspring = [toolbox.clone(ind) for ind in offspring]
@@ -306,7 +306,9 @@ class Optimizer:
                              restart_from_checkpoint=False):
         from evostencils.expressions import multigrid as mg_exp
         import math
-        gp_generations_remaining = gp_generations
+
+        gp_min_generation = 0
+        gp_max_generation = gp_generations
         levels = self.max_level - self.min_level
         levels_per_run = 2
         grids = [self.grid]
@@ -339,12 +341,12 @@ class Optimizer:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     initial_population = checkpoint.population
                     best_expression = checkpoint.solver
-                    gp_generations_remaining = gp_generations - checkpoint.generation
+                    gp_min_generation = checkpoint.generation
+                    gp_max_generation = gp_generations
                 elif min_level > checkpoint.min_level:
                     continue
                 else:
                     initial_population = None
-                    gp_generations_remaining = gp_generations
             grid = grids[i]
             rhs = right_hand_sides[i]
             operator = mg_exp.get_coarse_operator(self.operator, grid)
@@ -356,7 +358,7 @@ class Optimizer:
                                                     depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                     LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
-            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations_remaining, gp_mu, gp_lambda, gp_crossover_probability,
+            pop, log, hof = self.nsgaII(10 * gp_mu, gp_min_generation, gp_max_generation, gp_mu, gp_lambda, gp_crossover_probability,
                                         gp_mutation_probability, min_level, max_level, solver_program, best_expression,
                                         checkpoint_frequency=5, initial_population=initial_population)
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
