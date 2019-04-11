@@ -471,7 +471,7 @@ class Optimizer:
 
         ax2 = ax1.twinx()
         line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
-        ax2.set_ylabel("Runtime", color="r")
+        ax2.set_ylabel("Runtime (ms)", color="r")
         for tl in ax2.get_yticklabels():
             tl.set_color("r")
 
@@ -486,14 +486,14 @@ class Optimizer:
         gen = logbook.select("gen")
         convergence_mins = logbook.chapters["convergence"].select("min")
         runtime_mins = logbook.chapters["runtime"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Runtime')
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Estimated Runtime per Iteration')
 
     @staticmethod
     def plot_average_fitness(logbook):
         gen = logbook.select("gen")
         convergence_avgs = logbook.chapters["convergence"].select("avg")
         runtime_avgs = logbook.chapters["runtime"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Runtime')
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Estimated Runtime per Iteration')
 
     @staticmethod
     def plot_pareto_front(pop):
@@ -504,7 +504,7 @@ class Optimizer:
         front = numpy.array([ind.fitness.values for ind in pop])
         plt.scatter(front[:, 0], front[:, 1], c="b")
         plt.xlabel("Spectral Radius")
-        plt.ylabel("Runtime")
+        plt.ylabel("Runtime (ms)")
         plt.axis("tight")
         plt.show()
 
