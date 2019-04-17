@@ -146,7 +146,7 @@ def get_iteration_matrix(expression: base.Expression):
             iteration_matrix = result
     elif isinstance(result, base.ZeroGrid) or isinstance(result, base.RightHandSide):
         iteration_matrix = base.ZeroOperator((result.shape[0], result.shape[0]), result)
-    elif isinstance(result, base.Grid):
+    elif isinstance(result, base.Approximation):
         iteration_matrix = base.Identity((result.shape[0], result.shape[0]), result)
     else:
         iteration_matrix = result
@@ -157,7 +157,7 @@ def get_iteration_matrix(expression: base.Expression):
 def obtain_iterate(expression: base.Expression):
     if isinstance(expression, base.BinaryExpression):
         return obtain_iterate(expression.operand2)
-    elif isinstance(expression, base.Grid):
+    elif isinstance(expression, base.Approximation):
         return expression
 
 

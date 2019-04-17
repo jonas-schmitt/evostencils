@@ -134,7 +134,7 @@ class RooflineEvaluator:
                     runtime += tmp
             tmp = self.estimate_runtime(expression.operand2)
             runtime += tmp
-        elif isinstance(expression, base.Grid):
+        elif isinstance(expression, base.Approximation):
             pass
         else:
             print(type(expression))

@@ -143,7 +143,30 @@ class ZeroOperator(Operator):
         return f'ZeroOperator({repr(self.shape)}, {repr(self.grid)})'
 
 
-class Grid(Entity):
+class Grid:
+    def __init__(self, size, step_size):
+        assert len(size) == len(step_size), "Dimensions of the size and step size must match"
+        self._size = size
+        self._step_size = step_size
+
+    @property
+    def size(self):
+        return self._size
+
+    @property
+    def step_size(self):
+        return self._step_size
+
+    @property
+    def dimension(self):
+        return len(self.size)
+
+    def __eq__(self, other):
+        if isinstance(other, Grid):
+            return self.size == other.size and self.step_size == other.step_size
+
+
+class Approximation(Entity):
     def __init__(self, name, size, step_size):
         assert len(size) == len(step_size), "Dimensions of the size and step size must match"
         import operator
@@ -154,7 +177,7 @@ class Grid(Entity):
         super().__init__()
 
     def __eq__(self, other):
-        if not isinstance(other, Grid):
+        if not isinstance(other, Approximation):
             return False
         return self.name == other.name and self.size == other.size and self.step_size == other.step_size
 
@@ -185,7 +208,7 @@ class Grid(Entity):
         return f'Grid({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
 
 
-class RightHandSide(Grid):
+class RightHandSide(Approximation):
 
     def __eq__(self, other):
         if not isinstance(other, RightHandSide):
@@ -199,7 +222,7 @@ class RightHandSide(Grid):
         return f'RightHandSide({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
 
 
-class ZeroGrid(Grid):
+class ZeroGrid(Approximation):
 
     def generate_stencil(self):
         return constant.get_null_stencil(self)
@@ -439,15 +462,15 @@ def minus(operand):
     return Scaling(-1, operand)
 
 
-def generate_grid(name: str, grid_size: tuple, step_size: tuple) -> Grid:
-    return Grid(name, grid_size, step_size)
+def generate_grid(name: str, grid_size: tuple, step_size: tuple) -> Approximation:
+    return Approximation(name, grid_size, step_size)
 
 
-def generate_rhs(name: str, grid_size: tuple, step_size: tuple) -> Grid:
+def generate_rhs(name: str, grid_size: tuple, step_size: tuple) -> Approximation:
     return RightHandSide(name, grid_size, step_size)
 
 
-def generate_operator_on_grid(name: str, grid: Grid, stencil_generator: callable) -> Operator:
+def generate_operator_on_grid(name: str, grid: Approximation, stencil_generator: callable) -> Operator:
     return Operator(name, (grid.shape[0], grid.shape[0]), grid, stencil_generator)
 
 

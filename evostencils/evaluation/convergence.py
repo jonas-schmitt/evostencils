@@ -56,7 +56,7 @@ class ConvergenceEvaluator:
     def lfa_restriction_generator(self):
         return self._lfa_restriction_generator
 
-    def get_lfa_grid(self, u: base.Grid):
+    def get_lfa_grid(self, u: base.Approximation):
         grid = self.finest_grid
         while grid.step_size() < u.step_size:
             grid = grid.coarse(self.coarsening_factor)
@@ -146,6 +146,7 @@ class ConvergenceEvaluator:
         from queue import Empty
         try:
             lfa_expression = self.transform(iteration_matrix)
+
             def evaluate(q, expr):
                 try:
                     s = expr.symbol()

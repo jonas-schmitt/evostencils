@@ -32,7 +32,7 @@ def load_checkpoint_from_file(filename):
 
 
 class Optimizer:
-    def __init__(self, op: base.Operator, grid: base.Grid, rhs: base.Grid, dimension, coarsening_factor,
+    def __init__(self, op: base.Operator, grid: base.Approximation, rhs: base.Approximation, dimension, coarsening_factor,
                  interpolation, restriction, min_level, max_level, convergence_evaluator=None, performance_evaluator=None,
                  program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
@@ -79,11 +79,11 @@ class Optimizer:
         return self._operator
 
     @property
-    def grid(self) -> base.Grid:
+    def grid(self) -> base.Approximation:
         return self._grid
 
     @property
-    def rhs(self) -> base.Grid:
+    def rhs(self) -> base.Approximation:
         return self._rhs
 
     @property

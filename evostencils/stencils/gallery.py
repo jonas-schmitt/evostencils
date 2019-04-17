@@ -191,7 +191,7 @@ class InterpolationGenerator:
     def __init__(self, coarsening_factor):
         self.coarsening_factor = coarsening_factor
 
-    def generate_stencil(self, grid: base.Grid):
+    def generate_stencil(self, grid: base.Approximation):
         import lfa_lab as lfa
         from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
         lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
@@ -208,7 +208,7 @@ class RestrictionGenerator:
     def __init__(self, coarsening_factor):
         self.coarsening_factor = coarsening_factor
 
-    def generate_stencil(self, grid: base.Grid):
+    def generate_stencil(self, grid: base.Approximation):
         import lfa_lab as lfa
         from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
         lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
@@ -225,7 +225,7 @@ class IdentityGenerator:
         self.dimension = dimension
 
     @staticmethod
-    def generate_stencil(grid: base.Grid):
+    def generate_stencil(grid: base.Approximation):
         return constant.get_unit_stencil(grid)
 
     def generate_exa3(self, name):

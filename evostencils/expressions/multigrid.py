@@ -199,20 +199,20 @@ def residual(operator, iterate, rhs):
     return Residual(operator, iterate, rhs)
 
 
-def get_interpolation(grid: base.Grid, coarse_grid: base.Grid, stencil_generator=None):
+def get_interpolation(grid: base.Approximation, coarse_grid: base.Approximation, stencil_generator=None):
     return Interpolation('P', grid, coarse_grid, stencil_generator)
 
 
-def get_restriction(grid: base.Grid, coarse_grid: base.Grid, stencil_generator=None):
+def get_restriction(grid: base.Approximation, coarse_grid: base.Approximation, stencil_generator=None):
     return Restriction('R', grid, coarse_grid, stencil_generator)
 
 
-def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
+def get_coarse_grid(grid: base.Approximation, coarsening_factor: tuple):
     from functools import reduce
     import operator
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
     coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
-    return base.Grid(f'{grid.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
+    return base.Approximation(f'{grid.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
 
 
 def get_coarse_rhs(rhs: base.RightHandSide, coarsening_factor: tuple):

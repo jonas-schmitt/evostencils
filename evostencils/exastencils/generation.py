@@ -33,7 +33,7 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Grid, rhs: base.Grid,
+    def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Approximation, rhs: base.Approximation,
                  identity: base.Identity, interpolation: mg.Interpolation, restriction: mg.Restriction,
                  dimension, coarsening_factor, min_level, max_level, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
@@ -344,7 +344,7 @@ class ProgramGenerator:
         elif isinstance(node, base.RightHandSide):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].rhs
-        elif isinstance(node, base.Grid) or isinstance(node, base.ZeroGrid):
+        elif isinstance(node, base.Approximation) or isinstance(node, base.ZeroGrid):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].solution
 
@@ -592,7 +592,7 @@ class ProgramGenerator:
             program = f'1'
         elif isinstance(expression, base.Operator):
             program = f'{expression.name}@(finest - {self.determine_operator_level(expression, storages)})'
-        elif isinstance(expression, base.Grid):
+        elif isinstance(expression, base.Approximation):
             pass
             # program = f'{expression.storage.to_exa3()}'
         else:
