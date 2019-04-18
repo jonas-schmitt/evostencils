@@ -32,8 +32,9 @@ def main():
     coarsening_factor = (2, 2)
     # coarsening_factor = (2, 2, 2)
 
-    u = base.generate_grid('u', grid_size, step_size)
-    b = base.generate_rhs('f', grid_size, step_size)
+    grid = base.Grid(grid_size, step_size)
+    u = base.Approximation('u', grid)
+    b = base.RightHandSide('f', grid)
 
     problem_name = 'poisson_2D_constant'
     # problem_name = 'poisson_2D_variable'
@@ -46,10 +47,10 @@ def main():
     interpolation_generator = InterpolationGenerator(coarsening_factor)
     restriction_generator = RestrictionGenerator(coarsening_factor)
 
-    A = base.generate_operator_on_grid('A', u, stencil_generator)
-    I = base.Identity(A.shape, u)
-    P = multigrid.get_interpolation(u, multigrid.get_coarse_grid(u, coarsening_factor), interpolation_generator)
-    R = multigrid.get_restriction(u, multigrid.get_coarse_grid(u, coarsening_factor), restriction_generator)
+    A = base.Operator('A', grid, stencil_generator)
+    I = base.Identity(grid)
+    P = multigrid.Interpolation('P', grid, multigrid.get_coarse_grid(grid, coarsening_factor), interpolation_generator)
+    R = multigrid.Restriction('R', grid, multigrid.get_coarse_grid(grid, coarsening_factor), restriction_generator)
 
     lfa_grid = lfa.Grid(dimension, step_size)
     convergence_evaluator = ConvergenceEvaluator(lfa_grid, coarsening_factor, dimension, lfa.gallery.ml_interpolation, lfa.gallery.fw_restriction)
@@ -78,12 +79,12 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
+    restart_from_checkpoint = True
+    # restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
     program, pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=10,
-                                                          es_generations=20, required_convergence=required_convergence,
+                                                          es_generations=2, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)

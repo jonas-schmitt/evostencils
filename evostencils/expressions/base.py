@@ -97,10 +97,12 @@ class BinaryExpression(Expression):
 
 # Entities
 class Operator(Entity):
-    def __init__(self, name, shape, grid, stencil_generator):
+    def __init__(self, name, grid, stencil_generator):
+        import operator
         self._name = name
-        self._shape = shape
         self._grid = grid
+        tmp = reduce(operator.mul, grid.size)
+        self._shape = (tmp, tmp)
         self._stencil_generator = stencil_generator
         super().__init__()
 
@@ -123,24 +125,24 @@ class Operator(Entity):
         return self._stencil_generator.generate_exa3(self._name)
 
     def __repr__(self):
-        return f'Operator({repr(self.name)}, {repr(self.shape)}, {repr(self.shape)}, {repr(self._stencil_generator)})'
+        return f'Operator({repr(self.name)}, {repr(self.grid)}, {repr(self._stencil_generator)})'
 
 
 class Identity(Operator):
-    def __init__(self, shape, grid):
+    def __init__(self, grid):
         from evostencils.stencils.gallery import IdentityGenerator
-        super().__init__('I', shape, grid, IdentityGenerator(grid.dimension))
+        super().__init__('I', grid, IdentityGenerator(grid.dimension))
 
     def __repr__(self):
-        return f'Identity({repr(self.shape)}, {repr(self.grid)})'
+        return f'Identity({repr(self.grid)})'
 
 
 class ZeroOperator(Operator):
-    def __init__(self, shape, grid):
-        super().__init__('0', shape, grid, constant.get_null_stencil)
+    def __init__(self, grid):
+        super().__init__('0', grid, constant.get_null_stencil)
 
     def __repr__(self):
-        return f'ZeroOperator({repr(self.shape)}, {repr(self.grid)})'
+        return f'ZeroOperator({repr(self.grid)})'
 
 
 class Grid:
@@ -165,25 +167,22 @@ class Grid:
         if isinstance(other, Grid):
             return self.size == other.size and self.step_size == other.step_size
 
+    def __repr__(self):
+        return f'Grid({repr(self.size)}, {repr(self.step_size)}'
+
 
 class Approximation(Entity):
-    def __init__(self, name, size, step_size):
-        assert len(size) == len(step_size), "Dimensions of the size and step size must match"
+    def __init__(self, name, grid):
         import operator
         self._name = name
-        self._size = size
-        self._step_size = step_size
-        self._shape = (reduce(operator.mul, size), 1)
+        self._grid = grid
+        self._shape = (reduce(operator.mul, grid.size), 1)
         super().__init__()
 
     def __eq__(self, other):
         if not isinstance(other, Approximation):
             return False
-        return self.name == other.name and self.size == other.size and self.step_size == other.step_size
-
-    @property
-    def size(self):
-        return self._size
+        return self.name == other.name and self.grid == other.grid
 
     @property
     def predecessor(self):
@@ -191,47 +190,44 @@ class Approximation(Entity):
 
     @property
     def grid(self):
-        return self
-
-    @property
-    def step_size(self):
-        return self._step_size
+        return self._grid
 
     @property
     def dimension(self):
-        return len(self.size)
+        return len(self.grid.dimension)
 
     def generate_stencil(self):
         return constant.get_unit_stencil(self)
 
     def __repr__(self):
-        return f'Grid({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
+        return f'Approximation({repr(self.name)}, {repr(self.grid)})'
 
 
 class RightHandSide(Approximation):
 
     def __eq__(self, other):
-        if not isinstance(other, RightHandSide):
+        if isinstance(other, RightHandSide):
+            return self == other
+        else:
             return False
-        return self.name == other.name and self.size == other.size and self.step_size == other.step_size
 
     def generate_stencil(self):
         return constant.get_null_stencil(self)
 
     def __repr__(self):
-        return f'RightHandSide({repr(self.name)}, {repr(self.size)}, {repr(self.step_size)})'
+        return f'RightHandSide({repr(self.name)}, {repr(self.grid)})'
 
 
-class ZeroGrid(Approximation):
+class ZeroApproximation(Approximation):
 
     def generate_stencil(self):
         return constant.get_null_stencil(self)
 
-    def __init__(self, size, step_size):
-        super(ZeroGrid, self).__init__('0', size, step_size)
+    def __init__(self, grid):
+        super(ZeroApproximation, self).__init__('0', grid)
 
     def __repr__(self):
-        return f'ZeroGrid({repr(self.size)}, {repr(self.step_size)})'
+        return f'ZeroApproximation({repr(self.grid)})'
 
 
 # Unary Expressions
@@ -371,7 +367,7 @@ class Subtraction(BinaryExpression):
 class Multiplication(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        #assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
+        assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
@@ -460,18 +456,6 @@ def scale(factor, operand):
 
 def minus(operand):
     return Scaling(-1, operand)
-
-
-def generate_grid(name: str, grid_size: tuple, step_size: tuple) -> Approximation:
-    return Approximation(name, grid_size, step_size)
-
-
-def generate_rhs(name: str, grid_size: tuple, step_size: tuple) -> Approximation:
-    return RightHandSide(name, grid_size, step_size)
-
-
-def generate_operator_on_grid(name: str, grid: Approximation, stencil_generator: callable) -> Operator:
-    return Operator(name, (grid.shape[0], grid.shape[0]), grid, stencil_generator)
 
 
 def is_quadratic(expression: Expression) -> bool:

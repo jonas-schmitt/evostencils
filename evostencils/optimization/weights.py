@@ -13,7 +13,7 @@ def reset_status(expression: base.Expression):
         return reset_status(expression.correction)
     elif isinstance(expression, mg.Residual):
         reset_status(expression.rhs)
-        reset_status(expression.iterate)
+        reset_status(expression.approximation)
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
         reset_status(expression.operand)
     elif isinstance(expression, base.BinaryExpression):
@@ -40,7 +40,7 @@ def set_weights(expression: base.Expression, weights: list) -> list:
         return set_weights(expression.correction, tail)
     elif isinstance(expression, mg.Residual):
         tail = set_weights(expression.rhs, weights)
-        return set_weights(expression.iterate, tail)
+        return set_weights(expression.approximation, tail)
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
         return set_weights(expression.operand, weights)
     elif isinstance(expression, base.BinaryExpression):
@@ -64,7 +64,7 @@ def obtain_weights(expression: base.Expression) -> list:
         return weights
     elif isinstance(expression, mg.Residual):
         weights.extend(obtain_weights(expression.rhs))
-        weights.extend(obtain_weights(expression.iterate))
+        weights.extend(obtain_weights(expression.approximation))
         return weights
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
         weights.extend(obtain_weights(expression.operand))

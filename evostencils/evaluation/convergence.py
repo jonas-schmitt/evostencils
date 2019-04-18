@@ -1,7 +1,7 @@
 import lfa_lab
 import evostencils.stencils.periodic as periodic
 import evostencils.stencils.constant as constant
-from evostencils.expressions import base, multigrid, transformations
+from evostencils.expressions import base, multigrid, partitioning
 
 
 @periodic.convert_constant_stencils
@@ -56,30 +56,35 @@ class ConvergenceEvaluator:
     def lfa_restriction_generator(self):
         return self._lfa_restriction_generator
 
-    def get_lfa_grid(self, u: base.Approximation):
+    def get_lfa_grid(self, u: base.Grid):
         grid = self.finest_grid
-        while grid.step_size() < u.step_size:
+        step_size = grid.step_size()
+        while step_size < u.step_size:
             grid = grid.coarse(self.coarsening_factor)
+            step_size = grid.step_size()
         return grid
 
     def transform(self, expression: base.Expression):
         if expression.lfa_symbol is not None:
             return expression.lfa_symbol
         if isinstance(expression, multigrid.Cycle):
-            identity = base.Identity(expression.iterate.shape, expression.grid)
+            identity = base.Identity(expression.grid)
             tmp = base.Addition(identity, base.Scaling(expression.weight, expression.correction))
             stencil = tmp.generate_stencil()
             partition_stencils = expression.partitioning.generate(stencil, expression.grid)
             if len(partition_stencils) == 1:
                 result = self.transform(expression.generate_expression())
             elif len(partition_stencils) == 2:
-                u = self.transform(expression.iterate)
-                correction = self.transform(expression.correction)
-                cycle = u + expression.weight * correction
-                lfa_grid = self.get_lfa_grid(expression.grid)
-                partition_stencils = [stencil_to_lfa(s, lfa_grid) for s in partition_stencils]
-                result = (partition_stencils[0] + partition_stencils[1] * cycle) \
-                    * (partition_stencils[1] + partition_stencils[0] * cycle)
+                try:
+                    u = self.transform(expression.approximation)
+                    correction = self.transform(expression.correction)
+                    cycle = u + expression.weight * correction
+                    lfa_grid = self.get_lfa_grid(expression.correction.grid)
+                    partition_stencils = [stencil_to_lfa(s, lfa_grid) for s in partition_stencils]
+                    result = (partition_stencils[0] + partition_stencils[1] * cycle) * \
+                             (partition_stencils[1] + partition_stencils[0] * cycle)
+                except RuntimeError as _:
+                    result = self.transform(expression.generate_expression())
             else:
                 raise NotImplementedError("Not implemented")
         elif isinstance(expression, base.BinaryExpression):
@@ -144,21 +149,23 @@ class ConvergenceEvaluator:
     def compute_spectral_radius(self, iteration_matrix: base.Expression):
         from multiprocessing import Process, Queue
         from queue import Empty
-        try:
-            lfa_expression = self.transform(iteration_matrix)
+        # try:
+        lfa_expression = self.transform(iteration_matrix)
+        return lfa_expression.symbol().spectral_radius()
 
-            def evaluate(q, expr):
-                try:
-                    s = expr.symbol()
-                    q.put(s.spectral_radius())
-                except (ArithmeticError, RuntimeError, MemoryError) as _:
-                    q.put(0.0)
+        def evaluate(q, expr):
+            # try:
+            s = expr.symbol()
+            q.put(s.spectral_radius())
 
-            queue = Queue()
-            p = Process(target=evaluate, args=(queue, lfa_expression))
-            p.start()
-            p.join()
-            result = queue.get(timeout=1)
-            return result
-        except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
-            return 0.0
+        # except (ArithmeticError, RuntimeError, MemoryError) as _:
+        #     q.put(0.0)
+
+        queue = Queue()
+        p = Process(target=evaluate, args=(queue, lfa_expression))
+        p.start()
+        p.join()
+        result = queue.get(timeout=1)
+        return result
+    # except (ArithmeticError, RuntimeError, MemoryError, Empty) as e:
+    #     return 0.0

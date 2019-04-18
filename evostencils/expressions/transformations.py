@@ -90,18 +90,18 @@ def get_iteration_matrix(expression: base.Expression):
         return expression.iteration_matrix
     result = expression.apply(get_iteration_matrix)
     if isinstance(result, mg.Cycle):
-        if isinstance(result.iterate, base.ZeroOperator):
+        if isinstance(result.approximation, base.ZeroOperator):
             iteration_matrix = base.scale(result.weight, result.correction)
         elif isinstance(result.correction, base.ZeroOperator):
-            iteration_matrix = result.iterate
+            iteration_matrix = result.approximation
         else:
             iteration_matrix = result
     elif isinstance(result, mg.Residual):
         operand1 = result.rhs
-        if isinstance(result.iterate, base.ZeroOperator):
-            operand2 = result.iterate
+        if isinstance(result.approximation, base.ZeroOperator):
+            operand2 = result.approximation
         else:
-            operand2 = base.mul(result.operator, result.iterate)
+            operand2 = base.mul(result.operator, result.approximation)
         # Inefficient but sufficient for now
         if isinstance(operand1, base.ZeroOperator):
             if isinstance(operand2, base.ZeroOperator):
@@ -132,7 +132,7 @@ def get_iteration_matrix(expression: base.Expression):
             iteration_matrix = result
     elif isinstance(result, base.Multiplication):
         if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
-            iteration_matrix=  base.ZeroOperator(result.shape, result.grid)
+            iteration_matrix = base.ZeroOperator(result.grid)
         elif isinstance(result.operand1, base.Identity):
             iteration_matrix = result.operand2
         elif isinstance(result.operand2, base.Identity):
@@ -144,10 +144,10 @@ def get_iteration_matrix(expression: base.Expression):
             iteration_matrix = result.operand
         else:
             iteration_matrix = result
-    elif isinstance(result, base.ZeroGrid) or isinstance(result, base.RightHandSide):
-        iteration_matrix = base.ZeroOperator((result.shape[0], result.shape[0]), result)
+    elif isinstance(result, base.ZeroApproximation) or isinstance(result, base.RightHandSide):
+        iteration_matrix = base.ZeroOperator(result.grid)
     elif isinstance(result, base.Approximation):
-        iteration_matrix = base.Identity((result.shape[0], result.shape[0]), result)
+        iteration_matrix = base.Identity(result.grid)
     else:
         iteration_matrix = result
     expression.iteration_matrix = iteration_matrix
@@ -164,8 +164,8 @@ def obtain_iterate(expression: base.Expression):
 def repeat(cycle: mg.Cycle, times):
     def replace_iterate(expression: base.Expression, iterate, new_iterate):
         if isinstance(expression, mg.Residual):
-            if expression.iterate.grid.size == iterate.grid.size \
-                    and expression.iterate.grid.step_size == iterate.grid.step_size:
+            if expression.approximation.approximation.size == iterate.approximation.size \
+                    and expression.approximation.approximation.step_size == iterate.approximation.step_size:
                 return mg.Residual(expression.operator, new_iterate, expression.rhs)
             else:
                 return expression.apply(replace_iterate, iterate, new_iterate)
@@ -173,7 +173,7 @@ def repeat(cycle: mg.Cycle, times):
             return expression.apply(replace_iterate, iterate, new_iterate)
     new_cycle = cycle
     for _ in range(1, times):
-        new_correction = replace_iterate(new_cycle.correction, new_cycle.iterate, new_cycle)
+        new_correction = replace_iterate(new_cycle.correction, new_cycle.approximation, new_cycle)
         new_cycle = mg.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
                              weight=new_cycle.weight, predecessor=new_cycle.predecessor)
     return new_cycle
@@ -182,18 +182,18 @@ def repeat(cycle: mg.Cycle, times):
 def simplify_iteration_matrix(expression: base.Expression):
     def replace_iterate_with_mutation(expression: base.Expression, iterate, new_iterate):
         if isinstance(expression, mg.Residual):
-            if expression.iterate.grid.size == iterate.grid.size \
-                    and expression.iterate.grid.step_size == iterate.grid.step_size:
-                expression._iterate = new_iterate
+            if expression.approximation.approximation.size == iterate.approximation.size \
+                    and expression.approximation.approximation.step_size == iterate.approximation.step_size:
+                expression._approximation = new_iterate
             else:
                 expression.mutate(replace_iterate_with_mutation, iterate, new_iterate)
         else:
             expression.mutate(replace_iterate_with_mutation, iterate, new_iterate)
 
-    if isinstance(expression, mg.Cycle) and not isinstance(expression.iterate, base.Identity):
-        I = base.Identity(expression.iterate.shape, expression.iterate.grid)
-        iterate = expression.iterate
-        expression._iterate = I
+    if isinstance(expression, mg.Cycle) and not isinstance(expression.approximation, base.Identity):
+        I = base.Identity(expression.approximation.shape, expression.approximation.approximation)
+        iterate = expression.approximation
+        expression._approximation = I
         replace_iterate_with_mutation(expression.correction, iterate, I)
         new_iterate = simplify_iteration_matrix(iterate)
         return base.mul(new_iterate, expression)
@@ -215,11 +215,11 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
             else:
                 new_size = current_size
                 new_level = current_level
-            level_iterate = recursive_descent(expression.iterate, new_size, new_level)
+            level_iterate = recursive_descent(expression.approximation, new_size, new_level)
             level_correction = recursive_descent(expression.correction, new_size, new_level)
             return max(level_iterate, level_correction)
         elif isinstance(expression, mg.Residual):
-            level_iterate = recursive_descent(expression.iterate, current_size, current_level)
+            level_iterate = recursive_descent(expression.approximation, current_size, current_level)
             level_rhs = recursive_descent(expression.rhs, current_size, current_level)
             return max(level_iterate, level_rhs)
         elif isinstance(expression, base.BinaryExpression):

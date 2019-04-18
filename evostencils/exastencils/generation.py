@@ -33,14 +33,14 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, grid: base.Approximation, rhs: base.Approximation,
+    def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, approximation: base.Approximation, rhs: base.Approximation,
                  identity: base.Identity, interpolation: mg.Interpolation, restriction: mg.Restriction,
                  dimension, coarsening_factor, min_level, max_level, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
         self._output_path = output_path
         self._operator = op
-        self._grid = grid
+        self._approximation = approximation
         self._rhs = rhs
         self._identity = identity
         self._interpolation = interpolation
@@ -78,7 +78,7 @@ class ProgramGenerator:
 
     @property
     def grid(self):
-        return self._grid
+        return self._approximation
 
     @property
     def rhs(self):
@@ -269,11 +269,11 @@ class ProgramGenerator:
                 else:
                     new_size = current_size
                     new_level = current_level
-                level_iterate = recursive_descent(expression.iterate, new_size, new_level)
+                level_iterate = recursive_descent(expression.approximation, new_size, new_level)
                 level_correction = recursive_descent(expression.correction, new_size, new_level)
                 return max(level_iterate, level_correction)
             elif isinstance(expression, mg.Residual):
-                level_iterate = recursive_descent(expression.iterate, current_size, current_level)
+                level_iterate = recursive_descent(expression.approximation, current_size, current_level)
                 level_rhs = recursive_descent(expression.rhs, current_size, current_level)
                 return max(level_iterate, level_rhs)
             elif isinstance(expression, base.BinaryExpression):
@@ -292,7 +292,7 @@ class ProgramGenerator:
 
     def generate_storage(self, maximum_level):
         tmps = []
-        grid = self.grid
+        grid = self._approximation.grid
         for level in range(0, maximum_level + 1):
             tmps.append(CycleStorage(level, grid))
             grid = mg.get_coarse_grid(grid, self.coarsening_factor)
@@ -316,14 +316,14 @@ class ProgramGenerator:
     def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
         if isinstance(node, mg.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution
+            node.approximation.storage = storages[i].solution
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
         elif isinstance(node, mg.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
-            node.iterate.storage = storages[i].solution
+            node.approximation.storage = storages[i].solution
             node.rhs.storage = storages[i].rhs
-            ProgramGenerator.assign_storage_to_subexpressions(node.iterate, storages, i)
+            ProgramGenerator.assign_storage_to_subexpressions(node.approximation, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(node.rhs, storages, i)
         elif isinstance(node, base.BinaryExpression):
             operand1 = node.operand1
@@ -344,7 +344,7 @@ class ProgramGenerator:
         elif isinstance(node, base.RightHandSide):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].rhs
-        elif isinstance(node, base.Approximation) or isinstance(node, base.ZeroGrid):
+        elif isinstance(node, base.Approximation) or isinstance(node, base.ZeroApproximation):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.storage = storages[i].solution
 
@@ -464,24 +464,24 @@ class ProgramGenerator:
             if isinstance(expression.correction, base.Multiplication) \
                     and part.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
-                iterate_str = expression.iterate.storage.to_exa3()
+                iterate_str = expression.approximation.storage.to_exa3()
                 stencil = expression.correction.operand1.generate_stencil()
                 if isinstance(expression.correction.operand2, mg.Residual) and periodic.is_diagonal(stencil):
                     residual = expression.correction.operand2
-                    program += self.generate_multigrid(residual.iterate, storages, use_global_weights)
+                    program += self.generate_multigrid(residual.approximation, storages, use_global_weights)
                     if not residual.rhs.storage.valid:
                         program += self.generate_multigrid(residual.rhs, storages, use_global_weights)
                         residual.rhs.storage.valid = True
 
-                    if isinstance(residual.iterate, base.ZeroGrid):
-                        program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
+                    if isinstance(residual.approximation, base.ZeroApproximation):
+                        program += f'\t{expression.approximation.storage.to_exa3()} = 0\n'
                     if isinstance(expression.correction.operand1, base.Operator):
                         operator_str = f'diag({self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)})'
                     else:
                         operator_str = f'({self.generate_multigrid(expression.correction.operand1, storages, use_global_weights)})'
                     correction_str = f'({residual.rhs.storage.to_exa3()} - ' \
                                      f'{self.generate_multigrid(residual.operator, storages, use_global_weights)} * ' \
-                                     f'{residual.iterate.storage.to_exa3()})'
+                                     f'{residual.approximation.storage.to_exa3()})'
                 else:
                     program += self.generate_multigrid(expression.correction.operand2, storages, use_global_weights)
                     if isinstance(expression.correction.operand1, base.BinaryExpression) or isinstance(expression.correction.operand1, base.Scaling):
@@ -509,19 +509,19 @@ class ProgramGenerator:
             else:
                 program += self.generate_multigrid(expression.correction, storages, use_global_weights)
                 program += f'\t{field.to_exa3()} = ' \
-                           f'{expression.iterate.storage.to_exa3()} + ' \
+                           f'{expression.approximation.storage.to_exa3()} + ' \
                            f'({weight}) * {expression.correction.storage.to_exa3()}\n'
         elif isinstance(expression, mg.Residual):
-            program += self.generate_multigrid(expression.iterate, storages, use_global_weights)
+            program += self.generate_multigrid(expression.approximation, storages, use_global_weights)
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages, use_global_weights)
                 expression.rhs.storage.valid = True
 
-            if isinstance(expression.iterate, base.ZeroGrid):
-                program += f'\t{expression.iterate.storage.to_exa3()} = 0\n'
+            if isinstance(expression.approximation, base.ZeroApproximation):
+                program += f'\t{expression.approximation.storage.to_exa3()} = 0\n'
             program += f'\t{expression.storage.to_exa3()} = {expression.rhs.storage.to_exa3()} - ' \
                        f'{self.generate_multigrid(expression.operator, storages, use_global_weights)} * ' \
-                       f'{expression.iterate.storage.to_exa3()}\n'
+                       f'{expression.approximation.storage.to_exa3()}\n'
         elif isinstance(expression, base.BinaryExpression):
             if isinstance(expression, base.Multiplication):
                 operator_str = "*"

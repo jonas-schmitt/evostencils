@@ -4,9 +4,14 @@ from evostencils.expressions import partitioning as part
 
 class Restriction(base.Operator):
     def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
+        import operator
+        from functools import reduce
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super().__init__(name, (coarse_grid.shape[0], fine_grid.shape[0]), coarse_grid, stencil_generator)
+        super().__init__(name, coarse_grid, stencil_generator)
+        tmp1 = reduce(operator.mul, fine_grid.size)
+        tmp2 = reduce(operator.mul, coarse_grid.size)
+        self._shape = (tmp2, tmp1)
 
     @property
     def fine_grid(self):
@@ -23,9 +28,15 @@ class Restriction(base.Operator):
 
 class Interpolation(base.Operator):
     def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
+        import operator
+        from functools import reduce
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super().__init__(name, (fine_grid.shape[0], coarse_grid.shape[0]), fine_grid, stencil_generator)
+        super().__init__(name, fine_grid, stencil_generator)
+        tmp1 = reduce(operator.mul, fine_grid.size)
+        tmp2 = reduce(operator.mul, coarse_grid.size)
+        self._shape = (tmp1, tmp2)
+
 
     @property
     def fine_grid(self):
@@ -69,28 +80,28 @@ class CoarseGridSolver(base.Entity):
 
 
 class Residual(base.Expression):
-    def __init__(self, operator, iterate, rhs):
+    def __init__(self, operator, approximation, rhs):
         # assert iterate.shape == rhs.shape, "Shapes of iterate and rhs must match"
         self._operator = operator
-        self._iterate = iterate
+        self._approximation = approximation
         self._rhs = rhs
         super().__init__()
 
     @property
     def shape(self):
-        return self.iterate.shape
+        return self.approximation.shape
 
     @property
     def grid(self):
-        return self.iterate.grid
+        return self.approximation.grid
 
     @property
     def operator(self):
         return self._operator
 
     @property
-    def iterate(self):
-        return self._iterate
+    def approximation(self):
+        return self._approximation
 
     @property
     def rhs(self):
@@ -101,31 +112,31 @@ class Residual(base.Expression):
         return None
 
     def generate_expression(self):
-        return base.sub(self.rhs, base.mul(self.operator, self.iterate))
+        return base.sub(self.rhs, base.mul(self.operator, self.approximation))
 
     def __str__(self):
-        return f'({str(self.rhs)} - {str(self.operator)} * {str(self.iterate)})'
+        return f'({str(self.rhs)} - {str(self.operator)} * {str(self.approximation)})'
 
     def __repr__(self):
-        return f'Residual({repr(self.operator)}, {repr(self.iterate)}, {repr(self.rhs)})'
+        return f'Residual({repr(self.operator)}, {repr(self.approximation)}, {repr(self.rhs)})'
 
     def apply(self, transform: callable, *args):
         operator = transform(self.operator, *args)
-        iterate = transform(self.iterate, *args)
+        iterate = transform(self.approximation, *args)
         rhs = transform(self.rhs, *args)
         return Residual(operator, iterate, rhs)
 
     def mutate(self, f: callable, *args):
         f(self.rhs, *args)
-        f(self.iterate, *args)
+        f(self.approximation, *args)
 
 
 class Cycle(base.Expression):
-    def __init__(self, iterate, rhs, correction, partitioning=part.Single, weight=0.5, predecessor=None):
+    def __init__(self, approximation, rhs, correction, partitioning=part.Single, weight=0.5, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
-        self._iterate = iterate
+        self._approximation = approximation
         self._rhs = rhs
         self._correction = correction
         self._weight = weight
@@ -138,15 +149,15 @@ class Cycle(base.Expression):
 
     @property
     def shape(self):
-        return self._iterate.shape
+        return self._approximation.shape
 
     @property
     def grid(self):
-        return self.iterate.grid
+        return self.approximation.grid
 
     @property
-    def iterate(self):
-        return self._iterate
+    def approximation(self):
+        return self._approximation
 
     @property
     def rhs(self):
@@ -169,23 +180,23 @@ class Cycle(base.Expression):
         return None
 
     def generate_expression(self):
-        return base.Addition(self.iterate, base.Scaling(self.weight, self.correction))
+        return base.Addition(self.approximation, base.Scaling(self.weight, self.correction))
 
     def __repr__(self):
-        return f'Cycle({repr(self.iterate)}, {repr(self.rhs)}, {repr(self.correction)}, ' \
+        return f'Cycle({repr(self.approximation)}, {repr(self.rhs)}, {repr(self.correction)}, ' \
                f'{repr(self.partitioning)}, {repr(self.weight)}'
 
     def __str__(self):
         return str(self.generate_expression())
 
     def apply(self, transform: callable, *args):
-        iterate = transform(self.iterate, *args)
+        approximation = transform(self.approximation, *args)
         rhs = transform(self.rhs, *args)
         correction = transform(self.correction, *args)
-        return Cycle(iterate, rhs, correction, self.partitioning, self.weight, self.predecessor)
+        return Cycle(approximation, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
     def mutate(self, f: callable, *args):
-        f(self.iterate, *args)
+        f(self.approximation, *args)
         f(self.rhs)
         f(self.correction, *args)
 
@@ -199,37 +210,22 @@ def residual(operator, iterate, rhs):
     return Residual(operator, iterate, rhs)
 
 
-def get_interpolation(grid: base.Approximation, coarse_grid: base.Approximation, stencil_generator=None):
-    return Interpolation('P', grid, coarse_grid, stencil_generator)
-
-
-def get_restriction(grid: base.Approximation, coarse_grid: base.Approximation, stencil_generator=None):
-    return Restriction('R', grid, coarse_grid, stencil_generator)
-
-
-def get_coarse_grid(grid: base.Approximation, coarsening_factor: tuple):
-    from functools import reduce
-    import operator
+def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
     coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
-    return base.Approximation(f'{grid.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
+    return base.Grid(coarse_size, coarse_step_size)
+
+
+def get_coarse_approximation(approximation: base.Approximation, coarsening_factor: tuple):
+    return base.Approximation(f'{approximation.name}_coarse', get_coarse_grid(approximation.grid, coarsening_factor))
 
 
 def get_coarse_rhs(rhs: base.RightHandSide, coarsening_factor: tuple):
-    from functools import reduce
-    import operator
-    coarse_size = tuple(size // factor for size, factor in zip(rhs.size, coarsening_factor))
-    coarse_step_size = tuple(h * factor for h, factor in zip(rhs.step_size, coarsening_factor))
-    return base.RightHandSide(f'{rhs.name}_{reduce(operator.mul, coarse_size)}', coarse_size, coarse_step_size)
+    return base.RightHandSide(f'{rhs.name}_coarse', get_coarse_grid(rhs.grid, coarsening_factor))
 
 
 def get_coarse_operator(operator, coarse_grid):
-    return base.Operator(f'{operator.name}',
-                         (coarse_grid.shape[0], coarse_grid.shape[0]), coarse_grid, operator.stencil_generator)
-
-
-def get_coarse_grid_solver(operator: base.Operator):
-    return CoarseGridSolver(operator)
+    return base.Operator(f'{operator.name}', coarse_grid, operator.stencil_generator)
 
 
 def is_intergrid_operation(expression: base.Expression) -> bool:
@@ -260,8 +256,8 @@ def determine_maximum_tree_depth(expression: base.Expression) -> int:
     elif isinstance(expression, base.BinaryExpression):
         return max(determine_maximum_tree_depth(expression.operand1), determine_maximum_tree_depth(expression.operand2)) + 1
     elif isinstance(expression, Residual):
-        return max(determine_maximum_tree_depth(expression.rhs), determine_maximum_tree_depth(expression.iterate) + 1) + 1
+        return max(determine_maximum_tree_depth(expression.rhs), determine_maximum_tree_depth(expression.approximation) + 1) + 1
     elif isinstance(expression, Cycle):
-        return max(determine_maximum_tree_depth(expression.iterate), determine_maximum_tree_depth(expression.correction) + 1) + 1
+        return max(determine_maximum_tree_depth(expression.approximation), determine_maximum_tree_depth(expression.correction) + 1) + 1
     else:
         raise RuntimeError("Case not implemented")

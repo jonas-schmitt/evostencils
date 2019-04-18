@@ -59,7 +59,7 @@ class RooflineEvaluator:
                 for partition in stencil_partitions:
                     if isinstance(expression.correction.operand2, mg.Residual):
                         residual = expression.correction.operand2
-                        tmp = self.estimate_runtime(residual.iterate)
+                        tmp = self.estimate_runtime(residual.approximation)
                         runtime += tmp
                         if not hasattr(residual.rhs, 'runtime_evaluated') or not residual.rhs.runtime_evaluated:
                             tmp = self.estimate_runtime(residual.rhs)
@@ -97,7 +97,7 @@ class RooflineEvaluator:
                 runtime += tmp
 
         elif isinstance(expression, mg.Residual):
-            tmp = self.estimate_runtime(expression.iterate)
+            tmp = self.estimate_runtime(expression.approximation)
             runtime += tmp
             tmp = self.estimate_runtime(expression.rhs)
             runtime += tmp

@@ -32,12 +32,12 @@ def load_checkpoint_from_file(filename):
 
 
 class Optimizer:
-    def __init__(self, op: base.Operator, grid: base.Approximation, rhs: base.Approximation, dimension, coarsening_factor,
+    def __init__(self, op: base.Operator, approximation: base.Approximation, rhs: base.Approximation, dimension, coarsening_factor,
                  interpolation, restriction, min_level, max_level, convergence_evaluator=None, performance_evaluator=None,
                  program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._operator = op
-        self._grid = grid
+        self._approximation = approximation
         self._rhs = rhs
         self._dimension = dimension
         self._coarsening_factor = coarsening_factor
@@ -79,8 +79,8 @@ class Optimizer:
         return self._operator
 
     @property
-    def grid(self) -> base.Approximation:
-        return self._grid
+    def approximation(self) -> base.Approximation:
+        return self._approximation
 
     @property
     def rhs(self) -> base.Approximation:
@@ -311,10 +311,10 @@ class Optimizer:
         gp_max_generation = gp_generations
         levels = self.max_level - self.min_level
         levels_per_run = 2
-        grids = [self.grid]
+        approximations = [self.approximation]
         right_hand_sides = [self.rhs]
         for i in range(1, levels + 1):
-            grids.append(mg_exp.get_coarse_grid(grids[-1], self.coarsening_factor))
+            approximations.append(mg_exp.get_coarse_approximation(approximations[-1], self.coarsening_factor))
             right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
         best_expression = None
         storages = self._program_generator.generate_storage(levels)
@@ -347,12 +347,12 @@ class Optimizer:
                     continue
                 else:
                     initial_population = None
-            grid = grids[i]
+            approximation = approximations[i]
             rhs = right_hand_sides[i]
-            operator = mg_exp.get_coarse_operator(self.operator, grid)
-            interpolation = mg_exp.get_interpolation(grids[i], grids[i+levels_per_run-1], self.interpolation.stencil_generator)
-            restriction = mg_exp.get_restriction(grids[i], grids[i+levels_per_run-1], self.restriction.stencil_generator)
-            pset = multigrid.generate_primitive_set(operator, grid, rhs, self.dimension, self.coarsening_factor,
+            operator = mg_exp.get_coarse_operator(self.operator, approximation.grid)
+            interpolation = mg_exp.Interpolation('P', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.interpolation.stencil_generator)
+            restriction = mg_exp.Restriction('R', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.restriction.stencil_generator)
+            pset = multigrid.generate_primitive_set(operator, approximation, rhs, self.dimension, self.coarsening_factor,
                                                     interpolation, restriction,
                                                     coarse_grid_solver_expression=best_expression,
                                                     depth=levels_per_run, LevelFinishedType=self._FinishedType,
@@ -389,7 +389,6 @@ class Optimizer:
                     ind = hof[j]
                     expression = self.compile_individual(ind, pset)[0]
                     evaluation_program = base_program + self._program_generator.generate_cycle_function(expression, storages)
-                    # print(evaluation_program)
                     self._program_generator.write_program_to_file(evaluation_program)
                     time_to_solution, convergence_factor = self._program_generator.evaluate(number_of_samples=10)
                     print(f'Time to solution: {time_to_solution}, Convergence factor: {convergence_factor}')
