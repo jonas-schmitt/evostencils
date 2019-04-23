@@ -307,8 +307,6 @@ class Optimizer:
         from evostencils.expressions import multigrid as mg_exp
         import math
 
-        gp_min_generation = 0
-        gp_max_generation = gp_generations
         levels = self.max_level - self.min_level
         levels_per_run = 2
         approximations = [self.approximation]
@@ -337,6 +335,8 @@ class Optimizer:
             max_level = i + levels_per_run - 1
             evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
             initial_population = None
+            gp_min_generation = 0
+            gp_max_generation = gp_generations
             if restart_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     initial_population = checkpoint.population
@@ -345,8 +345,6 @@ class Optimizer:
                     gp_max_generation = gp_generations
                 elif min_level > checkpoint.min_level:
                     continue
-                else:
-                    initial_population = None
             approximation = approximations[i]
             rhs = right_hand_sides[i]
             operator = mg_exp.get_coarse_operator(self.operator, approximation.grid)

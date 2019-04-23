@@ -1,5 +1,5 @@
 import sys, os
-from evostencils.exastencils.generation import ProgramGenerator
+from evostencils.code_generation.exastencils import ProgramGenerator
 
 
 def main():

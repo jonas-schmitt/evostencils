@@ -3,9 +3,9 @@ from evostencils.expressions import multigrid
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
-from evostencils.exastencils.generation import ProgramGenerator
+from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-from evostencils.exastencils.gallery.finite_differences.poisson_2D import InitializationInformation
+from evostencils.code_generation.gallery.finite_differences.poisson_2D import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
 #    import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
@@ -83,8 +83,8 @@ def main():
     # restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    program, pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=10,
-                                                          es_generations=2, required_convergence=required_convergence,
+    program, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=5,
+                                                          es_generations=5, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)
