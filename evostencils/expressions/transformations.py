@@ -1,6 +1,6 @@
 from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
-from evostencils.expressions import partitioning as part
+from evostencils.expressions import system
 
 # Not bugfree
 """
@@ -83,6 +83,74 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
         return f(result)
     return result
 """
+
+
+def get_system_iteration_matrix(expression: base.Expression):
+    if expression.iteration_matrix is not None:
+        return expression.iteration_matrix
+    result = expression.apply(get_iteration_matrix)
+    if isinstance(result, mg.Cycle):
+        if isinstance(result.approximation, system.ZeroOperator):
+            iteration_matrix = base.scale(result.weight, result.correction)
+        elif isinstance(result.correction, system.ZeroOperator):
+            iteration_matrix = result.approximation
+        else:
+            iteration_matrix = result
+    elif isinstance(result, mg.Residual):
+        operand1 = result.rhs
+        if isinstance(result.approximation, system.ZeroOperator):
+            operand2 = result.approximation
+        else:
+            operand2 = base.mul(result.operator, result.approximation)
+        # Inefficient but sufficient for now
+        if isinstance(operand1, system.ZeroOperator):
+            if isinstance(operand2, system.ZeroOperator):
+                iteration_matrix = operand2
+            else:
+                iteration_matrix = base.Scaling(-1, operand2)
+        elif isinstance(operand2, system.ZeroOperator):
+            iteration_matrix = operand1
+        else:
+            iteration_matrix = base.Subtraction(operand1, operand2)
+    elif isinstance(result, base.Addition):
+        if isinstance(result.operand1, system.ZeroOperator):
+            iteration_matrix = result.operand2
+        elif isinstance(result.operand2, system.ZeroOperator):
+            iteration_matrix = result.operand1
+        else:
+            iteration_matrix = result
+    elif isinstance(result, base.Subtraction):
+        if isinstance(result.operand1, system.ZeroOperator):
+            if isinstance(result.operand2, system.ZeroOperator):
+                iteration_matrix = result.operand2
+            else:
+                iteration_matrix = base.Scaling(-1, result.operand2)
+        elif isinstance(result.operand2, system.ZeroOperator):
+            iteration_matrix = result.operand1
+        else:
+            iteration_matrix = result
+    elif isinstance(result, base.Multiplication):
+        if isinstance(result.operand1, system.ZeroOperator) or isinstance(result.operand2, system.ZeroOperator):
+            iteration_matrix = system.ZeroOperator(result.grid)
+        elif isinstance(result.operand1, system.Identity):
+            iteration_matrix = result.operand2
+        elif isinstance(result.operand2, system.Identity):
+            iteration_matrix = result.operand1
+        else:
+            iteration_matrix = result
+    elif isinstance(result, base.Scaling):
+        if isinstance(result.operand, system.ZeroOperator):
+            iteration_matrix = result.operand
+        else:
+            iteration_matrix = result
+    elif isinstance(result, system.ZeroApproximation) or isinstance(result, system.RightHandSide):
+        iteration_matrix = system.ZeroOperator('Z', result.grid)
+    elif isinstance(result, system.Approximation):
+        iteration_matrix = system.Identity('I', result.grid)
+    else:
+        iteration_matrix = result
+    expression.iteration_matrix = iteration_matrix
+    return iteration_matrix
 
 
 def get_iteration_matrix(expression: base.Expression):

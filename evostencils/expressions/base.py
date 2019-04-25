@@ -134,17 +134,17 @@ class Operator(Entity):
 
 
 class Identity(Operator):
-    def __init__(self, grid):
+    def __init__(self, grid, name='I'):
         from evostencils.stencils.gallery import IdentityGenerator
-        super().__init__('I', grid, IdentityGenerator(grid.dimension))
+        super().__init__(name, grid, IdentityGenerator(grid.dimension))
 
     def __repr__(self):
         return f'Identity({repr(self.grid)})'
 
 
 class ZeroOperator(Operator):
-    def __init__(self, grid, shape=None):
-        super().__init__('0', grid, constant.get_null_stencil)
+    def __init__(self, grid, shape=None, name='0'):
+        super().__init__(name, grid, constant.get_null_stencil)
         if shape is not None:
             self._shape = shape
 
@@ -230,8 +230,8 @@ class ZeroApproximation(Approximation):
     def generate_stencil(self):
         return constant.get_null_stencil(self)
 
-    def __init__(self, grid):
-        super(ZeroApproximation, self).__init__('0', grid)
+    def __init__(self, grid, name='0'):
+        super(ZeroApproximation, self).__init__(name, grid)
 
     def __repr__(self):
         return f'ZeroApproximation({repr(self.grid)})'
@@ -324,9 +324,9 @@ class Transpose(UnaryScalarExpression):
 class Addition(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
-        assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
-            "Grids must match"
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
+        #     "Grids must match"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape
@@ -349,9 +349,9 @@ class Addition(BinaryExpression):
 class Subtraction(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
-        assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
-            "Grids must match"
+        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
+        #     "Grids must match"
         self._operand1 = operand1
         self._operand2 = operand2
         self._shape = operand1.shape

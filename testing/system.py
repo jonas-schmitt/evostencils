@@ -1,4 +1,4 @@
-from evostencils.expressions import base, system, multigrid
+from evostencils.expressions import base, system, multigrid, transformations
 from evostencils.stencils.gallery import *
 
 dimension = 2
@@ -42,4 +42,5 @@ tmp = base.Multiplication(R, res)
 tmp = base.Multiplication(CGS, tmp)
 tmp = base.Multiplication(P, tmp)
 tmp = multigrid.Cycle(u, f, tmp)
+iteration_matrix = transformations.get_system_iteration_matrix(tmp)
 foo = 0

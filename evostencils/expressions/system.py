@@ -25,6 +25,25 @@ class Operator(base.Entity):
         return list(map(lambda entry: entry.grid, self.entries[0]))
 
 
+class ZeroOperator(Operator):
+    def __init__(self, grid: [base.Grid], name='0'):
+        entries = [[base.ZeroOperator(g) for g in grid] for _ in grid]
+        super().__init__(name, entries)
+
+
+class Identity(Operator):
+    def __init__(self, grid: [base.Grid], name='I'):
+        entries = []
+        for i, _ in enumerate(grid):
+            entries.append([])
+            for j, g in enumerate(grid):
+                if i == j:
+                    entries[i].append(base.Identity(g))
+                else:
+                    entries[i].append(base.ZeroOperator(g))
+        super().__init__(name, entries)
+
+
 class Approximation(base.Entity):
 
     def __init__(self, name, entries):
@@ -44,6 +63,11 @@ class Approximation(base.Entity):
 
 class RightHandSide(Approximation):
     pass
+
+
+class ZeroApproximation(Approximation):
+    def __init__(self, grid: [base.Grid], name='0'):
+        super().__init__(name, [base.ZeroApproximation(g) for g in grid])
 
 
 class IntergridOperator(Operator):
