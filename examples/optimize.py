@@ -49,7 +49,7 @@ def main():
 
     A = base.Operator('A', grid, stencil_generator)
     I = base.Identity(grid)
-    P = multigrid.Interpolation('P', grid, multigrid.get_coarse_grid(grid, coarsening_factor), interpolation_generator)
+    P = multigrid.Prolongation('P', grid, multigrid.get_coarse_grid(grid, coarsening_factor), interpolation_generator)
     R = multigrid.Restriction('R', grid, multigrid.get_coarse_grid(grid, coarsening_factor), restriction_generator)
 
     lfa_grid = lfa.Grid(dimension, step_size)
@@ -79,12 +79,12 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
-    restart_from_checkpoint = True
-    # restart_from_checkpoint = False
+    # restart_from_checkpoint = True
+    restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    program, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=5,
-                                                          es_generations=5, required_convergence=required_convergence,
+    program, pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=50,
+                                                          es_generations=100, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)

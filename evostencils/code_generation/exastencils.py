@@ -34,7 +34,7 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, approximation: base.Approximation, rhs: base.Approximation,
-                 identity: base.Identity, interpolation: mg.Interpolation, restriction: mg.Restriction,
+                 identity: base.Identity, interpolation: mg.Prolongation, restriction: mg.Restriction,
                  dimension, coarsening_factor, min_level, max_level, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
@@ -280,7 +280,7 @@ class ProgramGenerator:
                 level_operand1 = recursive_descent(expression.operand1, current_size, current_level)
                 level_operand2 = recursive_descent(expression.operand2, current_size, current_level)
                 return max(level_operand1, level_operand2)
-            elif isinstance(expression, base.UnaryExpression):
+            elif isinstance(expression, base.UnaryScalarExpression):
                 return recursive_descent(expression.operand, current_size, current_level)
             elif isinstance(expression, base.Scaling):
                 return recursive_descent(expression.operand, current_size, current_level)
@@ -336,7 +336,7 @@ class ProgramGenerator:
                     operand2.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(operand1, storages, i)
             ProgramGenerator.assign_storage_to_subexpressions(operand2, storages, i)
-        elif isinstance(node, base.UnaryExpression) or isinstance(node, base.Scaling):
+        elif isinstance(node, base.UnaryScalarExpression) or isinstance(node, base.Scaling):
             operand = node.operand
             if ProgramGenerator.needs_storage(operand):
                 i = ProgramGenerator.adjust_storage_index(operand, storages, i)
@@ -585,7 +585,7 @@ class ProgramGenerator:
         elif isinstance(expression, mg.Restriction):
             level_offset = self.determine_operator_level(expression, storages) - 1
             program = f'{expression.name}@(finest - {level_offset})'
-        elif isinstance(expression, mg.Interpolation):
+        elif isinstance(expression, mg.Prolongation):
             level_offset = self.determine_operator_level(expression, storages) + 1
             program = f'{expression.name}@(finest - {level_offset})'
         elif isinstance(expression, base.Identity):

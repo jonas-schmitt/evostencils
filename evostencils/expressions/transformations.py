@@ -179,33 +179,6 @@ def repeat(cycle: mg.Cycle, times):
     return new_cycle
 
 
-def simplify_iteration_matrix(expression: base.Expression):
-    def replace_iterate_with_mutation(expression: base.Expression, iterate, new_iterate):
-        if isinstance(expression, mg.Residual):
-            if expression.approximation.approximation.size == iterate.approximation.size \
-                    and expression.approximation.approximation.step_size == iterate.approximation.step_size:
-                expression._approximation = new_iterate
-            else:
-                expression.mutate(replace_iterate_with_mutation, iterate, new_iterate)
-        else:
-            expression.mutate(replace_iterate_with_mutation, iterate, new_iterate)
-
-    if isinstance(expression, mg.Cycle) and not isinstance(expression.approximation, base.Identity):
-        I = base.Identity(expression.approximation.shape, expression.approximation.approximation)
-        iterate = expression.approximation
-        expression._approximation = I
-        replace_iterate_with_mutation(expression.correction, iterate, I)
-        new_iterate = simplify_iteration_matrix(iterate)
-        return base.mul(new_iterate, expression)
-    else:
-        return expression
-
-
-def simplify_iteration_matrix_on_all_levels(expression: base.Expression):
-    expression.mutate(simplify_iteration_matrix)
-    expression.mutate(simplify_iteration_matrix_on_all_levels)
-
-
 def obtain_coarsest_level(cycle: mg.Cycle) -> int:
     def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
         if isinstance(expression, mg.Cycle):
@@ -226,7 +199,7 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
             level_operand1 = recursive_descent(expression.operand1, current_size, current_level)
             level_operand2 = recursive_descent(expression.operand2, current_size, current_level)
             return max(level_operand1, level_operand2)
-        elif isinstance(expression, base.UnaryExpression):
+        elif isinstance(expression, base.UnaryScalarExpression):
             return recursive_descent(expression.operand, current_size, current_level)
         elif isinstance(expression, base.Scaling):
             return recursive_descent(expression.operand, current_size, current_level)

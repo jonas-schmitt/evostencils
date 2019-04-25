@@ -26,7 +26,7 @@ class Restriction(base.Operator):
                f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
-class Interpolation(base.Operator):
+class Prolongation(base.Operator):
     def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
         import operator
         from functools import reduce
@@ -132,7 +132,7 @@ class Residual(base.Expression):
 
 
 class Cycle(base.Expression):
-    def __init__(self, approximation, rhs, correction, partitioning=part.Single, weight=0.5, predecessor=None):
+    def __init__(self, approximation, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
@@ -229,14 +229,14 @@ def get_coarse_operator(operator, coarse_grid):
 
 
 def is_intergrid_operation(expression: base.Expression) -> bool:
-    return isinstance(expression, Restriction) or isinstance(expression, Interpolation) \
+    return isinstance(expression, Restriction) or isinstance(expression, Prolongation) \
            or isinstance(expression, CoarseGridSolver)
 
 
 def contains_intergrid_operation(expression: base.Expression) -> bool:
     if isinstance(expression, base.BinaryExpression):
         return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
-    elif isinstance(expression, base.UnaryExpression):
+    elif isinstance(expression, base.UnaryScalarExpression):
         return contains_intergrid_operation(expression.operand)
     elif isinstance(expression, base.Scaling):
         return contains_intergrid_operation(expression.operand)
@@ -251,7 +251,7 @@ def contains_intergrid_operation(expression: base.Expression) -> bool:
 def determine_maximum_tree_depth(expression: base.Expression) -> int:
     if isinstance(expression, base.Entity):
         return 0
-    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
+    elif isinstance(expression, base.UnaryScalarExpression) or isinstance(expression, base.Scaling):
         return determine_maximum_tree_depth(expression.operand) + 1
     elif isinstance(expression, base.BinaryExpression):
         return max(determine_maximum_tree_depth(expression.operand1), determine_maximum_tree_depth(expression.operand2)) + 1

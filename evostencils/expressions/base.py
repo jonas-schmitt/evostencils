@@ -59,10 +59,6 @@ class UnaryExpression(Expression):
         return self._operand
 
     @property
-    def grid(self):
-        return self.operand.grid
-
-    @property
     def shape(self):
         return self._shape
 
@@ -71,6 +67,15 @@ class UnaryExpression(Expression):
 
     def mutate(self, f: callable, *args):
         f(self.operand, *args)
+
+
+class UnaryScalarExpression(UnaryExpression):
+    def __init__(self, operand):
+        super().__init__(operand)
+
+    @property
+    def grid(self):
+        return self.operand.grid
 
 
 class BinaryExpression(Expression):
@@ -138,8 +143,10 @@ class Identity(Operator):
 
 
 class ZeroOperator(Operator):
-    def __init__(self, grid):
+    def __init__(self, grid, shape=None):
         super().__init__('0', grid, constant.get_null_stencil)
+        if shape is not None:
+            self._shape = shape
 
     def __repr__(self):
         return f'ZeroOperator({repr(self.grid)})'
@@ -231,7 +238,7 @@ class ZeroApproximation(Approximation):
 
 
 # Unary Expressions
-class Diagonal(UnaryExpression):
+class Diagonal(UnaryScalarExpression):
     def generate_stencil(self):
         return periodic.diagonal(self.operand.generate_stencil())
 
@@ -242,7 +249,7 @@ class Diagonal(UnaryExpression):
         return f'Diagonal({repr(self.operand)})'
 
 
-class LowerTriangle(UnaryExpression):
+class LowerTriangle(UnaryScalarExpression):
     def generate_stencil(self):
         return periodic.lower(self.operand.generate_stencil())
 
@@ -253,7 +260,7 @@ class LowerTriangle(UnaryExpression):
         return f'LowerTriangle({repr(self.operand)})'
 
 
-class UpperTriangle(UnaryExpression):
+class UpperTriangle(UnaryScalarExpression):
     def generate_stencil(self):
         return periodic.upper(self.operand.generate_stencil())
 
@@ -264,7 +271,7 @@ class UpperTriangle(UnaryExpression):
         return f'UpperTriangle({repr(self.operand)})'
 
 
-class BlockDiagonal(UnaryExpression):
+class BlockDiagonal(UnaryScalarExpression):
     def __init__(self, operand, block_size):
         self._block_size = block_size
         super().__init__(operand)
@@ -286,7 +293,7 @@ class BlockDiagonal(UnaryExpression):
         return type(self)(transform(self.operand, *args), self.block_size)
 
 
-class Inverse(UnaryExpression):
+class Inverse(UnaryScalarExpression):
     def generate_stencil(self):
         return periodic.inverse(self.operand.generate_stencil())
 
@@ -297,7 +304,7 @@ class Inverse(UnaryExpression):
         return f'Inverse({repr(self.operand)})'
 
 
-class Transpose(UnaryExpression):
+class Transpose(UnaryScalarExpression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = (operand.shape[1], operand.shape[0])

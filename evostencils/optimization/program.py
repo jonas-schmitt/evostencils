@@ -348,7 +348,7 @@ class Optimizer:
             approximation = approximations[i]
             rhs = right_hand_sides[i]
             operator = mg_exp.get_coarse_operator(self.operator, approximation.grid)
-            interpolation = mg_exp.Interpolation('P', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.interpolation.stencil_generator)
+            interpolation = mg_exp.Prolongation('P', approximations[i].grid, approximations[i + levels_per_run - 1].grid, self.interpolation.stencil_generator)
             restriction = mg_exp.Restriction('R', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.restriction.stencil_generator)
             pset = multigrid.generate_primitive_set(operator, approximation, rhs, self.dimension, self.coarsening_factor,
                                                     interpolation, restriction,

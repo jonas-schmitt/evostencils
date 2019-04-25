@@ -211,7 +211,7 @@ def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_f
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):
         coarse_approximation = base.ZeroApproximation(terminals.coarse_grid)
-        coarse_interpolation = mg.Interpolation('P', terminals.coarse_grid, mg.get_coarse_grid(terminals.coarse_grid, coarsening_factor), interpolation.stencil_generator)
+        coarse_interpolation = mg.Prolongation('P', terminals.coarse_grid, mg.get_coarse_grid(terminals.coarse_grid, coarsening_factor), interpolation.stencil_generator)
         coarse_restriction = mg.Restriction('R', terminals.coarse_grid, mg.get_coarse_grid(terminals.coarse_grid, coarsening_factor), restriction.stencil_generator)
         cgs_expression = None
         coarsest = False
