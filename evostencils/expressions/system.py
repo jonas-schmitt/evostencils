@@ -93,6 +93,14 @@ class Prolongation(IntergridOperator):
         super().__init__(name, scalar_prolongation_operator, grid)
 
 
+class Diagonal(base.UnaryExpression):
+    pass
+
+
+class ElementwiseDiagonal(base.UnaryExpression):
+    pass
+
+
 def get_coarse_grid(grid: [base.Grid], coarsening_factor):
     return list(map(lambda g: multigrid.get_coarse_grid(g, coarsening_factor), grid))
 

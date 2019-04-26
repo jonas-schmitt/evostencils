@@ -236,7 +236,7 @@ def is_intergrid_operation(expression: base.Expression) -> bool:
 def contains_intergrid_operation(expression: base.Expression) -> bool:
     if isinstance(expression, base.BinaryExpression):
         return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
-    elif isinstance(expression, base.UnaryScalarExpression):
+    elif isinstance(expression, base.UnaryExpression):
         return contains_intergrid_operation(expression.operand)
     elif isinstance(expression, base.Scaling):
         return contains_intergrid_operation(expression.operand)
@@ -251,7 +251,7 @@ def contains_intergrid_operation(expression: base.Expression) -> bool:
 def determine_maximum_tree_depth(expression: base.Expression) -> int:
     if isinstance(expression, base.Entity):
         return 0
-    elif isinstance(expression, base.UnaryScalarExpression) or isinstance(expression, base.Scaling):
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
         return determine_maximum_tree_depth(expression.operand) + 1
     elif isinstance(expression, base.BinaryExpression):
         return max(determine_maximum_tree_depth(expression.operand1), determine_maximum_tree_depth(expression.operand2)) + 1

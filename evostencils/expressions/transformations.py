@@ -267,7 +267,7 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
             level_operand1 = recursive_descent(expression.operand1, current_size, current_level)
             level_operand2 = recursive_descent(expression.operand2, current_size, current_level)
             return max(level_operand1, level_operand2)
-        elif isinstance(expression, base.UnaryScalarExpression):
+        elif isinstance(expression, base.UnaryExpression):
             return recursive_descent(expression.operand, current_size, current_level)
         elif isinstance(expression, base.Scaling):
             return recursive_descent(expression.operand, current_size, current_level)

@@ -40,7 +40,7 @@ def can_be_partitioned(expression: base.Expression):
         return False
     elif isinstance(expression, base.BinaryExpression):
         return can_be_partitioned(expression.operand1) and can_be_partitioned(expression.operand2)
-    elif isinstance(expression, base.UnaryScalarExpression) or isinstance(expression, base.Scaling):
+    elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
         return can_be_partitioned(expression.operand)
     elif isinstance(expression, base.Operator):
         return True

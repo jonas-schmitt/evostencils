@@ -49,6 +49,7 @@ class Entity(Expression):
 
 
 class UnaryExpression(Expression):
+
     def __init__(self, operand):
         self._operand = operand
         self._shape = operand.shape
@@ -67,11 +68,6 @@ class UnaryExpression(Expression):
 
     def mutate(self, f: callable, *args):
         f(self.operand, *args)
-
-
-class UnaryScalarExpression(UnaryExpression):
-    def __init__(self, operand):
-        super().__init__(operand)
 
     @property
     def grid(self):
@@ -238,7 +234,7 @@ class ZeroApproximation(Approximation):
 
 
 # Unary Expressions
-class Diagonal(UnaryScalarExpression):
+class Diagonal(UnaryExpression):
     def generate_stencil(self):
         return periodic.diagonal(self.operand.generate_stencil())
 
@@ -249,7 +245,7 @@ class Diagonal(UnaryScalarExpression):
         return f'Diagonal({repr(self.operand)})'
 
 
-class LowerTriangle(UnaryScalarExpression):
+class LowerTriangle(UnaryExpression):
     def generate_stencil(self):
         return periodic.lower(self.operand.generate_stencil())
 
@@ -260,7 +256,7 @@ class LowerTriangle(UnaryScalarExpression):
         return f'LowerTriangle({repr(self.operand)})'
 
 
-class UpperTriangle(UnaryScalarExpression):
+class UpperTriangle(UnaryExpression):
     def generate_stencil(self):
         return periodic.upper(self.operand.generate_stencil())
 
@@ -271,7 +267,7 @@ class UpperTriangle(UnaryScalarExpression):
         return f'UpperTriangle({repr(self.operand)})'
 
 
-class BlockDiagonal(UnaryScalarExpression):
+class BlockDiagonal(UnaryExpression):
     def __init__(self, operand, block_size):
         self._block_size = block_size
         super().__init__(operand)
@@ -293,7 +289,7 @@ class BlockDiagonal(UnaryScalarExpression):
         return type(self)(transform(self.operand, *args), self.block_size)
 
 
-class Inverse(UnaryScalarExpression):
+class Inverse(UnaryExpression):
     def generate_stencil(self):
         return periodic.inverse(self.operand.generate_stencil())
 
@@ -304,7 +300,7 @@ class Inverse(UnaryScalarExpression):
         return f'Inverse({repr(self.operand)})'
 
 
-class Transpose(UnaryScalarExpression):
+class Transpose(UnaryExpression):
     def __init__(self, operand):
         self._operand = operand
         self._shape = (operand.shape[1], operand.shape[0])
@@ -324,7 +320,7 @@ class Transpose(UnaryScalarExpression):
 class Addition(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
         #     "Grids must match"
         self._operand1 = operand1
@@ -349,7 +345,7 @@ class Addition(BinaryExpression):
 class Subtraction(BinaryExpression):
 
     def __init__(self, operand1, operand2):
-        assert operand1.shape == operand2.shape, "Operand shapes are not equal"
+        # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
         #     "Grids must match"
         self._operand1 = operand1
