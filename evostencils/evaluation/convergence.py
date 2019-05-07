@@ -1,7 +1,7 @@
 import lfa_lab
 import evostencils.stencils.periodic as periodic
 import evostencils.stencils.constant as constant
-from evostencils.expressions import base, multigrid
+from evostencils.expressions import base, multigrid, system
 from multiprocessing import Process, Queue
 from queue import Empty
 
@@ -140,6 +140,103 @@ class ConvergenceEvaluator:
             lfa_grid = self.get_lfa_grid(expression.grid)
             operator = stencil_to_lfa(expression.generate_stencil(), lfa_grid)
             result = operator
+        else:
+            raise NotImplementedError("Not implemented")
+        expression.lfa_symbol = result
+        return result
+
+    def compute_spectral_radius(self, iteration_matrix: base.Expression):
+
+        try:
+            lfa_expression = self.transform(iteration_matrix)
+
+            def evaluate(q, expr):
+                try:
+                    s = expr.symbol()
+                    q.put(s.spectral_radius())
+
+                except (ArithmeticError, RuntimeError, MemoryError) as _:
+                    q.put(0.0)
+
+            queue = Queue()
+            p = Process(target=evaluate, args=(queue, lfa_expression))
+            p.start()
+            p.join()
+            return queue.get(timeout=1)
+        except (ArithmeticError, RuntimeError, MemoryError) as _:
+            return 0.0
+
+
+class ConvergenceEvaluatorSystem:
+
+    def __init__(self, lfa_grid, coarsening_factors, dimension, lfa_interpolation_generator,
+                 lfa_restriction_generator):
+        self._lfa_grid = lfa_grid
+        self._coarsening_factors = coarsening_factors
+        self._dimension = dimension
+        self._lfa_interpolation_generator = lfa_interpolation_generator
+        self._lfa_restriction_generator = lfa_restriction_generator
+
+    @property
+    def lfa_grid(self):
+        return self._lfa_grid
+
+    def set_grid(self, new_lfa_grid):
+        self._lfa_grid = new_lfa_grid
+
+    @property
+    def coarsening_factors(self):
+        return self._coarsening_factors
+
+    @property
+    def dimension(self):
+        return self._dimension
+
+    @property
+    def lfa_interpolation_generator(self):
+        return self._lfa_interpolation_generator
+
+    @property
+    def lfa_restriction_generator(self):
+        return self._lfa_restriction_generator
+
+    def get_lfa_grid(self, grid: [base.Grid]):
+        lfa_grid = self.lfa_grid
+        while all(lfa_subgrid.step_size() < subgrid.step_size for lfa_subgrid, subgrid in zip(lfa_grid, grid)):
+            lfa_grid = [lfa_subgrid.coarse(coarsening_factor) for lfa_subgrid, coarsening_factor in zip(lfa_grid, self.coarsening_factors)]
+        return lfa_grid
+
+    def transform(self, expression: base.Expression):
+        if expression.lfa_symbol is not None:
+            return expression.lfa_symbol
+        if isinstance(expression, multigrid.Cycle):
+            result = self.transform(expression.generate_expression())
+        elif isinstance(expression, base.BinaryExpression):
+            child1 = self.transform(expression.operand1)
+            child2 = self.transform(expression.operand2)
+            if isinstance(expression, base.Multiplication):
+                result = child1 * child2
+            elif isinstance(expression, base.Addition):
+                result = child1 + child2
+            elif isinstance(expression, base.Subtraction):
+                result = child1 - child2
+        elif isinstance(expression, base.Scaling):
+            result = expression.factor * self.transform(expression.operand)
+        elif isinstance(expression, base.Inverse):
+            result = self.transform(expression.operand).inverse()
+        elif isinstance(expression, multigrid.CoarseGridSolver):
+            cgs_expression = expression.expression
+            if cgs_expression is None or not cgs_expression.evaluate:
+                operator = self.transform(expression.operator)
+                result = operator.inverse()
+            else:
+                if cgs_expression.iteration_matrix is None or cgs_expression.iteration_matrix.lfa_symbol is None:
+                    raise RuntimeError("Not evaluated")
+                result = cgs_expression.iteration_matrix.lfa_symbol
+        elif isinstance(expression, system.Operator):
+            lfa_grid = expression.grid
+            #TODO implementation
+            result = None
         else:
             raise NotImplementedError("Not implemented")
         expression.lfa_symbol = result
