@@ -9,7 +9,7 @@ from evostencils.code_generation.gallery.finite_differences.poisson_2D import In
 # from evostencils.exastencils.gallery.finite_differences.poisson_2D_variable_coefficients \
 #    import InitializationInformation
 # from evostencils.exastencils.gallery.finite_differences.poisson_3D import InitializationInformation
-# from evostencils.exastencils.gallery.finite_differences.poisson_3D_variable_coefficients \
+#from evostencils.code_generation.gallery.finite_differences.poisson_3D_variable_coefficients \
 #    import InitializationInformation
 import pickle
 import lfa_lab as lfa
@@ -79,12 +79,12 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
+    restart_from_checkpoint = True
+    # restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    program, pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=50,
-                                                          es_generations=100, required_convergence=required_convergence,
+    program, pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=10,
+                                                          es_generations=5, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)
     program_generator.write_program_to_file(program)

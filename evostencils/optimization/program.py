@@ -13,13 +13,15 @@ from evostencils.types import level_control
 
 
 class CheckPoint:
-    def __init__(self, min_level, max_level, generation, program, solver, population):
+    def __init__(self, min_level, max_level, generation, program, solver, population, logbooks):
         self.min_level = min_level
         self.max_level = max_level
         self.generation = generation
         self.program = program
         self.solver = solver
         self.population = population
+        self.logbooks = logbooks
+
 
     def dump_to_file(self, filename):
         with open(filename, 'wb') as file:
@@ -162,73 +164,16 @@ class Optimizer:
             else:
                 return spectral_radius, self.infinity
 
-    def random_search(self, initial_population_size, generations, mu_, lambda_):
+    def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+               min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         random.seed()
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.ParetoFront()
-
-        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-        logbook = tools.Logbook()
-        logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
-        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
-        toolbox = self._toolbox
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
-
-        hof.update(pop)
-
-        # This is just to assign the crowding distance to the individuals
-        # no actual selection is done
-        pop = toolbox.select(pop, len(pop))
-
-        record = mstats.compile(pop) if mstats is not None else {}
-        logbook.record(gen=0, nevals=len(invalid_ind), **record)
-        print(logbook.stream)
-
-        # Begin the generational process
-        for gen in range(1, generations + 1):
-            # Vary the population
-            offspring = toolbox.population(n=lambda_)
-
-            # Evaluate the individuals with an invalid fitness
-            invalid_ind = offspring
-            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-            for ind, fit in zip(invalid_ind, fitnesses):
-                ind.fitness.values = fit
-            hof.update(pop)
-
-            # Select the next generation population
-            pop = toolbox.select(pop + offspring, mu_)
-            record = mstats.compile(pop)
-            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            print(logbook.stream)
-
-        return pop, logbook, hof
-
-    def nsgaII(self, initial_population_size, min_generation, max_generation, mu_, lambda_, crossover_probability, mutation_probability,
-               min_level, max_level, program, solver, checkpoint_frequency=5, initial_population=None):
-        random.seed()
-        if initial_population is None:
+        if checkpoint is None:
             pop = self._toolbox.population(n=initial_population_size)
+            min_generation = 0
         else:
-            pop = initial_population
+            pop = checkpoint.population
+            min_generation = checkpoint.generation
+        max_generation = generations
         hof = tools.ParetoFront()
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
@@ -248,8 +193,13 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        logbook = tools.Logbook()
-        logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+        if checkpoint is None:
+            logbook = tools.Logbook()
+            logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+            logbooks.append(logbook)
+        else:
+            logbook = logbooks[-1]
+
         invalid_ind = [ind for ind in pop if not ind.fitness.valid]
         toolbox = self._toolbox
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
@@ -263,7 +213,7 @@ class Optimizer:
         pop = toolbox.select(pop, len(pop))
 
         record = mstats.compile(pop) if mstats is not None else {}
-        logbook.record(gen=0, nevals=len(invalid_ind), **record)
+        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
         # Begin the generational process
@@ -291,7 +241,8 @@ class Optimizer:
                 if solver is not None:
                     transformations.invalidate_expression(solver.iteration_matrix)
                     transformations.invalidate_expression(solver)
-                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop)
+                logbooks[-1] = logbook
+                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
                 checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
             # Select the next generation population
             pop = toolbox.select(pop + offspring, mu_)
@@ -328,21 +279,18 @@ class Optimizer:
         else:
             restart_from_checkpoint = False
         pops = []
-        stats = []
+        logbooks = []
         boilerplate_program = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon)
         for i in range(levels - levels_per_run, -1, -levels_per_run):
             min_level = i
             max_level = i + levels_per_run - 1
+            pass_checkpoint = False
             evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
-            initial_population = None
-            gp_min_generation = 0
-            gp_max_generation = gp_generations
             if restart_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
-                    initial_population = checkpoint.population
                     best_expression = checkpoint.solver
-                    gp_min_generation = checkpoint.generation
-                    gp_max_generation = gp_generations
+                    pass_checkpoint = True
+                    logbooks = checkpoint.logbooks
                 elif min_level > checkpoint.min_level:
                     continue
             approximation = approximations[i]
@@ -356,12 +304,18 @@ class Optimizer:
                                                     depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                     LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
-            pop, log, hof = self.nsgaII(10 * gp_mu, gp_min_generation, gp_max_generation, gp_mu, gp_lambda, gp_crossover_probability,
-                                        gp_mutation_probability, min_level, max_level, solver_program, best_expression,
-                                        checkpoint_frequency=5, initial_population=initial_population)
+            if pass_checkpoint:
+                pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                            gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
+                                            checkpoint_frequency=5, checkpoint=checkpoint)
+            else:
+                pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                            gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
+                                            checkpoint_frequency=5, checkpoint=None)
+
             # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
-            stats.append(log)
+            # logbooks.append(log)
 
             def key_function(ind):
                 rho = ind.fitness.values[0]
@@ -419,7 +373,7 @@ class Optimizer:
                 print('Ungeneratable program')
                 print(e)
 
-        return boilerplate_program + solver_program, pops, stats
+        return boilerplate_program + solver_program, pops, logbooks
 
     def optimize_weights(self, expression, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
