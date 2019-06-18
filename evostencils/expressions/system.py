@@ -27,7 +27,7 @@ class Operator(base.Entity):
 
 class ZeroOperator(Operator):
     def __init__(self, grid: [base.Grid], name='0'):
-        entries = [[base.ZeroOperator(g) for g in grid] for _ in grids]
+        entries = [[base.ZeroOperator(g) for g in grid] for _ in grid]
         super().__init__(name, entries)
 
 

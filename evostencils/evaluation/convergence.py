@@ -3,7 +3,6 @@ import evostencils.stencils.periodic as periodic
 import evostencils.stencils.constant as constant
 from evostencils.expressions import base, multigrid, system
 from multiprocessing import Process, Queue
-from queue import Empty
 
 
 @periodic.convert_constant_stencils
@@ -234,9 +233,7 @@ class ConvergenceEvaluatorSystem:
                     raise RuntimeError("Not evaluated")
                 result = cgs_expression.iteration_matrix.lfa_symbol
         elif isinstance(expression, system.Operator):
-            lfa_grid = expression.grid
-            #TODO implementation
-            result = None
+            result = [[entry.lfa_symbol for entry in row] for row in expression.entries]
         else:
             raise NotImplementedError("Not implemented")
         expression.lfa_symbol = result

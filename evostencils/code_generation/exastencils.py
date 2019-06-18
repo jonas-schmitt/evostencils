@@ -55,7 +55,7 @@ class ProgramGenerator:
             os.makedirs(output_path)
         if os.path.exists(exastencils_path):
             subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
-            if os.path.isfile(f'{exastencils_path}/Compiler/Compiler.jar'):
+            if os.path.isfile(f'{exastencils_path}/Compiler/compiler.jar'):
                 self._compiler_available = True
         self.generate_settings_file()
         self.generate_knowledge_file()
@@ -209,7 +209,7 @@ class ProgramGenerator:
     def run_exastencils_compiler(self, platform='linux'):
         import subprocess
         result = subprocess.run(['java', '-cp',
-                                 f'{self.exastencils_path}/Compiler/Compiler.jar', 'Main',
+                                 f'{self.exastencils_path}/Compiler/compiler.jar', 'Main',
                                  f'{self.output_path}/{self.problem_name}.settings',
                                  f'{self.output_path}/{self.problem_name}.knowledge',
                                  f'{self.output_path}/lib/{platform}.platform'],

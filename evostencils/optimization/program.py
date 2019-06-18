@@ -354,6 +354,8 @@ class Optimizer:
                         or math.isinf(best_convergence_factor):
                     raise RuntimeError("None of the generated solvers did achieve satisfactory convergence. "
                                        "Optimization failed.")
+            else:
+                print("No working compiler available. Using LFA Lab for convergence optimization.")
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             best_expression.evaluate = False
