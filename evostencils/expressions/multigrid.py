@@ -1,5 +1,6 @@
 from evostencils.expressions import base
 from evostencils.expressions import partitioning as part
+from evostencils.stencils import gallery
 
 
 class Restriction(base.Operator):
@@ -26,6 +27,11 @@ class Restriction(base.Operator):
                f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
 
 
+class ZeroRestriction(Restriction):
+    def __init__(self, name, fine_grid, coarse_grid):
+        super().__init__(name, fine_grid, coarse_grid, gallery.ZeroGenerator)
+
+
 class Prolongation(base.Operator):
     def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
         import operator
@@ -49,6 +55,11 @@ class Prolongation(base.Operator):
     def __repr__(self):
         return f'Interpolation({repr(self.name)}, {repr(self.fine_grid)}, ' \
                f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
+
+
+class ZeroProlongation(Prolongation):
+    def __init__(self, name, fine_grid, coarse_grid):
+        super().__init__(name, fine_grid, coarse_grid, gallery.ZeroGenerator)
 
 
 class CoarseGridSolver(base.Entity):
