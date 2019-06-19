@@ -140,9 +140,10 @@ class Identity(Operator):
 
 class ZeroOperator(Operator):
     def __init__(self, grid, shape=None, name='0'):
-        super().__init__(name, grid, constant.get_null_stencil)
         if shape is not None:
             self._shape = shape
+        from evostencils.stencils.gallery import ZeroGenerator
+        super().__init__(name, grid, ZeroGenerator(grid.dimension))
 
     def __repr__(self):
         return f'ZeroOperator({repr(self.grid)})'

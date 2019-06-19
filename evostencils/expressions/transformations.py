@@ -88,7 +88,7 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
 def get_system_iteration_matrix(expression: base.Expression):
     if expression.iteration_matrix is not None:
         return expression.iteration_matrix
-    result = expression.apply(get_iteration_matrix)
+    result = expression.apply(get_system_iteration_matrix)
     if isinstance(result, mg.Cycle):
         if isinstance(result.approximation, system.ZeroOperator):
             iteration_matrix = base.scale(result.weight, result.correction)
@@ -144,9 +144,9 @@ def get_system_iteration_matrix(expression: base.Expression):
         else:
             iteration_matrix = result
     elif isinstance(result, system.ZeroApproximation) or isinstance(result, system.RightHandSide):
-        iteration_matrix = system.ZeroOperator('Z', result.grid)
+        iteration_matrix = system.ZeroOperator(result.grid, 'Z')
     elif isinstance(result, system.Approximation):
-        iteration_matrix = system.Identity('I', result.grid)
+        iteration_matrix = system.Identity(result.grid, 'I')
     else:
         iteration_matrix = result
     expression.iteration_matrix = iteration_matrix

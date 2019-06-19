@@ -236,3 +236,16 @@ class IdentityGenerator:
         result += f'0] => (1.0)\n'
         result += f'}}\n'
         return result
+
+
+class ZeroGenerator:
+    def __init__(self, dimension):
+        self.dimension = dimension
+
+    @staticmethod
+    def generate_stencil(grid: base.Approximation):
+        return constant.get_null_stencil(grid)
+
+    def generate_exa3(self, name):
+        # TODO implement
+        raise NotImplementedError("ZeroGenerator not implemented yet!")

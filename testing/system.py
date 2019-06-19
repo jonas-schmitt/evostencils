@@ -1,5 +1,7 @@
 from evostencils.expressions import base, system, multigrid, transformations
 from evostencils.stencils.gallery import *
+import lfa_lab
+from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
 
 dimension = 2
 min_level = 2
@@ -32,7 +34,7 @@ A = system.Operator('A', [[laplace, Z], [base.Scaling(-1, I), laplace]])
 u = system.Approximation('u', [vs, us])
 f = system.RightHandSide('f', [f_v, f_u])
 res = multigrid.Residual(A, u, f)
-tmp = base.Multiplication(base.Inverse(system.Diagonal(A)), res)
+tmp = base.Multiplication(base.Inverse(system.ElementwiseDiagonal(A)), res)
 
 #R = system.Restriction('R', Rs, res.grid)
 #P = system.Prolongation('P', Ps, res.grid)
@@ -45,4 +47,8 @@ tmp = base.Multiplication(base.Inverse(system.Diagonal(A)), res)
 #tmp = base.Multiplication(P, tmp)
 tmp = multigrid.Cycle(u, f, tmp)
 iteration_matrix = transformations.get_system_iteration_matrix(tmp)
-foo = 0
+
+convergence_evaluator = ConvergenceEvaluatorSystem([lfa_lab.Grid(dimension, step_size), lfa_lab.Grid(dimension, step_size)], coarsening_factor, dimension)
+lfa_node = convergence_evaluator.transform(iteration_matrix)
+convergence_factor = convergence_evaluator.compute_spectral_radius(iteration_matrix)
+print(f'Spectral radius: {convergence_factor}')

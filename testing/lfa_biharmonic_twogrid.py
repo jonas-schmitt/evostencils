@@ -35,10 +35,10 @@ cgc = coarse_grid_correction(
         restriction = R)
 
 #E = S_pointwise * cgc * S_pointwise
-E = S_collective * cgc * S_collective
-
+# E = S_collective * cgc * S_collective
+E = S_pointwise
 symbol = E.symbol()
 
 print("Spectral radius: {}".format(symbol.spectral_radius()))
-print("Spectral norm: {}".format(symbol.spectral_norm()))
+# print("Spectral norm: {}".format(symbol.spectral_norm()))
 

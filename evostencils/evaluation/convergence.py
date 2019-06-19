@@ -161,17 +161,17 @@ class ConvergenceEvaluator:
 
 class ConvergenceEvaluatorSystem:
 
-    def __init__(self, lfa_grid, coarsening_factors, dimension):
-        self._lfa_grid = lfa_grid
+    def __init__(self, lfa_grids, coarsening_factors, dimension):
+        self._lfa_grids = lfa_grids
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
 
     @property
-    def lfa_grid(self):
-        return self._lfa_grid
+    def lfa_grids(self):
+        return self._lfa_grids
 
-    def set_grid(self, new_lfa_grid):
-        self._lfa_grid = new_lfa_grid
+    def set_grids(self, new_lfa_grids):
+        self._lfa_grids = new_lfa_grids
 
     @property
     def coarsening_factors(self):
@@ -181,10 +181,12 @@ class ConvergenceEvaluatorSystem:
     def dimension(self):
         return self._dimension
 
-    def get_lfa_grid(self, grid: [base.Grid]):
-        lfa_grid = self.lfa_grid
-        while all(lfa_subgrid.step_size() < subgrid.step_size for lfa_subgrid, subgrid in zip(lfa_grid, grid)):
-            lfa_grid = [lfa_subgrid.coarse(coarsening_factor) for lfa_subgrid, coarsening_factor in zip(lfa_grid, self.coarsening_factors)]
+    def get_lfa_grid(self, grid: base.Grid, i: int):
+        lfa_grid = self.lfa_grids[i]
+        step_size = lfa_grid.step_size()
+        while step_size < grid.step_size:
+            lfa_grid = lfa_grid.coarse(self.coarsening_factors[i])
+            step_size = lfa_grid.step_size()
         return lfa_grid
 
     def transform(self, expression: base.Expression):
@@ -207,6 +209,10 @@ class ConvergenceEvaluatorSystem:
             result = expression.factor * self.transform(expression.operand)
         elif isinstance(expression, base.Inverse):
             result = self.transform(expression.operand).inverse()
+        elif isinstance(expression, system.Diagonal):
+            result = self.transform(expression.operand).diag()
+        elif isinstance(expression, system.ElementwiseDiagonal):
+            result = self.transform(expression.operand).elementwise_diag()
         elif isinstance(expression, multigrid.CoarseGridSolver):
             cgs_expression = expression.expression
             if cgs_expression is None or not cgs_expression.evaluate:
@@ -217,15 +223,27 @@ class ConvergenceEvaluatorSystem:
                     raise RuntimeError("Not evaluated")
                 result = cgs_expression.iteration_matrix.lfa_symbol
         elif isinstance(expression, system.Operator):
+            lfa_entries = []
             for operator_row in expression.entries:
-                for operator in operator_row:
-                    if isinstance(operator, multigrid.Prolongation):
-                        pass
-                    elif isinstance(operator, multigrid. Restriction):
-                        pass
+                lfa_entries.append([])
+                for i, operator in enumerate(operator_row):
+                    if isinstance(operator, multigrid.Restriction):
+                        lfa_fine_grid = self.get_lfa_grid(operator.fine_grid, i)
+                        lfa_coarse_grid = self.get_lfa_grid(operator.coarse_grid, i)
+                        stencil = operator.generate_stencil()
+                        lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
+                        lfa_operator = lfa_lab.injection_restriction(lfa_fine_grid, lfa_coarse_grid) * lfa_stencil
+                    elif isinstance(operator, multigrid.Prolongation):
+                        lfa_fine_grid = self.get_lfa_grid(operator.fine_grid, i)
+                        lfa_coarse_grid = self.get_lfa_grid(operator.coarse_grid, i)
+                        stencil = operator.generate_stencil()
+                        lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
+                        lfa_operator = lfa_stencil * lfa_lab.injection_interpolation(lfa_fine_grid, lfa_coarse_grid)
                     else:
-                        pass
-            result = None
+                        lfa_grid = self.get_lfa_grid(operator.grid, i)
+                        lfa_operator = stencil_to_lfa(operator.generate_stencil(), lfa_grid)
+                    lfa_entries[-1].append(lfa_operator)
+            result = lfa_lab.system(lfa_entries)
         else:
             raise NotImplementedError("Not implemented")
         expression.lfa_symbol = result
