@@ -70,7 +70,7 @@ class ZeroApproximation(Approximation):
         super().__init__(name, [base.ZeroApproximation(g) for g in grid])
 
 
-class IntergridOperator(Operator):
+class InterGridOperator(Operator):
     def __init__(self, name, scalar_intergrid_operator, scalar_zero_operator, grid: [base.Grid]):
         number_of_unknowns = len(grid)
         entries = [[] for _ in range(number_of_unknowns)]
@@ -83,14 +83,18 @@ class IntergridOperator(Operator):
         super().__init__(name, entries)
 
 
-class Restriction(IntergridOperator):
+class Restriction(InterGridOperator):
     def __init__(self, name, scalar_restriction_operator, grid: [base.Grid]):
-        super().__init__(name, scalar_restriction_operator, multigrid.ZeroRestriction('0', scalar_restriction_operator.fine_grid, scalar_restriction_operator.coarse_grid), grid)
+        zero_operator = multigrid.ZeroRestriction(scalar_restriction_operator.fine_grid,
+                                                  scalar_restriction_operator.coarse_grid)
+        super().__init__(name, scalar_restriction_operator, zero_operator, grid)
 
 
-class Prolongation(IntergridOperator):
+class Prolongation(InterGridOperator):
     def __init__(self, name, scalar_prolongation_operator, grid: [base.Grid]):
-        super().__init__(name, scalar_prolongation_operator, multigrid.ZeroProlongation('0', scalar_prolongation_operator.fine_grid, scalar_prolongation_operator.coarse_grid), grid)
+        zero_operator = multigrid.ZeroProlongation(scalar_prolongation_operator.fine_grid,
+                                                  scalar_prolongation_operator.coarse_grid)
+        super().__init__(name, scalar_prolongation_operator, zero_operator, grid)
 
 
 class Diagonal(base.UnaryExpression):

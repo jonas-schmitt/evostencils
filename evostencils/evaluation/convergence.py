@@ -227,18 +227,17 @@ class ConvergenceEvaluatorSystem:
             for operator_row in expression.entries:
                 lfa_entries.append([])
                 for i, operator in enumerate(operator_row):
-                    if isinstance(operator, multigrid.Restriction):
+                    if isinstance(operator, multigrid.InterGridOperator):
                         lfa_fine_grid = self.get_lfa_grid(operator.fine_grid, i)
                         lfa_coarse_grid = self.get_lfa_grid(operator.coarse_grid, i)
                         stencil = operator.generate_stencil()
                         lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
-                        lfa_operator = lfa_lab.injection_restriction(lfa_fine_grid, lfa_coarse_grid) * lfa_stencil
-                    elif isinstance(operator, multigrid.Prolongation):
-                        lfa_fine_grid = self.get_lfa_grid(operator.fine_grid, i)
-                        lfa_coarse_grid = self.get_lfa_grid(operator.coarse_grid, i)
-                        stencil = operator.generate_stencil()
-                        lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
-                        lfa_operator = lfa_stencil * lfa_lab.injection_interpolation(lfa_fine_grid, lfa_coarse_grid)
+                        if isinstance(operator, multigrid.Restriction):
+                            lfa_operator = lfa_lab.injection_restriction(lfa_fine_grid, lfa_coarse_grid) * lfa_stencil
+                        elif isinstance(operator, multigrid.Prolongation):
+                            lfa_operator = lfa_stencil * lfa_lab.injection_interpolation(lfa_fine_grid, lfa_coarse_grid)
+                        else:
+                            raise NotImplementedError("Not implemented")
                     else:
                         lfa_grid = self.get_lfa_grid(operator.grid, i)
                         lfa_operator = stencil_to_lfa(operator.generate_stencil(), lfa_grid)

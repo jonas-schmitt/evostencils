@@ -3,13 +3,27 @@ from evostencils.expressions import partitioning as part
 from evostencils.stencils import gallery
 
 
-class Restriction(base.Operator):
-    def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
-        import operator
-        from functools import reduce
+class InterGridOperator(base.Operator):
+
+    def __init__(self, name, grid, fine_grid, coarse_grid, stencil_generator):
         self._fine_grid = fine_grid
         self._coarse_grid = coarse_grid
-        super().__init__(name, coarse_grid, stencil_generator)
+        super().__init__(name, grid, stencil_generator)
+
+    @property
+    def fine_grid(self):
+        return self._fine_grid
+
+    @property
+    def coarse_grid(self):
+        return self._coarse_grid
+
+
+class Restriction(InterGridOperator):
+    def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
+        super().__init__(name, coarse_grid, fine_grid, coarse_grid, stencil_generator)
+        import operator
+        from functools import reduce
         tmp1 = reduce(operator.mul, fine_grid.size)
         tmp2 = reduce(operator.mul, coarse_grid.size)
         self._shape = (tmp2, tmp1)
@@ -28,17 +42,15 @@ class Restriction(base.Operator):
 
 
 class ZeroRestriction(Restriction):
-    def __init__(self, name, fine_grid, coarse_grid):
+    def __init__(self, fine_grid, coarse_grid, name='0'):
         super().__init__(name, fine_grid, coarse_grid, gallery.ZeroGenerator)
 
 
-class Prolongation(base.Operator):
+class Prolongation(InterGridOperator):
     def __init__(self, name, fine_grid, coarse_grid, stencil_generator=None):
+        super().__init__(name, fine_grid, fine_grid, coarse_grid, stencil_generator)
         import operator
         from functools import reduce
-        self._fine_grid = fine_grid
-        self._coarse_grid = coarse_grid
-        super().__init__(name, fine_grid, stencil_generator)
         tmp1 = reduce(operator.mul, fine_grid.size)
         tmp2 = reduce(operator.mul, coarse_grid.size)
         self._shape = (tmp1, tmp2)
@@ -58,7 +70,7 @@ class Prolongation(base.Operator):
 
 
 class ZeroProlongation(Prolongation):
-    def __init__(self, name, fine_grid, coarse_grid):
+    def __init__(self, fine_grid, coarse_grid, name='0'):
         super().__init__(name, fine_grid, coarse_grid, gallery.ZeroGenerator)
 
 
