@@ -26,13 +26,10 @@ def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, finest_grid, coarsening_factor, dimension, lfa_interpolation_generator,
-                 lfa_restriction_generator):
+    def __init__(self, finest_grid, coarsening_factor, dimension):
         self._finest_grid = finest_grid
         self._coarsening_factor = coarsening_factor
         self._dimension = dimension
-        self._lfa_interpolation_generator = lfa_interpolation_generator
-        self._lfa_restriction_generator = lfa_restriction_generator
 
     @property
     def finest_grid(self):
@@ -48,14 +45,6 @@ class ConvergenceEvaluator:
     @property
     def dimension(self):
         return self._dimension
-
-    @property
-    def lfa_interpolation_generator(self):
-        return self._lfa_interpolation_generator
-
-    @property
-    def lfa_restriction_generator(self):
-        return self._lfa_restriction_generator
 
     def get_lfa_grid(self, u: base.Grid):
         grid = self.finest_grid
@@ -119,11 +108,15 @@ class ConvergenceEvaluator:
         elif isinstance(expression, multigrid.Restriction):
             lfa_fine_grid = self.get_lfa_grid(expression.fine_grid)
             lfa_coarse_grid = self.get_lfa_grid(expression.coarse_grid)
-            result = self.lfa_restriction_generator(lfa_fine_grid, lfa_coarse_grid)
+            stencil = expression.generate_stencil()
+            lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
+            result = lfa_lab.injection_restriction(lfa_fine_grid, lfa_coarse_grid) * lfa_stencil
         elif isinstance(expression, multigrid.Prolongation):
             lfa_fine_grid = self.get_lfa_grid(expression.fine_grid)
             lfa_coarse_grid = self.get_lfa_grid(expression.coarse_grid)
-            result = self.lfa_interpolation_generator(lfa_fine_grid, lfa_coarse_grid)
+            stencil = expression.generate_stencil()
+            lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
+            result = lfa_stencil * lfa_lab.injection_interpolation(lfa_fine_grid, lfa_coarse_grid)
         elif isinstance(expression, multigrid.CoarseGridSolver):
             cgs_expression = expression.expression
             if cgs_expression is None or not cgs_expression.evaluate:
@@ -168,13 +161,10 @@ class ConvergenceEvaluator:
 
 class ConvergenceEvaluatorSystem:
 
-    def __init__(self, lfa_grid, coarsening_factors, dimension, lfa_interpolation_generator,
-                 lfa_restriction_generator):
+    def __init__(self, lfa_grid, coarsening_factors, dimension):
         self._lfa_grid = lfa_grid
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
-        self._lfa_interpolation_generator = lfa_interpolation_generator
-        self._lfa_restriction_generator = lfa_restriction_generator
 
     @property
     def lfa_grid(self):
@@ -190,14 +180,6 @@ class ConvergenceEvaluatorSystem:
     @property
     def dimension(self):
         return self._dimension
-
-    @property
-    def lfa_interpolation_generator(self):
-        return self._lfa_interpolation_generator
-
-    @property
-    def lfa_restriction_generator(self):
-        return self._lfa_restriction_generator
 
     def get_lfa_grid(self, grid: [base.Grid]):
         lfa_grid = self.lfa_grid
@@ -219,6 +201,8 @@ class ConvergenceEvaluatorSystem:
                 result = child1 + child2
             elif isinstance(expression, base.Subtraction):
                 result = child1 - child2
+            else:
+                raise RuntimeError("Not evaluated")
         elif isinstance(expression, base.Scaling):
             result = expression.factor * self.transform(expression.operand)
         elif isinstance(expression, base.Inverse):
@@ -233,7 +217,15 @@ class ConvergenceEvaluatorSystem:
                     raise RuntimeError("Not evaluated")
                 result = cgs_expression.iteration_matrix.lfa_symbol
         elif isinstance(expression, system.Operator):
-            result = [[entry.lfa_symbol for entry in row] for row in expression.entries]
+            for operator_row in expression.entries:
+                for operator in operator_row:
+                    if isinstance(operator, multigrid.Prolongation):
+                        pass
+                    elif isinstance(operator, multigrid. Restriction):
+                        pass
+                    else:
+                        pass
+            result = None
         else:
             raise NotImplementedError("Not implemented")
         expression.lfa_symbol = result
