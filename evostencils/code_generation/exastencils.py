@@ -2,7 +2,6 @@ from evostencils.expressions import base, multigrid as mg, partitioning as part
 from evostencils.stencils import constant, periodic
 import os
 import subprocess
-from pathlib import Path
 import math
 
 
@@ -57,8 +56,7 @@ class ProgramGenerator:
             subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
             if os.path.isfile(f'{exastencils_path}/Compiler/compiler.jar'):
                 self._compiler_available = True
-        self.generate_settings_file()
-        self.generate_knowledge_file()
+        self.generate_knowledge_and_settings_for_execution()
 
     @property
     def exastencils_path(self):
@@ -119,6 +117,7 @@ class ProgramGenerator:
         tmp += f'debugL3File\t= "Debug/{self.problem_name}_debug.exa3"\n'
         tmp += f'debugL4File\t= "Debug/{self.problem_name}_debug.exa4"\n\n'
         tmp += f'htmlLogFile\t= "Debug/{self.problem_name}_log.html"\n\n'
+        tmp += f'performanceEstimateOutputFile\t= "{self.output_path}/performance_estimate.csv"\n'
         tmp += f'outputPath\t= "generated/{self.problem_name}"\n\n'
         tmp += f'produceHtmlLog\t= true\n'
         tmp += f'timeStrategies\t= true\n\n'
@@ -127,15 +126,33 @@ class ProgramGenerator:
             print(tmp, file=file)
 
     def generate_knowledge_file(self, discretization_type="FiniteDifferences",
-                                domain="domain_onePatch", parallelization="parallelization_pureOmp"):
+                                domain="domain_onePatch", parallelization="parallelization_pureOmp",
+                                add_performance_estimate=False, only_estimate_performance=False):
         tmp = f'dimensionality\t= {self.dimension}\n\n'
         tmp += f'minLevel\t= {self.min_level}\n'
         tmp += f'maxLevel\t= {self.max_level}\n\n'
         tmp += f'discr_type\t= "{discretization_type}"\n\n'
+        if add_performance_estimate:
+            tmp += f'experimental_addPerformanceEstimate\t= true\n'
+        if only_estimate_performance:
+            tmp += f'experimental_onlyEstimatePerformance\t= true\n'
         tmp += f'import "lib/{domain}.knowledge"\n'
         tmp += f'import "lib/{parallelization}.knowledge"\n'
         with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
             print(tmp, file=file)
+
+    def generate_knowledge_and_settings_for_execution(self, discretization_type="FiniteDifferences",
+                                domain="domain_onePatch", parallelization="parallelization_pureOmp"):
+        self.generate_knowledge_file(discretization_type, domain, parallelization, add_performance_estimate=False,
+                                     only_estimate_performance=False)
+        self.generate_settings_file()
+
+    def generate_knowledge_and_settings_for_performance_estimation(self, discretization_type="FiniteDifferences",
+                                                                   domain="domain_onePatch",
+                                                                   parallelization="parallelization_pureOmp"):
+        self.generate_knowledge_file(discretization_type, domain, parallelization, add_performance_estimate=True,
+                                     only_estimate_performance=True)
+        self.generate_settings_file()
 
     def generate_boilerplate(self, storages, dimension, epsilon=1e-10, level=0):
         if dimension == 1:
