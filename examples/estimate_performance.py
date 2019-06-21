@@ -11,8 +11,8 @@ def main():
         max_level = 10
         program_generator = ProgramGenerator(problem_name, exastencils_path,
                                              None, None, None, None, None, None, dimensions, None, min_level, max_level, None)
-        time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=10)
-        print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}')
+        runtime_per_iteration = program_generator.estimate_runtime_per_iteration()
+        print(f'Estimated runtime per iteration: {runtime_per_iteration} ms')
 
 
 if __name__ == "__main__":

@@ -83,7 +83,7 @@ def main():
     # restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    program, pops, stats = optimizer.default_optimization(gp_mu=500, gp_lambda=500, gp_generations=10,
+    program, pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=20,
                                                           es_generations=20, required_convergence=required_convergence,
                                                           restart_from_checkpoint=restart_from_checkpoint)
     print(program)

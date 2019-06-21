@@ -3,6 +3,7 @@ from evostencils.stencils import constant, periodic
 import os
 import subprocess
 import math
+import csv
 
 
 class CycleStorage:
@@ -50,13 +51,25 @@ class ProgramGenerator:
         self._max_level = max_level
         self._initialization_information = initialization_information
         self._compiler_available = False
+        self._performance_estimate_file_name = 'performance_estimate.csv'
+        self._compiler_file_name = 'compiler.jar'
         if not os.path.exists(output_path):
             os.makedirs(output_path)
         if os.path.exists(exastencils_path):
             subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
-            if os.path.isfile(f'{exastencils_path}/Compiler/compiler.jar'):
+            if os.path.isfile(f'{exastencils_path}/Compiler/{self.compiler_file_name}'):
                 self._compiler_available = True
-        self.generate_knowledge_and_settings_for_execution()
+        # Settings and knowledge for execution
+        self.generate_settings_file(problem_name)
+        self.generate_knowledge_file(problem_name)
+        # Settings and knowledge for performance estimation
+        tmp = f'{problem_name}_performance_estimation'
+        self.generate_settings_file(tmp, add_performance_estimate=True)
+        self.generate_knowledge_file(tmp, add_performance_estimate=True, only_estimate_performance=True)
+
+    @property
+    def compiler_file_name(self):
+        return self._compiler_file_name
 
     @property
     def exastencils_path(self):
@@ -110,22 +123,23 @@ class ProgramGenerator:
     def restriction(self):
         return self._restriction
 
-    def generate_settings_file(self):
+    def generate_settings_file(self, output_name, add_performance_estimate=False):
         tmp = f'user\t= "Guest"\n\n'
         tmp += f'basePathPrefix\t= "{self.output_path}"\n\n'
         tmp += f'l3file\t= "{self.problem_name}.exa3"\n\n'
-        tmp += f'debugL3File\t= "Debug/{self.problem_name}_debug.exa3"\n'
-        tmp += f'debugL4File\t= "Debug/{self.problem_name}_debug.exa4"\n\n'
-        tmp += f'htmlLogFile\t= "Debug/{self.problem_name}_log.html"\n\n'
-        tmp += f'performanceEstimateOutputFile\t= "{self.output_path}/performance_estimate.csv"\n'
-        tmp += f'outputPath\t= "generated/{self.problem_name}"\n\n'
+        tmp += f'debugL3File\t= "Debug/{output_name}_debug.exa3"\n'
+        tmp += f'debugL4File\t= "Debug/{output_name}_debug.exa4"\n\n'
+        tmp += f'htmlLogFile\t= "Debug/{output_name}_log.html"\n\n'
+        if add_performance_estimate:
+            tmp += f'performanceEstimateOutputFile\t= "{self.output_path}/{self._performance_estimate_file_name}"\n'
+        tmp += f'outputPath\t= "generated/{output_name}"\n\n'
         tmp += f'produceHtmlLog\t= true\n'
         tmp += f'timeStrategies\t= true\n\n'
         tmp += f'buildfileGenerators\t= {{"MakefileGenerator"}}\n'
-        with open(f'{self.output_path}/{self.problem_name}.settings', "w") as file:
+        with open(f'{self.output_path}/{output_name}.settings', "w") as file:
             print(tmp, file=file)
 
-    def generate_knowledge_file(self, discretization_type="FiniteDifferences",
+    def generate_knowledge_file(self, output_name, discretization_type="FiniteDifferences",
                                 domain="domain_onePatch", parallelization="parallelization_pureOmp",
                                 add_performance_estimate=False, only_estimate_performance=False):
         tmp = f'dimensionality\t= {self.dimension}\n\n'
@@ -138,21 +152,8 @@ class ProgramGenerator:
             tmp += f'experimental_onlyEstimatePerformance\t= true\n'
         tmp += f'import "lib/{domain}.knowledge"\n'
         tmp += f'import "lib/{parallelization}.knowledge"\n'
-        with open(f'{self.output_path}/{self.problem_name}.knowledge', "w") as file:
+        with open(f'{self.output_path}/{output_name}.knowledge', "w") as file:
             print(tmp, file=file)
-
-    def generate_knowledge_and_settings_for_execution(self, discretization_type="FiniteDifferences",
-                                domain="domain_onePatch", parallelization="parallelization_pureOmp"):
-        self.generate_knowledge_file(discretization_type, domain, parallelization, add_performance_estimate=False,
-                                     only_estimate_performance=False)
-        self.generate_settings_file()
-
-    def generate_knowledge_and_settings_for_performance_estimation(self, discretization_type="FiniteDifferences",
-                                                                   domain="domain_onePatch",
-                                                                   parallelization="parallelization_pureOmp"):
-        self.generate_knowledge_file(discretization_type, domain, parallelization, add_performance_estimate=True,
-                                     only_estimate_performance=True)
-        self.generate_settings_file()
 
     def generate_boilerplate(self, storages, dimension, epsilon=1e-10, level=0):
         if dimension == 1:
@@ -223,15 +224,27 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
             print(program, file=file)
 
-    def run_exastencils_compiler(self, platform='linux'):
-        import subprocess
+    def run_exastencils_compiler(self, input_name=None, platform='linux'):
+        if input_name is None:
+            input_name = self.problem_name
         result = subprocess.run(['java', '-cp',
-                                 f'{self.exastencils_path}/Compiler/compiler.jar', 'Main',
-                                 f'{self.output_path}/{self.problem_name}.settings',
-                                 f'{self.output_path}/{self.problem_name}.knowledge',
+                                 f'{self.exastencils_path}/Compiler/{self.compiler_file_name}', 'Main',
+                                 f'{self.output_path}/{input_name}.settings',
+                                 f'{self.output_path}/{input_name}.knowledge',
                                  f'{self.output_path}/lib/{platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
+
+    def estimate_runtime_per_iteration(self, platform='linux'):
+        self.run_exastencils_compiler(f'{self.problem_name}_performance_estimation', platform)
+        results = []
+        with open(f'{self.output_path}/{self._performance_estimate_file_name}', 'r') as file:
+            reader = csv.reader(file, delimiter=';')
+            for row in reader:
+                if 'cycle' in row[1].lower():
+                    results.append(float(row[2]))
+        estimated_runtime = max(results)
+        return estimated_runtime
 
     def run_c_compiler(self):
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
@@ -240,7 +253,7 @@ class ProgramGenerator:
 
     def evaluate(self, platform='linux', infinity=1e100, number_of_samples=1, only_weights_adapted=False):
         if not only_weights_adapted:
-            return_code = self.run_exastencils_compiler(platform)
+            return_code = self.run_exastencils_compiler(self.problem_name, platform)
             if not return_code == 0:
                 return infinity, infinity
         return_code = self.run_c_compiler()
