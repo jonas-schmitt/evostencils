@@ -201,11 +201,11 @@ class Optimizer:
         mstats.register("min", np.min)
         mstats.register("max", np.max)
         if use_checkpoint:
+            logbook = logbooks[-1]
+        else:
             logbook = tools.Logbook()
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
-        else:
-            logbook = logbooks[-1]
 
         invalid_ind = [ind for ind in pop if not ind.fitness.valid]
         toolbox = self._toolbox
