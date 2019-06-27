@@ -167,12 +167,19 @@ class Optimizer:
     def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
                min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         random.seed()
-        if checkpoint is None:
-            pop = self._toolbox.population(n=initial_population_size)
-            min_generation = 0
-        else:
+        use_checkpoint = False
+        if checkpoint is not None:
+            if lambda_ == len(checkpoint.population):
+                use_checkpoint = True
+            else:
+                print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
+                      f'but the required size is {lambda_}.')
+        if use_checkpoint:
             pop = checkpoint.population
             min_generation = checkpoint.generation
+        else:
+            pop = self._toolbox.population(n=initial_population_size)
+            min_generation = 0
         max_generation = generations
         hof = tools.ParetoFront()
 
@@ -193,7 +200,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        if checkpoint is None:
+        if use_checkpoint:
             logbook = tools.Logbook()
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)

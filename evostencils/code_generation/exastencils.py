@@ -65,7 +65,7 @@ class ProgramGenerator:
         # Settings and knowledge for performance estimation
         tmp = f'{problem_name}_performance_estimation'
         self.generate_settings_file(tmp, add_performance_estimate=True)
-        self.generate_knowledge_file(tmp, add_performance_estimate=True, only_estimate_performance=True)
+        self.generate_knowledge_file(tmp, add_performance_estimate=True)
 
     @property
     def compiler_file_name(self):
@@ -141,15 +141,13 @@ class ProgramGenerator:
 
     def generate_knowledge_file(self, output_name, discretization_type="FiniteDifferences",
                                 domain="domain_onePatch", parallelization="parallelization_pureOmp",
-                                add_performance_estimate=False, only_estimate_performance=False):
+                                add_performance_estimate=False):
         tmp = f'dimensionality\t= {self.dimension}\n\n'
         tmp += f'minLevel\t= {self.min_level}\n'
         tmp += f'maxLevel\t= {self.max_level}\n\n'
         tmp += f'discr_type\t= "{discretization_type}"\n\n'
         if add_performance_estimate:
             tmp += f'experimental_addPerformanceEstimate\t= true\n'
-        if only_estimate_performance:
-            tmp += f'experimental_onlyEstimatePerformance\t= true\n'
         tmp += f'import "lib/{domain}.knowledge"\n'
         tmp += f'import "lib/{parallelization}.knowledge"\n'
         with open(f'{self.output_path}/{output_name}.knowledge', "w") as file:
