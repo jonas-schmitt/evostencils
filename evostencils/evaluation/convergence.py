@@ -199,12 +199,16 @@ class ConvergenceEvaluatorSystem:
                 if isinstance(expression.correction, base.Multiplication):
                     operand1 = expression.correction.operand1
                     operand2 = expression.correction.operand2
-                    if isinstance(operand1, base.Inverse) or isinstance(operand1, system.Operator) and isinstance(operand2, multigrid.Residual):
+                    if isinstance(operand1, base.Inverse) and isinstance(operand2, multigrid.Residual):
                         red_entries = []
                         black_entries = []
-                        if isinstance(operand1, base.Inverse):
-                            operand1 = operand1.operand.operand
-                        for i, row in enumerate(operand1.entries):
+                        operator = operand1.operand
+                        while not isinstance(operator, system.Operator):
+                            if isinstance(operator, base.UnaryExpression):
+                                operator = operator.operand
+                            else:
+                                raise RuntimeError("Computation could not be partitioned.")
+                        for i, row in enumerate(operator.entries):
                             red_entries.append([])
                             black_entries.append([])
                             for j, entry in enumerate(row):
@@ -225,10 +229,12 @@ class ConvergenceEvaluatorSystem:
                     else:
                         result = self.transform(expression.generate_expression())
                 else:
-                    raise RuntimeError("Computation could not be partitioned")
+                    raise RuntimeError("Computation could not be partitioned.")
             else:
                 raise NotImplementedError("Not implemented")
             # result = self.transform(expression.generate_expression())
+        elif isinstance(expression, multigrid.Residual):
+            result = self.transform(expression.generate_expression())
         elif isinstance(expression, base.BinaryExpression):
             child1 = self.transform(expression.operand1)
             child2 = self.transform(expression.operand2)

@@ -96,22 +96,6 @@ def get_system_iteration_matrix(expression: base.Expression):
             iteration_matrix = result.approximation
         else:
             iteration_matrix = result
-    elif isinstance(result, mg.Residual):
-        operand1 = result.rhs
-        if isinstance(result.approximation, system.ZeroOperator):
-            operand2 = result.approximation
-        else:
-            operand2 = base.mul(result.operator, result.approximation)
-        # Inefficient but sufficient for now
-        if isinstance(operand1, system.ZeroOperator):
-            if isinstance(operand2, system.ZeroOperator):
-                iteration_matrix = operand2
-            else:
-                iteration_matrix = base.Scaling(-1, operand2)
-        elif isinstance(operand2, system.ZeroOperator):
-            iteration_matrix = operand1
-        else:
-            iteration_matrix = base.Subtraction(operand1, operand2)
     elif isinstance(result, base.Addition):
         if isinstance(result.operand1, system.ZeroOperator):
             iteration_matrix = result.operand2

@@ -10,8 +10,8 @@ Z = operator.zero(grid)
 
 A = system([[Laplace, I],
             [Z      , Laplace]])
-S_pointwise = jacobi(A, 0.8)
-S_collective = collective_jacobi(A, 0.8)
+S_pointwise = jacobi(A, 1)
+S_collective = collective_jacobi(A, 1)
 
 
 Rs = gallery.fw_restriction(grid, coarse_grid)
@@ -26,7 +26,9 @@ P = system([[Ps, PZ],
             [PZ, Ps]])
 
 # Create the Galerkin coarse grid approximation
-Ac = R * A * P
+#Ac = R * A * P
+Lc = gallery.poisson_2d(coarse_grid)
+Ac = system([[Lc, Lc.matching_identity()], [Lc.matching_zero(), Lc]])
 
 cgc = coarse_grid_correction(
         operator = A,
@@ -34,9 +36,10 @@ cgc = coarse_grid_correction(
         interpolation = P,
         restriction = R)
 
-#E = S_pointwise * cgc * S_pointwise
+E = cgc
+E = S_pointwise * cgc * S_pointwise
 # E = S_collective * cgc * S_collective
-E = S_pointwise
+# E = S_pointwise
 symbol = E.symbol()
 
 print("Spectral radius: {}".format(symbol.spectral_radius()))
