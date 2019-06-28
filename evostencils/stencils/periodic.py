@@ -224,3 +224,4 @@ def red_black_partitioning(stencil, grid):
     return red_filter, black_filter
 
 
+
