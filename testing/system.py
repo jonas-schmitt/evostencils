@@ -39,7 +39,7 @@ u_new = multigrid.Cycle(u, f, tmp, weight=1, partitioning=partitioning.RedBlack)
 res_new = multigrid.Residual(A, u_new, f)
 coarse_grid = system.get_coarse_grid(u.grid, coarsening_factor)
 R = system.Restriction('R', u.grid, coarse_grid, restriction_generator)
-P = system.Prolongation('P', u.grid, coarse_grid, restriction_generator)
+P = system.Prolongation('P', u.grid, coarse_grid, interpolation_generator)
 A_c = system.get_coarse_operator(A, coarse_grid)
 # A_c = base.Multiplication(base.Multiplication(R, A), P)
 
