@@ -55,7 +55,6 @@ class Prolongation(InterGridOperator):
         tmp2 = reduce(operator.mul, coarse_grid.size)
         self._shape = (tmp1, tmp2)
 
-
     @property
     def fine_grid(self):
         return self._fine_grid
@@ -233,18 +232,18 @@ def residual(operator, iterate, rhs):
     return Residual(operator, iterate, rhs)
 
 
-def get_coarse_grid(grid: base.Grid, coarsening_factor: tuple):
+def get_coarse_grid(grid: base.Grid, coarsening_factor):
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
     coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
     return base.Grid(coarse_size, coarse_step_size)
 
 
-def get_coarse_approximation(approximation: base.Approximation, coarsening_factor: tuple):
-    return base.Approximation(f'{approximation.name}_coarse', get_coarse_grid(approximation.grid, coarsening_factor))
+def get_coarse_approximation(approximation: base.Approximation, coarsening_factor):
+    return base.Approximation(f'{approximation.name}_c', get_coarse_grid(approximation.grid, coarsening_factor))
 
 
-def get_coarse_rhs(rhs: base.RightHandSide, coarsening_factor: tuple):
-    return base.RightHandSide(f'{rhs.name}_coarse', get_coarse_grid(rhs.grid, coarsening_factor))
+def get_coarse_rhs(rhs: base.RightHandSide, coarsening_factor):
+    return base.RightHandSide(f'{rhs.name}_c', get_coarse_grid(rhs.grid, coarsening_factor))
 
 
 def get_coarse_operator(operator, coarse_grid):

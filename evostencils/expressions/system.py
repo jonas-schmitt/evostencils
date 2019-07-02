@@ -70,20 +70,30 @@ class ZeroApproximation(Approximation):
         super().__init__(name, [base.ZeroApproximation(g) for g in grid])
 
 
-class Restriction(Operator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
-        entries = [[multigrid.Restriction(name, fg, cg, stencil_generator)
-                    if i == j else multigrid.ZeroRestriction(fg, cg) for j in range(len(fine_grid))]
+class InterGridOperator(Operator):
+    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator,
+                 InterGridOperatorType, ZeroOperatorType):
+        self._stencil_generator = stencil_generator
+        entries = [[InterGridOperatorType(name, fg, cg, stencil_generator)
+                    if i == j else ZeroOperatorType(fg, cg) for j in range(len(fine_grid))]
                    for i, (fg, cg) in enumerate(zip(fine_grid, coarse_grid))]
         super().__init__(name, entries)
 
+    @property
+    def stencil_generator(self):
+        return self._stencil_generator
 
-class Prolongation(Operator):
+
+class Restriction(InterGridOperator):
     def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
-        entries = [[multigrid.Prolongation(name, fg, cg, stencil_generator)
-                    if i == j else multigrid.ZeroProlongation(fg, cg) for j in range(len(fine_grid))]
-                   for i, (fg, cg) in enumerate(zip(fine_grid, coarse_grid))]
-        super().__init__(name, entries)
+        super().__init__(name, fine_grid, coarse_grid, stencil_generator,
+                         multigrid.Restriction, multigrid.ZeroRestriction)
+
+
+class Prolongation(InterGridOperator):
+    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
+        super().__init__(name, fine_grid, coarse_grid, stencil_generator,
+                         multigrid.Prolongation, multigrid.ZeroProlongation)
 
 
 class Diagonal(base.UnaryExpression):
@@ -96,6 +106,14 @@ class ElementwiseDiagonal(base.UnaryExpression):
 
 def get_coarse_grid(grid: [base.Grid], coarsening_factor):
     return list(map(lambda g: multigrid.get_coarse_grid(g, coarsening_factor), grid))
+
+
+def get_coarse_approximation(approximation: Approximation, coarsening_factor):
+    return Approximation(f'{approximation.name}_c', get_coarse_grid(approximation.grid, coarsening_factor))
+
+
+def get_coarse_rhs(rhs: RightHandSide, coarsening_factor):
+    return RightHandSide(f'{rhs.name}_c', get_coarse_grid(rhs.grid, coarsening_factor))
 
 
 def get_coarse_operator(operator, coarse_grid):
