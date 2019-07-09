@@ -93,7 +93,7 @@ class Optimizer:
         return self._dimension
 
     @property
-    def coarsening_factor(self):
+    def coarsening_factors(self):
         return self._coarsening_factor
 
     @property
@@ -268,10 +268,10 @@ class Optimizer:
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
         for i in range(1, levels + 1):
-            approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factor))
-            right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
+            approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factors))
+            right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factors))
         best_expression = None
-        storages = self._program_generator.generate_storage(levels)
+        # storages = self._program_generator.generate_storage(levels)
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         solver_program = ""
@@ -303,7 +303,7 @@ class Optimizer:
             operator = system.get_coarse_operator(self.operator, approximation.grid)
             interpolation = system.Prolongation('P', approximations[i].grid, approximations[i + levels_per_run - 1].grid, self.interpolation.stencil_generator)
             restriction = system.Restriction('R', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.restriction.stencil_generator)
-            pset = system_initialization.generate_primitive_set(operator, approximation, rhs, self.dimension, self.coarsening_factor,
+            pset = system_initialization.generate_primitive_set(operator, approximation, rhs, self.dimension, self.coarsening_factors,
                                                                 interpolation, restriction,
                                                                 coarse_grid_solver_expression=best_expression,
                                                                 depth=levels_per_run, LevelFinishedType=self._FinishedType,

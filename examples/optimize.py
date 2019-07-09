@@ -44,8 +44,8 @@ def main():
     # stencil_generator = Poisson2DVariableCoefficients(get_coefficient_2D, (0.5, 0.5))
     # stencil_generator = Poisson3D()
     # stencil_generator = Poisson3DVariableCoefficients(get_coefficient_3D, (0.5, 0.5, 0.5))
-    interpolation_generator = InterpolationGenerator(coarsening_factor)
-    restriction_generator = RestrictionGenerator(coarsening_factor)
+    interpolation_generator = MultilinearInterpolationGenerator(coarsening_factor)
+    restriction_generator = FullWeightingRestrictionGenerator(coarsening_factor)
 
     A = base.Operator('A', grid, stencil_generator)
     I = base.Identity(grid)

@@ -186,7 +186,7 @@ Operator A from Stencil {
 """
 
 
-class InterpolationGenerator:
+class MultilinearInterpolationGenerator:
 
     def __init__(self, coarsening_factor):
         self.coarsening_factor = coarsening_factor
@@ -203,7 +203,7 @@ class InterpolationGenerator:
         return f"Operator {name} from default prolongation on Node with 'linear'\n"
 
 
-class RestrictionGenerator:
+class FullWeightingRestrictionGenerator:
 
     def __init__(self, coarsening_factor):
         self.coarsening_factor = coarsening_factor

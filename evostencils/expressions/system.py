@@ -104,16 +104,20 @@ class ElementwiseDiagonal(base.UnaryExpression):
     pass
 
 
-def get_coarse_grid(grid: [base.Grid], coarsening_factor):
-    return list(map(lambda g: multigrid.get_coarse_grid(g, coarsening_factor), grid))
+def get_coarse_grid(grid: [base.Grid], coarsening_factors: [tuple]):
+    return [multigrid.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]
 
 
-def get_coarse_approximation(approximation: Approximation, coarsening_factor):
-    return Approximation(f'{approximation.name}_c', get_coarse_grid(approximation.grid, coarsening_factor))
+def get_coarse_approximation(approximation: Approximation, coarsening_factors: tuple):
+    return Approximation(f'{approximation.name}_c', [base.Approximation(f'{entry.name}_c)',
+                                                                        multigrid.get_coarse_grid(entry.grid, cf))
+                                                     for entry, cf in zip(approximation.entries, coarsening_factors)])
 
 
-def get_coarse_rhs(rhs: RightHandSide, coarsening_factor):
-    return RightHandSide(f'{rhs.name}_c', get_coarse_grid(rhs.grid, coarsening_factor))
+def get_coarse_rhs(rhs: RightHandSide, coarsening_factors):
+    return RightHandSide(f'{rhs.name}_c', [base.RightHandSide(f'{entry.name}_c)',
+                                                              multigrid.get_coarse_grid(entry.grid, cf))
+                                           for entry, cf in zip(rhs.entries, coarsening_factors)])
 
 
 def get_coarse_operator(operator, coarse_grid):
