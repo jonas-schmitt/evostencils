@@ -375,7 +375,7 @@ class Optimizer:
             iteration_matrix = transformations.get_iteration_matrix(best_expression)
             # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
-            self.performance_evaluator.estimate_runtime(best_expression)
+            # self.performance_evaluator.estimate_runtime(best_expression)
             #try:
             #    solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
             #except Exception as e:

@@ -196,6 +196,8 @@ class ConvergenceEvaluatorSystem:
             if expression.partitioning == partitioning.Single:
                 result = self.transform(expression.generate_expression())
             elif expression.partitioning == partitioning.RedBlack:
+                result = self.transform(expression.generate_expression())
+                """
                 if isinstance(expression.correction, base.Multiplication):
                     operand1 = expression.correction.operand1
                     operand2 = expression.correction.operand2
@@ -230,6 +232,7 @@ class ConvergenceEvaluatorSystem:
                         result = self.transform(expression.generate_expression())
                 else:
                     raise RuntimeError("Computation could not be partitioned.")
+                """
             else:
                 raise NotImplementedError("Not implemented")
             # result = self.transform(expression.generate_expression())
@@ -290,6 +293,10 @@ class ConvergenceEvaluatorSystem:
         return result
 
     def compute_spectral_radius(self, iteration_matrix: base.Expression):
+
+        lfa_expression = self.transform(iteration_matrix)
+        s = lfa_expression.symbol()
+        return s.spectral_radius()
 
         try:
             lfa_expression = self.transform(iteration_matrix)

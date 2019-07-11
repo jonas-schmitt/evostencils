@@ -60,6 +60,10 @@ class Approximation(base.Entity):
     def grid(self):
         return list(map(lambda entry: entry.grid, self.entries))
 
+    @property
+    def predecessor(self):
+        return None
+
 
 class RightHandSide(Approximation):
     pass
@@ -109,18 +113,18 @@ def get_coarse_grid(grid: [base.Grid], coarsening_factors: [tuple]):
 
 
 def get_coarse_approximation(approximation: Approximation, coarsening_factors: tuple):
-    return Approximation(f'{approximation.name}_c', [base.Approximation(f'{entry.name}_c)',
-                                                                        multigrid.get_coarse_grid(entry.grid, cf))
-                                                     for entry, cf in zip(approximation.entries, coarsening_factors)])
+    return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c)',
+                                                                      multigrid.get_coarse_grid(entry.grid, cf))
+                                                   for entry, cf in zip(approximation.entries, coarsening_factors)])
 
 
 def get_coarse_rhs(rhs: RightHandSide, coarsening_factors):
-    return RightHandSide(f'{rhs.name}_c', [base.RightHandSide(f'{entry.name}_c)',
-                                                              multigrid.get_coarse_grid(entry.grid, cf))
-                                           for entry, cf in zip(rhs.entries, coarsening_factors)])
+    return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c)',
+                                                            multigrid.get_coarse_grid(entry.grid, cf))
+                                         for entry, cf in zip(rhs.entries, coarsening_factors)])
 
 
 def get_coarse_operator(operator, coarse_grid):
     new_entries = [[base.Operator(f'{entry.name}_c', coarse_grid[i], entry.stencil_generator) for entry in row]
                    for i, row in enumerate(operator.entries)]
-    return Operator(f'{operator.name}_c', new_entries)
+    return Operator(f'{operator.name}', new_entries)

@@ -84,7 +84,7 @@ def substitute_entity(expression: base.Expression, sources: list, destinations: 
     return result
 """
 
-
+# Adapt this function
 def get_system_iteration_matrix(expression: base.Expression):
     if expression.iteration_matrix is not None:
         return expression.iteration_matrix

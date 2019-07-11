@@ -31,8 +31,6 @@ class Terminals:
 class Types:
     def __init__(self, terminals: Terminals, FinishedType, NotFinishedType):
         self.Operator = matrix_types.generate_operator_type(terminals.operator.shape)
-        self.LowerTriangularOperator = matrix_types.generate_lower_triangular_operator_type(terminals.operator.shape)
-        self.UpperTriangularOperator = matrix_types.generate_upper_triangular_operator_type(terminals.operator.shape)
         types = [grid_types.generate_grid_type(grid.size) for grid in terminals.grid]
         self.Grid = multiple.generate_type_list(*types)
         types = [grid_types.generate_correction_type(grid.size) for grid in terminals.grid]
@@ -59,7 +57,7 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, coarsest=False):
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
-    pset.addTerminal(base.inv(base.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
+    pset.addTerminal(base.inv(system.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
     pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -145,7 +143,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       multiple.generate_type_list(types.Grid, types.Correction, types.LevelNotFinished),
                       f'interpolate_{level}')
         """
-
     # Multigrid recipes
     pset.addPrimitive(apply, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.Finished)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished),
@@ -186,8 +183,8 @@ def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_f
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):
         coarse_approximation = system.ZeroApproximation(terminals.coarse_grid)
-        coarse_interpolation = system.Prolongation('P', terminals.grid, terminals.coarse_grid, interpolation.stencil_generator)
-        coarse_restriction = system.Restriction('R', terminals.grid, terminals.coarse_grid, restriction.stencil_generator)
+        coarse_interpolation = system.Prolongation('P', terminals.coarse_grid, system.get_coarse_grid(terminals.coarse_grid, coarsening_factor), interpolation.stencil_generator)
+        coarse_restriction = system.Restriction('R', terminals.coarse_grid, system.get_coarse_grid(terminals.coarse_grid, coarsening_factor), restriction.stencil_generator)
         cgs_expression = None
         coarsest = False
         if i == depth - 1:
