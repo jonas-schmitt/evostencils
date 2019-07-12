@@ -193,51 +193,71 @@ class ConvergenceEvaluatorSystem:
         if expression.lfa_symbol is not None:
             return expression.lfa_symbol
         if isinstance(expression, multigrid.Cycle):
+            correction = self.transform(expression.correction)
+            if isinstance(expression.approximation, system.ZeroApproximation):
+                approximation = correction.matching_zero()
+            elif isinstance(expression.approximation, system.Approximation):
+                approximation = correction.matching_identity()
+            else:
+                approximation = self.transform(expression.approximation)
+            tmp = approximation + expression.weight * correction
             if expression.partitioning == partitioning.Single:
-                result = self.transform(expression.generate_expression())
+                result = tmp
             elif expression.partitioning == partitioning.RedBlack:
-                result = self.transform(expression.generate_expression())
-                """
                 if isinstance(expression.correction, base.Multiplication):
                     operand1 = expression.correction.operand1
                     operand2 = expression.correction.operand2
                     if isinstance(operand1, base.Inverse) and isinstance(operand2, multigrid.Residual):
-                        red_entries = []
-                        black_entries = []
-                        operator = operand1.operand
-                        while not isinstance(operator, system.Operator):
-                            if isinstance(operator, base.UnaryExpression):
-                                operator = operator.operand
-                            else:
-                                raise RuntimeError("Computation could not be partitioned.")
-                        for i, row in enumerate(operator.entries):
-                            red_entries.append([])
-                            black_entries.append([])
-                            for j, entry in enumerate(row):
-                                lfa_grid = self.get_lfa_grid(entry.grid, i)
-                                partition_stencils = expression.partitioning.generate(entry.generate_stencil(), entry.grid)
-                                lfa_red = stencil_to_lfa(partition_stencils[0], lfa_grid)
-                                lfa_black = stencil_to_lfa(partition_stencils[1], lfa_grid)
-                                if i == j:
-                                    red_entries[-1].append(lfa_red)
-                                    black_entries[-1].append(lfa_black)
+                        try:
+                            red_entries = []
+                            black_entries = []
+                            operator = operand1.operand
+                            while not isinstance(operator, system.Operator):
+                                if isinstance(operator, base.UnaryExpression):
+                                    operator = operator.operand
                                 else:
-                                    red_entries[-1].append(lfa_red * lfa_red.matching_zero())
-                                    black_entries[-1].append(lfa_black * lfa_black.matching_zero())
-                        red_filter = lfa_lab.system(red_entries)
-                        black_filter = lfa_lab.system(black_entries)
-                        tmp = self.transform(expression.generate_expression())
-                        result = (black_filter + red_filter * tmp) * (red_filter + black_filter * tmp)
+                                    raise RuntimeError("Computation could not be partitioned.")
+                            for i, row in enumerate(operator.entries):
+                                red_entries.append([])
+                                black_entries.append([])
+                                for j, entry in enumerate(row):
+                                    lfa_grid = self.get_lfa_grid(entry.grid, i)
+                                    partition_stencils = expression.partitioning.generate(entry.generate_stencil(), entry.grid)
+                                    lfa_red = stencil_to_lfa(partition_stencils[0], lfa_grid)
+                                    lfa_black = stencil_to_lfa(partition_stencils[1], lfa_grid)
+                                    if i == j:
+                                        red_entries[-1].append(lfa_red)
+                                        black_entries[-1].append(lfa_black)
+                                    else:
+                                        red_entries[-1].append(lfa_red * lfa_red.matching_zero())
+                                        black_entries[-1].append(lfa_black * lfa_black.matching_zero())
+                            red_filter = lfa_lab.system(red_entries)
+                            black_filter = lfa_lab.system(black_entries)
+                            result = (black_filter + red_filter * tmp) * (red_filter + black_filter * tmp)
+                        except RuntimeError as _:
+                            result = tmp
+                            # raise RuntimeError("Computation could not be partitioned.")
                     else:
-                        result = self.transform(expression.generate_expression())
+                        result = tmp
                 else:
-                    raise RuntimeError("Computation could not be partitioned.")
-                """
+                    result = tmp
+                    # raise RuntimeError("Computation could not be partitioned.")
             else:
                 raise NotImplementedError("Not implemented")
-            # result = self.transform(expression.generate_expression())
         elif isinstance(expression, multigrid.Residual):
-            result = self.transform(expression.generate_expression())
+            operator = self.transform(expression.operator)
+            if isinstance(expression.rhs, system.RightHandSide):
+                rhs = operator.matching_zero()
+            else:
+                rhs = self.transform(expression.rhs)
+            if isinstance(expression.approximation, system.ZeroApproximation):
+                approximation = rhs.matching_zero()
+            elif isinstance(expression.approximation, system.Approximation):
+                approximation = rhs.matching_identity()
+            else:
+                approximation = self.transform(expression.approximation)
+            result = rhs - operator * approximation
+            # result = self.transform(expression.generate_expression())
         elif isinstance(expression, base.BinaryExpression):
             child1 = self.transform(expression.operand1)
             child2 = self.transform(expression.operand2)
@@ -297,7 +317,7 @@ class ConvergenceEvaluatorSystem:
         lfa_expression = self.transform(iteration_matrix)
         s = lfa_expression.symbol()
         return s.spectral_radius()
-
+        """
         try:
             lfa_expression = self.transform(iteration_matrix)
 
@@ -316,4 +336,5 @@ class ConvergenceEvaluatorSystem:
             return queue.get(timeout=1)
         except (ArithmeticError, RuntimeError, MemoryError) as _:
             return 0.0
+        """
 

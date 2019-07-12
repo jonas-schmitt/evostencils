@@ -100,6 +100,9 @@ class CoarseGridSolver(base.Entity):
     def __repr__(self):
         return f'CoarseGridSolver({repr(self.operator)}, {repr(self.expression)})'
 
+    def mutate(self, f: callable, *args):
+        f(self.operator, *args)
+
 
 class Residual(base.Expression):
     def __init__(self, operator, approximation, rhs):
@@ -149,8 +152,8 @@ class Residual(base.Expression):
         return Residual(operator, iterate, rhs)
 
     def mutate(self, f: callable, *args):
-        f(self.rhs, *args)
-        f(self.approximation, *args)
+        # We already mutate within the cycle node
+        pass
 
 
 class Cycle(base.Expression):
@@ -219,7 +222,7 @@ class Cycle(base.Expression):
 
     def mutate(self, f: callable, *args):
         f(self.approximation, *args)
-        f(self.rhs)
+        f(self.rhs, *args)
         f(self.correction, *args)
 
 

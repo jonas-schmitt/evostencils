@@ -148,8 +148,7 @@ class Optimizer:
             return self.infinity, self.infinity
 
         expression = expression1
-        iteration_matrix = transformations.get_system_iteration_matrix(expression)
-        spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+        spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
@@ -246,7 +245,6 @@ class Optimizer:
             hof.update(pop)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
-                    transformations.invalidate_expression(solver.iteration_matrix)
                     transformations.invalidate_expression(solver)
                 logbooks[-1] = logbook
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
@@ -372,9 +370,8 @@ class Optimizer:
             #if optimized_convergence_factor < best_convergence_factor:
             #    weights.set_weights(best_expression, optimized_weights)
             #    print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
-            iteration_matrix = transformations.get_iteration_matrix(best_expression)
             # print(repr(iteration_matrix))
-            self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+            self.convergence_evaluator.compute_spectral_radius(best_expression)
             # self.performance_evaluator.estimate_runtime(best_expression)
             #try:
             #    solver_program += self._program_generator.generate_cycle_function(best_expression, storages)

@@ -79,8 +79,8 @@ def main():
     optimizer = Optimizer(A, u, b, dimension, coarsening_factor, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
-    restart_from_checkpoint = True
-    # restart_from_checkpoint = False
+    # restart_from_checkpoint = True
+    restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
     program, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20,
