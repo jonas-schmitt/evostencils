@@ -1,5 +1,4 @@
 from evostencils.expressions import base, multigrid as mg, partitioning as part
-import evostencils.stencils.constant as constant
 import evostencils.stencils.periodic as periodic
 
 
