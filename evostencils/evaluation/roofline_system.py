@@ -39,10 +39,9 @@ class RooflineEvaluator:
         return operations / (words * self.bytes_per_word)
 
     def compute_runtime(self, operations, words, problem_size):
-        total_number_of_operations = problem_size * operations
         arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
         if arithmetic_intensity > 0.0:
-            runtime = total_number_of_operations / self.compute_performance(arithmetic_intensity)
+            runtime = operations / self.compute_performance(arithmetic_intensity)
         else:
             runtime = 0.0
         return runtime
@@ -99,9 +98,17 @@ class RooflineEvaluator:
     def words_transferred_for_store():
         return 1
 
-    def estimate_runtime_for_operator_application(self, inverse: base.Inverse):
-        operator = inverse.operand
+    def estimate_runtime_for_operator_application(self, expression):
+        #TODO consider potential coefficient function
+        #TODO check accuracy of periodic stencil treatment
+        if isinstance(expression, base.Inverse):
+            operator = expression.operand
+        elif isinstance(expression, system.Operator):
+            operator = expression
+        else:
+            raise RuntimeError(f"Can not estimate runtime for {type(expression)}")
         entries = operator.entries
+        grid = operator.grid
         diagonal_operator = True
         zero_below_diagonal = 0
         for i, row_of_entries in enumerate(entries):
@@ -115,15 +122,25 @@ class RooflineEvaluator:
                     zero_below_diagonal += 1
 
         if diagonal_operator:
-            #TODO Handle simple stencil application
-            pass
+            # Decoupled Relaxation or Intergrid Transfer
+            operations_per_cell = 0
+            words_per_cell = 0
+            operations = 0
+            for i, row_of_entries in enumerate(entries):
+                problem_size = reduce(lambda x, y: x * y, grid[i].size)
+                entry = row_of_entries[i]
+                stencil = entry.generate_stencil()
+                for number_of_entries in periodic.count_number_of_entries(stencil):
+                    operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_entries)
+                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries)
+                operations += problem_size * operations
+            arithmetic_intensity = self.compute_arithmetic_intensity(operations_per_cell, words_per_cell)
         else:
-            # Handle case where local system must be solved
-            grid = operator.grid
+            # Collective Relaxation
             number_of_variables = len(grid)
             offsets = [{} for _ in grid]
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0 - number_of_variables * zero_below_diagonal
-            multiplications = additions - number_of_variables * zero_below_diagonal
+            multiplications = additions
             divisions = number_of_variables * (number_of_variables + 1) / 2 - zero_below_diagonal
             operations = (additions * RooflineEvaluator.operations_for_addition() +
                          multiplications * RooflineEvaluator.operations_for_multiplication() +
@@ -155,7 +172,12 @@ class RooflineEvaluator:
                 words += RooflineEvaluator.words_transferred_for_store() * problem_size
                 for offset, fraction in offset_dict.items():
                     words += RooflineEvaluator.words_transferred_for_load() * fraction * problem_size
-            return self.compute_runtime(operations, words, reduce(lambda x, y: x + y, [reduce(lambda x, y: x * y, g.size) for g in grid]))
+            arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
+
+        if arithmetic_intensity > 0.0:
+            return operations / arithmetic_intensity
+        else:
+            raise RuntimeError("The arithmetic intensity is zero.")
 
 
 
