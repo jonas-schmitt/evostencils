@@ -1,5 +1,6 @@
 from evostencils.expressions import base, multigrid, partitioning, system
 import evostencils.stencils.periodic as periodic
+from functools import reduce
 
 
 class RooflineEvaluator:
@@ -98,14 +99,13 @@ class RooflineEvaluator:
     def words_transferred_for_store():
         return 1
 
-    @staticmethod
-    def estimate_runtime_for_operator_application(operator: system.Operator):
+    def estimate_runtime_for_operator_application(self, inverse: base.Inverse):
+        operator = inverse.operand
         entries = operator.entries
         diagonal_operator = True
         zero_below_diagonal = 0
-        if isinstance(operator, system.Identity) or isinstance(operator, system.ZeroOperator):
-        for i, row in enumerate(entries):
-            for j, entry in enumerate(row):
+        for i, row_of_entries in enumerate(entries):
+            for j, entry in enumerate(row_of_entries):
                 if i != j and not isinstance(entry, base.ZeroOperator) and \
                         not isinstance(entry, multigrid.ZeroProlongation) and \
                         not isinstance(entry, multigrid.ZeroRestriction):
@@ -118,26 +118,47 @@ class RooflineEvaluator:
             #TODO Handle simple stencil application
             pass
         else:
-            #TODO Handle case where local system must be solved
+            # Handle case where local system must be solved
             grid = operator.grid
-            n = len(grid)
-            additions = (2*n**3 + 3*n**2 - 5*n)/6.0 - n * zero_below_diagonal
-            multiplications = additions - n * zero_below_diagonal
-            divisions = n * (n + 1) / 2 - zero_below_diagonal
-            operations = additions * RooflineEvaluator.operations_for_addition() + \
-                         multiplications * RooflineEvaluator.operations_for_multiplication() + \
-                         divisions * RooflineEvaluator.operations_for_division()
-            for row in entries:
-                for entry in row:
+            number_of_variables = len(grid)
+            offsets = [{} for _ in grid]
+            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0 - number_of_variables * zero_below_diagonal
+            multiplications = additions - number_of_variables * zero_below_diagonal
+            divisions = number_of_variables * (number_of_variables + 1) / 2 - zero_below_diagonal
+            operations = (additions * RooflineEvaluator.operations_for_addition() +
+                         multiplications * RooflineEvaluator.operations_for_multiplication() +
+                         divisions * RooflineEvaluator.operations_for_division()) \
+                         * min([reduce(lambda x, y: x * y, g.size) for g in grid])
+            for row_of_entries in entries:
+                for j, entry in enumerate(row_of_entries):
                     stencil = entry.generate_stencil()
-                    constant_stencils = stencil.constant_stencils
-                    #TODO Count unique offsets within the same column to obtain the required number of loads
-
-                    number_of_entries_list = periodic.count_number_of_entries(stencil)
-                    for number_of_entries in number_of_entries_list:
+                    constant_stencil_list = periodic.get_list_of_entries(stencil)
+                    problem_size = reduce(lambda x, y: x * y, grid[j].size)
+                    for constant_stencil in constant_stencil_list:
+                        number_of_entries = constant_stencil.number_of_entries
+                        current_offsets = {}
+                        for offset, _ in constant_stencil.entries:
+                            tmp = 1.0 / len(constant_stencil_list)
+                            if offset in offsets[j]:
+                                current_offsets[offset] += tmp
+                            else:
+                                current_offsets[offset] = tmp
+                        for offset, fraction in current_offsets.items():
+                            if offset not in offsets[j] or fraction > offsets[j][offset]:
+                                offsets[j][offset] = fraction
                         if number_of_entries > 1:
                             operations += RooflineEvaluator.operations_for_stencil_application(number_of_entries - 1) \
-                                          * n / number_of_entries_list
+                                          * problem_size / len(constant_stencil_list)
+            words = 0
+            for i, offset_dict in enumerate(offsets):
+                problem_size = reduce(lambda x, y: x * y, grid[i].size)
+                words += RooflineEvaluator.words_transferred_for_store() * problem_size
+                for offset, fraction in offset_dict.items():
+                    words += RooflineEvaluator.words_transferred_for_load() * fraction * problem_size
+            return self.compute_runtime(operations, words, reduce(lambda x, y: x + y, [reduce(lambda x, y: x * y, g.size) for g in grid]))
+
+
+
 
 
 

@@ -79,6 +79,21 @@ def count_number_of_entries(stencil):
 
 
 @convert_constant_stencils
+def get_list_of_entries(stencil):
+    from itertools import chain
+
+    def recursive_descent(array, dimension):
+        if dimension == 1:
+            return (element for element in array if element is not None)
+        else:
+            result = chain()
+            for element in array:
+                result = chain(result, recursive_descent(element, dimension - 1))
+            return result
+    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimension))
+
+
+@convert_constant_stencils
 def determine_maximal_shape(stencil):
     def recursive_descent(array, dimension):
         if dimension == 1:
