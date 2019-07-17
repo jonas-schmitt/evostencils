@@ -51,13 +51,13 @@ class RooflineEvaluator:
             return expression.runtime
         if isinstance(expression, multigrid.Cycle):
             if expression.partitioning == partitioning.Single:
-
+                pass
             elif expression.partitioning == partitioning.RedBlack:
                 if isinstance(expression.correction, base.Multiplication):
                     operand1 = expression.correction.operand1
                     operand2 = expression.correction.operand2
                     if isinstance(operand1, base.Inverse) and isinstance(operand2, multigrid.Residual):
-
+                        pass
         runtime = 0.0
         return runtime
 
@@ -98,105 +98,51 @@ class RooflineEvaluator:
     def words_transferred_for_store():
         return 1
 
-    def estimate_runtime_for_operator_application(self, expression):
-        #TODO consider potential coefficient function
-        #TODO check accuracy of periodic stencil treatment
-        if isinstance(expression, base.Inverse):
-            operator = expression.operand
-        elif isinstance(expression, system.Operator):
-            operator = expression
-        else:
-            raise RuntimeError(f"Can not estimate runtime for {type(expression)}")
-        entries = operator.entries
-        grid = operator.grid
-        diagonal_operator = True
-        zero_below_diagonal = 0
-        for i, row_of_entries in enumerate(entries):
-            for j, entry in enumerate(row_of_entries):
-                if i != j and not isinstance(entry, base.ZeroOperator) and \
-                        not isinstance(entry, multigrid.ZeroProlongation) and \
-                        not isinstance(entry, multigrid.ZeroRestriction):
-                    diagonal_operator = False
-                if i > j and (isinstance(entry, base.ZeroOperator) or isinstance(entry, multigrid.ZeroRestriction)
-                              or isinstance(entry, multigrid.ZeroProlongation)):
-                    zero_below_diagonal += 1
+    def estimate_runtime_for_solving_local_system(self, inverse: base.Inverse):
+        expression = inverse.operand
+        grid = expression.grid
 
-        if diagonal_operator:
-            # Decoupled Relaxation or Intergrid Transfer
+        if isinstance(expression, system.Diagonal):
+            # Decoupled Relaxation
+            operator = expression.operand
+            entries = operator.entries
+            operations = 0
             operations_per_cell = 0
             words_per_cell = 0
-            operations = 0
             for i, row_of_entries in enumerate(entries):
+                operations_per_dof = RooflineEvaluator.operations_for_multiplication()
+                operations_per_cell += operations_per_dof
+                words_per_cell += RooflineEvaluator.words_transferred_for_load() \
+                                 + RooflineEvaluator.words_transferred_for_store()
                 problem_size = reduce(lambda x, y: x * y, grid[i].size)
-                entry = row_of_entries[i]
-                stencil = entry.generate_stencil()
-                for number_of_entries in periodic.count_number_of_entries(stencil):
-                    operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_entries)
-                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries)
-                operations += problem_size * operations
+                operations += problem_size * operations_per_dof
             arithmetic_intensity = self.compute_arithmetic_intensity(operations_per_cell, words_per_cell)
-        else:
+        elif isinstance(expression, system.ElementwiseDiagonal):
             # Collective Relaxation
+            operator = expression.operand
+            entries = operator.entries
+            zero_below_diagonal = 0
+            for i, row_of_entries in enumerate(entries):
+                for j in range(0, i):
+                    if isinstance(row_of_entries[j], base.ZeroOperator):
+                        zero_below_diagonal += 1
+
             number_of_variables = len(grid)
-            offsets = [{} for _ in grid]
+            # Required operations for Gaussian Elimination
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0 - number_of_variables * zero_below_diagonal
             multiplications = additions
             divisions = number_of_variables * (number_of_variables + 1) / 2 - zero_below_diagonal
-            operations = (additions * RooflineEvaluator.operations_for_addition() +
-                         multiplications * RooflineEvaluator.operations_for_multiplication() +
-                         divisions * RooflineEvaluator.operations_for_division()) \
-                         * min([reduce(lambda x, y: x * y, g.size) for g in grid])
-            for row_of_entries in entries:
-                for j, entry in enumerate(row_of_entries):
-                    stencil = entry.generate_stencil()
-                    constant_stencil_list = periodic.get_list_of_entries(stencil)
-                    problem_size = reduce(lambda x, y: x * y, grid[j].size)
-                    for constant_stencil in constant_stencil_list:
-                        number_of_entries = constant_stencil.number_of_entries
-                        current_offsets = {}
-                        for offset, _ in constant_stencil.entries:
-                            tmp = 1.0 / len(constant_stencil_list)
-                            if offset in offsets[j]:
-                                current_offsets[offset] += tmp
-                            else:
-                                current_offsets[offset] = tmp
-                        for offset, fraction in current_offsets.items():
-                            if offset not in offsets[j] or fraction > offsets[j][offset]:
-                                offsets[j][offset] = fraction
-                        if number_of_entries > 1:
-                            operations += RooflineEvaluator.operations_for_stencil_application(number_of_entries - 1) \
-                                          * problem_size / len(constant_stencil_list)
-            words = 0
-            for i, offset_dict in enumerate(offsets):
-                problem_size = reduce(lambda x, y: x * y, grid[i].size)
-                words += RooflineEvaluator.words_transferred_for_store() * problem_size
-                for offset, fraction in offset_dict.items():
-                    words += RooflineEvaluator.words_transferred_for_load() * fraction * problem_size
-            arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
+            operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
+                         multiplications * RooflineEvaluator.operations_for_multiplication() + \
+                         divisions * RooflineEvaluator.operations_for_division()
+            words_per_cell =  number_of_variables * (RooflineEvaluator.words_transferred_for_load()
+                              + RooflineEvaluator.words_transferred_for_store())
+            arithmetic_intensity = self.compute_arithmetic_intensity(operations_per_cell, words_per_cell)
+            operations = operations_per_cell * min([reduce(lambda x, y: x * y, g.size) for g in grid])
+        else:
+            raise NotImplementedError("Smoother currently not supported.")
 
         if arithmetic_intensity > 0.0:
-            return operations / arithmetic_intensity
+            return operations / self.compute_performance(arithmetic_intensity)
         else:
             raise RuntimeError("The arithmetic intensity is zero.")
-
-
-
-
-
-
-    @staticmethod
-    def estimate_operations_per_word_for_solving_matrix(number_of_unknowns, problem_size) -> tuple:
-        n = number_of_unknowns
-        # Gaussian Elimination
-        operations = 2.0/3.0 * n * n * n
-        words = n * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
-        return operations, words, float(problem_size) / n
-
-    @staticmethod
-    def estimate_operations_per_word_for_stencil(stencil, problem_size) -> list:
-        number_of_entries_list = periodic.count_number_of_entries(stencil)
-        return [(RooflineEvaluator.operations_for_stencil_application(number_of_entries),
-                 RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries) +
-                 RooflineEvaluator.words_transferred_for_store(),
-                 float(problem_size) / len(number_of_entries_list))
-                for number_of_entries in number_of_entries_list]
