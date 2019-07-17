@@ -88,7 +88,7 @@ class RooflineEvaluator:
 
     @staticmethod
     def words_transferred_for_stencil_application(number_of_entries):
-        return number_of_entries
+        return number_of_entries * RooflineEvaluator.words_transferred_for_load()
 
     @staticmethod
     def words_transferred_for_load():
@@ -98,25 +98,17 @@ class RooflineEvaluator:
     def words_transferred_for_store():
         return 1
 
-    def estimate_runtime_for_solving_local_system(self, inverse: base.Inverse):
+    @staticmethod
+    def estimate_words_per_operation_for_solving_local_system(inverse: base.Inverse):
+        # TODO consider variable stencil coefficients that must be loaded additionally
         expression = inverse.operand
         grid = expression.grid
+        number_of_variables = len(grid)
 
         if isinstance(expression, system.Diagonal):
             # Decoupled Relaxation
-            operator = expression.operand
-            entries = operator.entries
-            operations = 0
-            operations_per_cell = 0
-            words_per_cell = 0
-            for i, row_of_entries in enumerate(entries):
-                operations_per_dof = RooflineEvaluator.operations_for_multiplication()
-                operations_per_cell += operations_per_dof
-                words_per_cell += RooflineEvaluator.words_transferred_for_load() \
-                                 + RooflineEvaluator.words_transferred_for_store()
-                problem_size = reduce(lambda x, y: x * y, grid[i].size)
-                operations += problem_size * operations_per_dof
-            arithmetic_intensity = self.compute_arithmetic_intensity(operations_per_cell, words_per_cell)
+            operations_per_cell = RooflineEvaluator.operations_for_multiplication() * number_of_variables
+            words_per_cell = RooflineEvaluator.words_transferred_for_load() * number_of_variables
         elif isinstance(expression, system.ElementwiseDiagonal):
             # Collective Relaxation
             operator = expression.operand
@@ -127,22 +119,36 @@ class RooflineEvaluator:
                     if isinstance(row_of_entries[j], base.ZeroOperator):
                         zero_below_diagonal += 1
 
-            number_of_variables = len(grid)
             # Required operations for Gaussian Elimination
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0 - number_of_variables * zero_below_diagonal
             multiplications = additions
             divisions = number_of_variables * (number_of_variables + 1) / 2 - zero_below_diagonal
             operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
-                         multiplications * RooflineEvaluator.operations_for_multiplication() + \
-                         divisions * RooflineEvaluator.operations_for_division()
-            words_per_cell =  number_of_variables * (RooflineEvaluator.words_transferred_for_load()
-                              + RooflineEvaluator.words_transferred_for_store())
-            arithmetic_intensity = self.compute_arithmetic_intensity(operations_per_cell, words_per_cell)
-            operations = operations_per_cell * min([reduce(lambda x, y: x * y, g.size) for g in grid])
+                multiplications * RooflineEvaluator.operations_for_multiplication() + \
+                divisions * RooflineEvaluator.operations_for_division()
+            words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
         else:
             raise NotImplementedError("Smoother currently not supported.")
+        return operations_per_cell, words_per_cell
 
-        if arithmetic_intensity > 0.0:
-            return operations / self.compute_performance(arithmetic_intensity)
-        else:
-            raise RuntimeError("The arithmetic intensity is zero.")
+    @staticmethod
+    def estimate_words_per_operations_for_intergrid_transfer(intergrid_operator: system.InterGridOperator):
+        operations_per_cell = 0
+        words_per_cell = 0
+        for row_of_entries in intergrid_operator.entries:
+            for entry in row_of_entries:
+                if isinstance(entry, multigrid.ZeroProlongation) or isinstance(entry, multigrid.ZeroRestriction):
+                    continue
+                stencil = entry.generate_stencil()
+                number_of_stencil_coefficients_list = periodic.count_number_of_entries(stencil)
+                n = len(number_of_stencil_coefficients_list)
+                for number_of_stencil_coefficients in number_of_stencil_coefficients_list:
+                    operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) / n
+                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients) / n
+        return operations_per_cell, words_per_cell
+
+
+
+
+
+

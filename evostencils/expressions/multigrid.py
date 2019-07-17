@@ -36,6 +36,14 @@ class Restriction(InterGridOperator):
     def coarse_grid(self):
         return self._coarse_grid
 
+    @property
+    def input_grid(self):
+        return self.fine_grid
+
+    @property
+    def output_grid(self):
+        return self.coarse_grid
+
     def __repr__(self):
         return f'Restriction({repr(self.name)}, {repr(self.fine_grid)}, ' \
                f'{repr(self.coarse_grid)}, {repr(self.generate_stencil())})'
@@ -62,6 +70,14 @@ class Prolongation(InterGridOperator):
     @property
     def coarse_grid(self):
         return self._coarse_grid
+
+    @property
+    def input_grid(self):
+        return self.coarse_grid
+
+    @property
+    def output_grid(self):
+        return self.fine_grid
 
     def __repr__(self):
         return f'Interpolation({repr(self.name)}, {repr(self.fine_grid)}, ' \
