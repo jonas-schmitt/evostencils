@@ -68,6 +68,8 @@ class RooflineEvaluator:
             return runtime + self.estimate_runtime(correction.operand2)
         elif isinstance(expression, multigrid.Residual):
             operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_residual(expression)
+            # Store result
+            words_per_cell += len(expression.grid) * RooflineEvaluator.words_transferred_for_store()
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
             return runtime + self.estimate_runtime(expression.rhs) + self.estimate_runtime(expression.approximation)
@@ -131,20 +133,25 @@ class RooflineEvaluator:
     @staticmethod
     def estimate_words_per_operation_for_residual(residual: multigrid.Residual):
         grid = residual.grid
+        offset_sets = [set() for _ in grid]
         operator = residual.operator
         operations_per_cell = 0
-        words_per_cell = len(grid) * \
-                         (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
+        # Load right-hand side
+        words_per_cell = len(grid) * RooflineEvaluator.words_transferred_for_load()
         for row_of_entries in operator.entries:
-            for entry in row_of_entries:
+            for i, entry in enumerate(row_of_entries):
                 stencil = entry.generate_stencil()
-                number_of_entries_list = periodic.count_number_of_entries(stencil)
-                for number_of_entries in number_of_entries_list:
-                    operations_per_cell += (RooflineEvaluator.operations_for_stencil_application(number_of_entries) +
-                                            RooflineEvaluator.operations_for_subtraction()) \
-                                           / len(number_of_entries_list)
-                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries) \
-                                           / len(number_of_entries_list)
+                list_of_entries = periodic.get_list_of_entries(stencil)
+                first_constant_stencil = list_of_entries[0]
+                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil, constant_stencil)) for constant_stencil in list_of_entries), \
+                    'The offsets must be the same for all operator stencils'
+                constant_stencil = first_constant_stencil
+                for offset, _ in constant_stencil.entries:
+                    offset_sets[i].add(offset)
+                number_of_stencil_coefficients = constant_stencil.number_of_entries
+                operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) + RooflineEvaluator.operations_for_subtraction()
+        for s in offset_sets:
+            words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(len(s))
         return operations_per_cell, words_per_cell
 
     @staticmethod
@@ -189,10 +196,13 @@ class RooflineEvaluator:
                 if isinstance(entry, multigrid.ZeroProlongation) or isinstance(entry, multigrid.ZeroRestriction):
                     continue
                 stencil = entry.generate_stencil()
-                number_of_stencil_coefficients_list = periodic.count_number_of_entries(stencil)
-                n = len(number_of_stencil_coefficients_list)
-                for number_of_stencil_coefficients in number_of_stencil_coefficients_list:
-                    operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) / n
-                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients) / n
+                list_of_entries = periodic.get_list_of_entries(stencil)
+                first_constant_stencil = list_of_entries[0]
+                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil, constant_stencil)) for constant_stencil in list_of_entries), \
+                    'The offsets must be the same for all operator stencils'
+                constant_stencil = first_constant_stencil
+                number_of_stencil_coefficients = constant_stencil.number_of_entries
+                operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients)
+                words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients)
         return operations_per_cell, words_per_cell
 
