@@ -41,7 +41,7 @@ class RooflineEvaluator:
     def compute_runtime(self, operations, words, problem_size):
         arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
         if arithmetic_intensity > 0.0:
-            runtime = operations / self.compute_performance(arithmetic_intensity)
+            runtime = problem_size / self.compute_performance(arithmetic_intensity)
         else:
             runtime = 0.0
         return runtime
@@ -50,16 +50,46 @@ class RooflineEvaluator:
         if expression.runtime is not None:
             return expression.runtime
         if isinstance(expression, multigrid.Cycle):
-            if expression.partitioning == partitioning.Single:
-                pass
-            elif expression.partitioning == partitioning.RedBlack:
-                if isinstance(expression.correction, base.Multiplication):
-                    operand1 = expression.correction.operand1
-                    operand2 = expression.correction.operand2
-                    if isinstance(operand1, base.Inverse) and isinstance(operand2, multigrid.Residual):
-                        pass
-        runtime = 0.0
-        return runtime
+            # Partitions are currently ignored since they do not affect the arithmetic intensity
+            # Although beware that in cases where the total data size is too the memory bandwidth can not be saturated
+            # and the maximum bandwidth will not be achieved
+            grid = expression.grid
+            correction = expression.correction
+            if not isinstance(correction, base.Multiplication):
+                raise RuntimeError("Expected multiplication")
+            if isinstance(correction.operand1, system.InterGridOperator):
+                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+            else:
+                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
+            operations_per_cell += len(grid) * (RooflineEvaluator.operations_for_addition() + RooflineEvaluator.operations_for_scaling())
+            words_per_cell += len(grid) * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            return runtime + self.estimate_runtime(correction.operand2)
+        elif isinstance(expression, multigrid.Residual):
+            operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_residual(expression)
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            return runtime + self.estimate_runtime(expression.rhs) + self.estimate_runtime(expression.approximation)
+        elif isinstance(expression, base.Multiplication):
+            if isinstance(expression.operand1, system.InterGridOperator):
+                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
+            elif isinstance(expression.operand1, multigrid.CoarseGridSolver):
+                cgs = expression.operand1
+                if cgs.expression is not None:
+                    if cgs.expression.runtime is None:
+                        raise RuntimeError("Not evaluated")
+                    runtime = cgs.expression.runtime
+                else:
+                    runtime = self.runtime_coarse_grid_solver
+                return runtime + self.estimate_runtime(expression.operand2)
+            else:
+                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            return runtime + self.estimate_runtime(expression.operand2)
+        else:
+            RuntimeError("Not implemented")
 
     @staticmethod
     def operations_for_addition():
@@ -99,6 +129,25 @@ class RooflineEvaluator:
         return 1
 
     @staticmethod
+    def estimate_words_per_operation_for_residual(residual: multigrid.Residual):
+        grid = residual.grid
+        operator = residual.operator
+        operations_per_cell = 0
+        words_per_cell = len(grid) * \
+                         (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
+        for row_of_entries in operator.entries:
+            for entry in row_of_entries:
+                stencil = entry.generate_stencil()
+                number_of_entries_list = periodic.count_number_of_entries(stencil)
+                for number_of_entries in number_of_entries_list:
+                    operations_per_cell += (RooflineEvaluator.operations_for_stencil_application(number_of_entries) +
+                                            RooflineEvaluator.operations_for_subtraction()) \
+                                           / len(number_of_entries_list)
+                    words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_entries) \
+                                           / len(number_of_entries_list)
+        return operations_per_cell, words_per_cell
+
+    @staticmethod
     def estimate_words_per_operation_for_solving_local_system(inverse: base.Inverse):
         # TODO consider variable stencil coefficients that must be loaded additionally
         expression = inverse.operand
@@ -132,7 +181,7 @@ class RooflineEvaluator:
         return operations_per_cell, words_per_cell
 
     @staticmethod
-    def estimate_words_per_operations_for_intergrid_transfer(intergrid_operator: system.InterGridOperator):
+    def estimate_words_per_operation_for_intergrid_transfer(intergrid_operator: system.InterGridOperator):
         operations_per_cell = 0
         words_per_cell = 0
         for row_of_entries in intergrid_operator.entries:
@@ -146,9 +195,4 @@ class RooflineEvaluator:
                     operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) / n
                     words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients) / n
         return operations_per_cell, words_per_cell
-
-
-
-
-
 
