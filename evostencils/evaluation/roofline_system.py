@@ -51,31 +51,45 @@ class RooflineEvaluator:
             return expression.runtime
         if isinstance(expression, multigrid.Cycle):
             # Partitions are currently ignored since they do not affect the arithmetic intensity
-            # Although beware that in cases where the total data size is too the memory bandwidth can not be saturated
+            # Although beware that in cases where the total data size is too small the memory bandwidth can not be saturated
             # and the maximum bandwidth will not be achieved
             grid = expression.grid
             correction = expression.correction
-            if not isinstance(correction, base.Multiplication):
-                raise RuntimeError("Expected multiplication")
-            if isinstance(correction.operand1, system.InterGridOperator):
-                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+            if isinstance(correction, multigrid.Residual):
+                operations_per_cell, words_per_cell = 0, 0
+                runtime = self.estimate_runtime(correction)
+            elif isinstance(correction, base.Multiplication):
+                runtime = self.estimate_runtime(correction.operand2)
+                if isinstance(correction.operand1, system.InterGridOperator):
+                    operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+                else:
+                    operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
             else:
-                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
+                raise RuntimeError("Expected multiplication")
             operations_per_cell += len(grid) * (RooflineEvaluator.operations_for_addition() + RooflineEvaluator.operations_for_scaling())
             words_per_cell += len(grid) * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
-            return runtime + self.estimate_runtime(correction.operand2)
+            runtime += self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
         elif isinstance(expression, multigrid.Residual):
             operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_residual(expression)
             # Store result
             words_per_cell += len(expression.grid) * RooflineEvaluator.words_transferred_for_store()
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
-            return runtime + self.estimate_runtime(expression.rhs) + self.estimate_runtime(expression.approximation)
+            if not isinstance(expression.rhs, system.RightHandSide):
+                runtime_rhs = self.estimate_runtime(expression.rhs)
+            else:
+                runtime_rhs = 0
+            if not isinstance(expression.approximation, system.Approximation):
+                runtime_approximation = self.estimate_runtime(expression.approximation)
+            else:
+                runtime_approximation = 0
+            runtime += runtime_rhs + runtime_approximation
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):
                 operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
+                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
             elif isinstance(expression.operand1, multigrid.CoarseGridSolver):
                 cgs = expression.operand1
                 if cgs.expression is not None:
@@ -84,14 +98,15 @@ class RooflineEvaluator:
                     runtime = cgs.expression.runtime
                 else:
                     runtime = self.runtime_coarse_grid_solver
-                return runtime + self.estimate_runtime(expression.operand2)
             else:
                 operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
-            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
-            return runtime + self.estimate_runtime(expression.operand2)
+                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            runtime += self.estimate_runtime(expression.operand2)
         else:
-            RuntimeError("Not implemented")
+            raise RuntimeError("Not implemented")
+        expression.runtime = runtime
+        return runtime
 
     @staticmethod
     def operations_for_addition():
@@ -143,7 +158,7 @@ class RooflineEvaluator:
                 stencil = entry.generate_stencil()
                 list_of_entries = periodic.get_list_of_entries(stencil)
                 first_constant_stencil = list_of_entries[0]
-                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil, constant_stencil)) for constant_stencil in list_of_entries), \
+                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil.entries, constant_stencil.entries)) for constant_stencil in list_of_entries), \
                     'The offsets must be the same for all operator stencils'
                 constant_stencil = first_constant_stencil
                 for offset, _ in constant_stencil.entries:
@@ -198,7 +213,7 @@ class RooflineEvaluator:
                 stencil = entry.generate_stencil()
                 list_of_entries = periodic.get_list_of_entries(stencil)
                 first_constant_stencil = list_of_entries[0]
-                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil, constant_stencil)) for constant_stencil in list_of_entries), \
+                assert all(all(coeff1[0] == coeff2[0] for coeff1, coeff2 in zip(first_constant_stencil.entries, constant_stencil.entries)) for constant_stencil in list_of_entries), \
                     'The offsets must be the same for all operator stencils'
                 constant_stencil = first_constant_stencil
                 number_of_stencil_coefficients = constant_stencil.number_of_entries

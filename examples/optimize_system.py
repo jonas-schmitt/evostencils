@@ -2,6 +2,7 @@ from evostencils.optimization.system import Optimizer
 from evostencils.expressions import multigrid, system
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
+from evostencils.evaluation.roofline_system import RooflineEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import pickle
@@ -40,6 +41,11 @@ def main():
 
     lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
     convergence_evaluator = ConvergenceEvaluatorSystem(lfa_grids, coarsening_factors, dimension)
+    bytes_per_word = 8
+    peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
+    peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
+    runtime_cgs = 1e-7 # example value
+    performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
     required_convergence = 0.9
@@ -50,6 +56,7 @@ def main():
     if not os.path.exists(checkpoint_directory_path):
         os.makedirs(checkpoint_directory_path)
     optimizer = Optimizer(A, u, f, dimension, coarsening_factors, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
+                          performance_evaluator=performance_evaluator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False

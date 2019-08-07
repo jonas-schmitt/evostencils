@@ -317,7 +317,6 @@ class ConvergenceEvaluatorSystem:
         lfa_expression = self.transform(iteration_matrix)
         s = lfa_expression.symbol()
         return s.spectral_radius()
-        """
         try:
             lfa_expression = self.transform(iteration_matrix)
 
@@ -336,5 +335,4 @@ class ConvergenceEvaluatorSystem:
             return queue.get(timeout=1)
         except (ArithmeticError, RuntimeError, MemoryError) as _:
             return 0.0
-        """
 

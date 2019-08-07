@@ -155,10 +155,7 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                try:
-                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
-                except RuntimeError as _:
-                    return self.infinity, self.infinity
+                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
@@ -372,7 +369,7 @@ class Optimizer:
             #    print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(best_expression)
-            # self.performance_evaluator.estimate_runtime(best_expression)
+            self.performance_evaluator.estimate_runtime(best_expression)
             #try:
             #    solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
             #except Exception as e:
