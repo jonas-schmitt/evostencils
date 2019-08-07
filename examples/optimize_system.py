@@ -1,4 +1,4 @@
-from evostencils.optimization.system import Optimizer
+from evostencils.optimization.program_system import Optimizer
 from evostencils.expressions import multigrid, system
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
