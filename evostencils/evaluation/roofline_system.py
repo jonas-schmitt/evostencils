@@ -182,21 +182,30 @@ class RooflineEvaluator:
             words_per_cell = RooflineEvaluator.words_transferred_for_load() * number_of_variables
         elif isinstance(expression, system.ElementwiseDiagonal):
             # Collective Relaxation
-            operator = expression.operand
-            entries = operator.entries
-            zero_below_diagonal = 0
-            for i, row_of_entries in enumerate(entries):
-                for j in range(0, i):
-                    if isinstance(row_of_entries[j], base.ZeroOperator):
-                        zero_below_diagonal += 1
-
             # Required operations for Gaussian Elimination
-            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0 - number_of_variables * zero_below_diagonal
+            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
             multiplications = additions
-            divisions = number_of_variables * (number_of_variables + 1) / 2 - zero_below_diagonal
+            divisions = number_of_variables * (number_of_variables + 1) / 2
             operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
                 multiplications * RooflineEvaluator.operations_for_multiplication() + \
                 divisions * RooflineEvaluator.operations_for_division()
+            words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
+        elif isinstance(expression, system.Operator):
+            # Custom Operator
+            entries = expression.entries
+            for i in range(len(grid)):
+                entry = entries[i][i]
+                stencil = entry.generate_stencil()
+                number_of_entries = periodic.count_number_of_entries(stencil)
+                number_of_additional_variables = reduce(lambda x, y: x*y, number_of_entries) - 1
+                number_of_variables += number_of_additional_variables
+
+            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
+            multiplications = additions
+            divisions = number_of_variables * (number_of_variables + 1) / 2
+            operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
+                                  multiplications * RooflineEvaluator.operations_for_multiplication() + \
+                                  divisions * RooflineEvaluator.operations_for_division()
             words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
         else:
             raise NotImplementedError("Smoother currently not supported.")

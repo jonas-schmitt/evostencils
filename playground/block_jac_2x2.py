@@ -9,11 +9,18 @@ a = [ ((-1,0),-1), ((0, -1), -1),
 A = operator.from_stencil(a, grid)
 
 # Define the block diagonal part of A
-d = NdArray(shape=(2,2))
-d[0,0] = [ ((0,0), 4), ((0,1), -1), ((1,0), -1) ]
-d[0,1] = [ ((0,-1), -1), ((0,0), 4), ((1,0), -1) ]
-d[1,0] = [ ((-1,0), -1), ((0,0), 4), ((0,1), -1) ]
-d[1,1] = [ ((-1,0), -1), ((0,-1), -1), ((0,0), 4) ]
+d = NdArray(shape=(2, 1))
+d[0,0] = [((0,0), 4), ((1,0), 0)]
+d[1,0] = [((0,0), 4), ((-1,0), 0)]
+
+#d = NdArray(shape=(1, 1))
+#d[0,0] = [((0,0), 4)]
+
+#d = NdArray(shape=(2,2))
+#d[0,0] = [ ((0,0), 4), ((0,1), -1), ((1,0), -1) ]
+#d[0,1] = [ ((0,-1), -1), ((0,0), 4), ((1,0), -1) ]
+#d[1,0] = [ ((-1,0), -1), ((0,0), 4), ((0,1), -1) ]
+#d[1,1] = [ ((-1,0), -1), ((0,-1), -1), ((0,0), 4) ]
 D = operator.from_periodic_stencil(d, grid)
 
 # Define the block Jacobi error propagation operator
@@ -23,8 +30,8 @@ E = (I - omega * D.inverse() * A)
 
 print(E.symbol().spectral_radius())
 
-plot.plot_2d(E, norm_type='output')
-plt.show()
+#plot.plot_2d(E, norm_type='output')
+#plt.show()
 
 
 

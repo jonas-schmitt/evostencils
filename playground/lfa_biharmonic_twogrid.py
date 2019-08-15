@@ -7,9 +7,12 @@ from lfa_lab import *
 import lfa_lab
 import lfa_lab.block_smoother
 
-grid = Grid(2)
+grid = Grid(2, [1.0/32, 1.0/32])
 coarse_grid = grid.coarse((2,2,))
-Laplace = gallery.poisson_2d(grid)
+a = [ ((-1,0),-1), ((0, -1), -1),
+      ((0,0), 4), ((0,1), -1), ((1,0), -1) ]
+Laplace = operator.from_stencil(a, grid)
+
 I = operator.identity(grid)
 Z = operator.zero(grid)
 
@@ -20,24 +23,31 @@ S_collective = collective_jacobi(A, 0.6)
 
 block_size = np.array((2, 2))
 
-diag_stencil = lfa_lab.block_smoother._block_diag_stencil(Laplace.stencil, block_size)
-D = from_periodic_stencil(diag_stencil, grid)
-I = A.matching_identity()
-entries = [
-  ]
-Z_periodic = SparseStencil(entries)
-diag_stencil = lfa_lab.block_smoother._block_diag_stencil(Z_periodic, block_size)
-Z_periodic = from_periodic_stencil(diag_stencil, grid)
-entries = [
-    (( 0,  0),  1)
-  ]
-I_periodic = SparseStencil(entries)
-diag_stencil = lfa_lab.block_smoother._block_diag_stencil(I_periodic, block_size)
-I_periodic = from_periodic_stencil(diag_stencil, grid)
+d = NdArray(shape=(1,2))
+d[0,0] = [ ((0,-1), -1), ((0,0), 4), ((0,1), -1)]
+d[0,1] = [ ((0,-1), -1), ((0,0), 4), ((0,1), -1)]
+#d[1,0] = [ ((-1,0), -1), ((0,0), 4), ((0,1), -1) ]
+#d[1,1] = [ ((-1,0), -1), ((0,-1), -1), ((0,0), 4) ]
+#d[0,0] = [ ((0,0), 4)]
+#d[0,1] = [ ((0,0), 4)]
+#d[1,0] = [ ((0,0), 4) ]
+#d[1,1] = [ ((0,0), 4) ]
+D = operator.from_periodic_stencil(d, grid)
+
+d = NdArray(shape=(1,2))
+d[0,0] = [ ((0,0), 1)]
+d[0,1] = [ ((0,0), 1)]
+#d[1,0] = [ ((0,0), 1)]
+#d[1,1] = [ ((0,0), 1)]
+I_bl = operator.from_periodic_stencil(d, grid)
+
+d = NdArray(shape=(1,2))
+Z_bl = operator.from_periodic_stencil(d, grid)
 
 
-tmp = system([[D,I_periodic], [Z_periodic, D]])
-tmp = I - 0.6 * tmp.inverse() * A
+
+tmp = system([[D, I_bl], [Z_bl, D]])
+tmp = tmp.matching_identity() - 0.6 * tmp.inverse() * A
 
 
 
@@ -65,9 +75,10 @@ cgc = coarse_grid_correction(
 
 #E = cgc
 # E = S_pointwise * cgc * S_pointwise
-E = tmp * cgc * tmp
+# E = tmp * cgc * tmp
 # E = S_collective * cgc * S_collective
 # E = S_pointwise
+E = tmp
 symbol = E.symbol()
 
 print("Spectral radius: {}".format(symbol.spectral_radius()))

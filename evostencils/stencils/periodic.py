@@ -238,5 +238,27 @@ def red_black_partitioning(stencil, grid):
     black_filter = indexed_map_stencil(empty_stencil, black)
     return red_filter, black_filter
 
+"""
+def count_zeros_in_system_of_equations(stencil: Stencil):
+    entries = stencil.constant_stencils
+    nentries = count_number_of_entries(stencil)
+    import functools
+    zeros = [0 for _ in range(functools.reduce(lambda x, y: x * y, nentries))]
+
+    def recursive_descent(array, dimension, index):
+        if dimension == 1:
+            for i, element in enumerate(array):
+                tmp = index + (i,)
+                for offsets, _ in element.entries:
+                   for k, index_sum in enumerate([a + b for a, b in zip(tmp, offsets)]):
+                       if index_sum > 0 and index_sum < nentries[k]:
+
+        else:
+            for i, element in enumerate(array):
+                recursive_descent(element, dimension - 1, index + (i,))
+    recursive_descent(entries, stencil.dimension, ())
+"""
+
+
 
 
