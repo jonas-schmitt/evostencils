@@ -191,7 +191,7 @@ class RooflineEvaluator:
                 divisions * RooflineEvaluator.operations_for_division()
             words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
         elif isinstance(expression, system.Operator):
-            # Custom Operator
+            # Custom Relaxation Operator
             entries = expression.entries
             for i in range(len(grid)):
                 entry = entries[i][i]

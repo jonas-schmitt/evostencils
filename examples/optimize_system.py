@@ -62,7 +62,7 @@ def main():
     restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    _, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20, es_generations=20,
+    _, pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=20, es_generations=20,
                                                     required_convergence=required_convergence,
                                                     restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
