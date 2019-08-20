@@ -1,4 +1,7 @@
 from sympy.parsing.sympy_parser import parse_expr
+import re
+from evostencils.stencils import constant
+
 
 class OperatorInfo:
     def __init__(self, name, level, stencil):
@@ -17,6 +20,7 @@ class OperatorInfo:
     @property
     def stencil(self):
         return self._stencil
+
 
 class EquationInfo:
     def __init__(self, name: str, level: int, expr_str: str):
@@ -42,7 +46,21 @@ class EquationInfo:
         return self._sympy_expr
 
 
-def extract_layer_2_information(file_path):
+def parse_stencil_offsets(string):
+    tokens = re.split(r" ?\[ ?| ?\] ?| ?, ?", string)
+    tokens = [token for token in tokens if not token == ""]
+    offsets = []
+    for token in tokens:
+        sympy_expr = parse_expr(token)
+        substituted_expr = sympy_expr
+        for symbol in sympy_expr.free_symbols:
+            substituted_expr = substituted_expr.subs(symbol, 0)
+        offset = int(round(substituted_expr.evalf()))
+        offsets.append(offset)
+    return tuple(offsets)
+
+
+def extract_layer_2_information(file_path, dimensionality):
     equations = []
     operators = []
     fields = []
@@ -51,9 +69,22 @@ def extract_layer_2_information(file_path):
         while line:
             tokens = line.split(' ')
             if tokens[0] == 'Operator':
+                stencil_entries = []
                 tmp = tokens[1].split('@')
-                op_info = OperatorInfo(tmp[0], int(tmp[1]), None)
-                #TODO parse stencil
+                name = tmp[0]
+                level = int(tmp[1])
+                line = file.readline()
+                tokens = line.split('from')
+                while True:
+                    tmp = tokens[1].split('with')
+                    value = float(tmp[1])
+                    offsets = parse_stencil_offsets(tmp[0])
+                    stencil_entries.append((offsets, value))
+                    line = file.readline()
+                    tokens = line.split('from')
+                    if '}' in line:
+                        break
+                op_info = OperatorInfo(name, level, constant.Stencil(stencil_entries, dimensionality))
                 operators.append(op_info)
             elif tokens[0] == 'Equation':
                 tmp = tokens[1].split('@')
@@ -71,6 +102,6 @@ def extract_layer_2_information(file_path):
                 fields.append(symbol)
     return equations, operators, fields
 
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2')
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2')
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2')
+#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2', 3)
+extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
+#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2', 2)
