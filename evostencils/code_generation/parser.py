@@ -8,6 +8,13 @@ class OperatorInfo:
         self._name = name
         self._level = level
         self._stencil = stencil
+        self._associated_field = None
+        if 'gen_restrictionForSol_' in name:
+            self._operator_type = 'restriction'
+        elif 'gen_prolongationForSol_' in name:
+            self._operator_type = 'prolongation'
+        else:
+            self._operator_type = 'square'
 
     @property
     def name(self):
@@ -20,6 +27,10 @@ class OperatorInfo:
     @property
     def stencil(self):
         return self._stencil
+
+    @property
+    def operator_type(self):
+        return self._operator_type
 
 
 class EquationInfo:
@@ -100,8 +111,16 @@ def extract_layer_2_information(file_path, dimensionality):
         for symbol in sympy_expr.free_symbols:
             if symbol.name not in (op_info.name for op_info in operators) and symbol not in fields:
                 fields.append(symbol)
+    operators.sort(key=lambda oi: oi.level)
+    for op_info in operators:
+        if op_info.operator_type == 'restriction' or op_info.operator_type == 'prolongation':
+            name = op_info.name
+            tmp = name.split('_')
+            field_name = tmp[-1]
+            op_info._associated_field = next(field for field in fields if field.name == field_name)
     return equations, operators, fields
 
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2', 3)
-extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
+#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2', 2)
+extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Poisson_fromL2_debug.exa3', 2)
