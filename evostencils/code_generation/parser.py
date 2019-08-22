@@ -121,7 +121,36 @@ def extract_layer_2_information(file_path, dimensionality):
             op_info._associated_field = next(field for field in fields if field.name == field_name)
     return equations, operators, fields
 
+
+def extract_knowledge_information(file_path):
+    with open(file_path, 'r') as file:
+        for line in file:
+            tokens = line.split('=')
+            lhs = tokens[0].strip(' \n\t')
+            if lhs == 'dimensionality':
+                dimensionality = int(tokens[1].strip(' \n\t'))
+            elif lhs == 'minLevel':
+                min_level = int(tokens[1].strip(' \n\t'))
+            elif lhs == 'maxLevel':
+                max_level = int(tokens[1].strip(' \n\t'))
+    return dimensionality, min_level, max_level
+
+
+def extract_settings_information(file_path):
+    with open(file_path, 'r') as file:
+        for line in file:
+            tokens = line.split('=')
+            lhs = tokens[0].strip(' \n\t')
+            if lhs == 'configName':
+                config_name = tokens[1].strip(' \n\t"')
+            elif lhs == 'basePathPrefix':
+                base_path = tokens[1].strip(' \n\t"')
+    return base_path, config_name
+
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2', 3)
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
+extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2', 2)
-extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Poisson_fromL2_debug.exa3', 2)
+#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Poisson_fromL2_debug.exa3', 2)
+extract_knowledge_information('/home/jonas/Schreibtisch/exastencils/Examples/Stokes/2D_FD_Stokes_fromL2.knowledge')
+extract_settings_information('/home/jonas/Schreibtisch/exastencils/Examples/Stokes/2D_FD_Stokes_fromL2.settings')
+
