@@ -42,8 +42,10 @@ class EquationInfo:
         tokens = expr_str.split(' ')
         for token in tokens:
             transformed_expr += ' ' + token.split('@')[0]
-        lhs = transformed_expr.split('==')[0]
-        self._sympy_expr = parse_expr(lhs)
+        tmp = transformed_expr.split('==')
+        self._sympy_expr = parse_expr(tmp[0])
+        self._rhs_name = tmp[1]
+        self._associated_field = None
 
     @property
     def name(self):
@@ -56,6 +58,14 @@ class EquationInfo:
     @property
     def sympy_expr(self):
         return self._sympy_expr
+
+    @property
+    def rhs_name(self):
+        return self._rhs_name
+
+    @property
+    def associated_field(self):
+        return self._associated_field
 
 
 def parse_stencil_offsets(string):
@@ -72,7 +82,7 @@ def parse_stencil_offsets(string):
     return tuple(offsets)
 
 
-def extract_layer_2_information(file_path, dimensionality):
+def extract_l2_information(file_path, dimensionality):
     equations = []
     operators = []
     fields = []
@@ -112,13 +122,20 @@ def extract_layer_2_information(file_path, dimensionality):
         for symbol in sympy_expr.free_symbols:
             if symbol.name not in (op_info.name for op_info in operators) and symbol not in fields:
                 fields.append(symbol)
-    operators.sort(key=lambda oi: oi.level)
+    fields.sort(key=lambda s: s.name)
+    for eq_info in equations:
+        rhs_name = eq_info.rhs_name
+        tmp = rhs_name.split('_')
+        field_name = tmp[1]
+        eq_info._associated_field = next(field for field in fields if field.name == field_name)
+    equations.sort(key=lambda ei: ei.associated_field.name)
     for op_info in operators:
         if op_info.operator_type == multigrid.Restriction or op_info.operator_type == multigrid.Prolongation:
             name = op_info.name
             tmp = name.split('_')
             field_name = tmp[-1]
             op_info._associated_field = next(field for field in fields if field.name == field_name)
+    assert len(equations) == len(fields), 'The number of equations does not match with the number of fields'
     return equations, operators, fields
 
 
@@ -148,7 +165,7 @@ def extract_settings_information(file_path):
     return base_path, config_name
 
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2', 3)
-extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
+extract_l2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2', 2)
 #extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Poisson_fromL2_debug.exa3', 2)
 extract_knowledge_information('/home/jonas/Schreibtisch/exastencils/Examples/Stokes/2D_FD_Stokes_fromL2.knowledge')

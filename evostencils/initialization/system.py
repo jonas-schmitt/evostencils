@@ -8,7 +8,30 @@ from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
 from evostencils.deap_extension import PrimitiveSetTyped
 from deap import gp
+from evostencils.code_generation import parser
+import sympy
 
+def generate_operators_from_l2_information(equations: [parser.EquationInfo], operators: [parser.OperatorInfo],
+                                           fields: [sympy.Symbol], level, fine_grid, coarse_grid):
+    operators_on_level = list(filter(lambda x: x.level == level, operators))
+    restriction_operators = []
+    prolongation_operators = []
+    system_operators = []
+    for op_info in operators_on_level:
+        if op_info.operator_type == mg.Restriction:
+            restriction_operators.append(op_info)
+        elif op_info.operator_type == mg.Prolongation:
+            prolongation_operators.append(op_info)
+        else:
+            system_operators.append(op_info)
+    assert len(restriction_operators) == len(fields), 'The number of restriction operators does not match with the number of fields'
+    assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
+    assert len(system_operators) == len(fields), 'The number of operators does not match with the number of fields'
+    for op_info in restriction_operators:
+        pass
+    for op_info in prolongation_operators:
+        pass
+    #TODO generate operators, restriction and prolongation
 
 class Terminals:
     def __init__(self, operator, approximation, dimension, coarsening_factors, interpolation, restriction,
