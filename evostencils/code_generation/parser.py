@@ -1,4 +1,5 @@
 from sympy.parsing.sympy_parser import parse_expr
+from evostencils.expressions import base,  multigrid
 import re
 from evostencils.stencils import constant
 
@@ -10,11 +11,11 @@ class OperatorInfo:
         self._stencil = stencil
         self._associated_field = None
         if 'gen_restrictionForSol_' in name:
-            self._operator_type = 'restriction'
+            self._operator_type = multigrid.Restriction
         elif 'gen_prolongationForSol_' in name:
-            self._operator_type = 'prolongation'
+            self._operator_type = multigrid.Prolongation
         else:
-            self._operator_type = 'square'
+            self._operator_type = base.Operator
 
     @property
     def name(self):
@@ -103,7 +104,7 @@ def extract_layer_2_information(file_path, dimensionality):
                 equations.append(eq_info)
                 file.readline()
             line = file.readline()
-    max_level = max(equations, key=lambda info: info._level).level
+    max_level = max(equations, key=lambda info: info.level).level
     equations = [eq_info for eq_info in equations if eq_info.level == max_level]
     equations.sort(key=lambda info: info.name)
     for eq_info in equations:
@@ -113,7 +114,7 @@ def extract_layer_2_information(file_path, dimensionality):
                 fields.append(symbol)
     operators.sort(key=lambda oi: oi.level)
     for op_info in operators:
-        if op_info.operator_type == 'restriction' or op_info.operator_type == 'prolongation':
+        if op_info.operator_type == multigrid.Restriction or op_info.operator_type == multigrid.Prolongation:
             name = op_info.name
             tmp = name.split('_')
             field_name = tmp[-1]
