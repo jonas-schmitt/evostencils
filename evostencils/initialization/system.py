@@ -11,8 +11,9 @@ from deap import gp
 from evostencils.code_generation import parser
 import sympy
 
+
 def generate_operators_from_l2_information(equations: [parser.EquationInfo], operators: [parser.OperatorInfo],
-                                           fields: [sympy.Symbol], level, fine_grid, coarse_grid):
+                                           fields: [sympy.Symbol], level, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
     restriction_operators = []
     prolongation_operators = []
@@ -27,11 +28,16 @@ def generate_operators_from_l2_information(equations: [parser.EquationInfo], ope
     assert len(restriction_operators) == len(fields), 'The number of restriction operators does not match with the number of fields'
     assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
     assert len(system_operators) == len(fields), 'The number of operators does not match with the number of fields'
-    for op_info in restriction_operators:
-        pass
-    for op_info in prolongation_operators:
-        pass
-    #TODO generate operators, restriction and prolongation
+    list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(restriction_operators)]
+    restriction = system.Restriction('R', fine_grid, coarse_grid, list_of_stencil_generators)
+
+    list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(prolongation_operators)]
+    prolongation = system.Prolongation('P', fine_grid, coarse_grid, list_of_stencil_generators)
+
+    #TODO generate the operator using the available equation and operator information
+    operator = None
+
+    return operator, restriction, prolongation
 
 class Terminals:
     def __init__(self, operator, approximation, dimension, coarsening_factors, interpolation, restriction,

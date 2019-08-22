@@ -75,17 +75,12 @@ class ZeroApproximation(Approximation):
 
 
 class InterGridOperator(Operator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator,
+    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], list_of_stencil_generators: [callable],
                  InterGridOperatorType, ZeroOperatorType):
-        self._stencil_generator = stencil_generator
-        entries = [[InterGridOperatorType(name, fg, cg, stencil_generator)
+        entries = [[InterGridOperatorType(name, fg, cg, list_of_stencil_generators[i])
                     if i == j else ZeroOperatorType(fg, cg) for j in range(len(fine_grid))]
                    for i, (fg, cg) in enumerate(zip(fine_grid, coarse_grid))]
         super().__init__(name, entries)
-
-    @property
-    def stencil_generator(self):
-        return self._stencil_generator
 
 
 class Restriction(InterGridOperator):
