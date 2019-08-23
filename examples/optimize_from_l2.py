@@ -31,8 +31,12 @@ def main():
     coarsening_factor = (2, 2)
     step_sizes = [step_size, step_size]
     coarsening_factors = [coarsening_factor, coarsening_factor]
-
     grid = base.Grid(grid_size, step_size)
+
+    fine_grids = [grid] * len(fields)
+    coarse_grids = system.get_coarse_grid(fine_grids, [coarsening_factor] * len(fields))
+    res = generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grids, coarse_grids)
+
     u = system.Approximation('u', [base.ZeroApproximation(grid), base.ZeroApproximation(grid)])
     f = system.RightHandSide('f', [base.RightHandSide('f_0', grid), base.RightHandSide('f_1', grid)])
 

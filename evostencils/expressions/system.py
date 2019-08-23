@@ -75,8 +75,13 @@ class ZeroApproximation(Approximation):
 
 
 class InterGridOperator(Operator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], list_of_stencil_generators: [callable],
+    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator,
                  InterGridOperatorType, ZeroOperatorType):
+        assert len(fine_grid) == len(coarse_grid), "Number of fine grids does not match with the number of coarse grids"
+        if isinstance(stencil_generator, list):
+            list_of_stencil_generators = stencil_generator
+        else:
+            list_of_stencil_generators = [stencil_generator] * len(fine_grid)
         entries = [[InterGridOperatorType(name, fg, cg, list_of_stencil_generators[i])
                     if i == j else ZeroOperatorType(fg, cg) for j in range(len(fine_grid))]
                    for i, (fg, cg) in enumerate(zip(fine_grid, coarse_grid))]

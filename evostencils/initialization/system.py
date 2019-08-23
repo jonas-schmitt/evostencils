@@ -12,6 +12,30 @@ from evostencils.code_generation import parser
 import sympy
 
 
+def generate_operator_entries_from_equation(equation, operators: list, fields, grid):
+    row_of_operators = []
+    indices = []
+
+    def recursive_descent(expr):
+        if expr.func == sympy.Add:
+            for arg in expr.args:
+                recursive_descent(arg)
+        elif expr.func == sympy.Mul and len(expr.args) == 2 and expr.args[-1] in fields:
+            op_symbol = expr.args[0]
+            field_symbol = expr.args[1]
+            field_index = fields.index(field_symbol)
+            j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
+            row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], lambda _: operators[j].stencil))
+            indices.append(field_index)
+    recursive_descent(equation.sympy_expr)
+    for i in range(len(grid)):
+        if i not in indices:
+            row_of_operators.append(base.ZeroOperator(grid[i]))
+            indices.append(i)
+    result = [operator for (index, operator) in sorted(zip(indices, row_of_operators), key=lambda p: p[0])]
+    return result
+
+
 def generate_operators_from_l2_information(equations: [parser.EquationInfo], operators: [parser.OperatorInfo],
                                            fields: [sympy.Symbol], level, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
@@ -27,17 +51,21 @@ def generate_operators_from_l2_information(equations: [parser.EquationInfo], ope
             system_operators.append(op_info)
     assert len(restriction_operators) == len(fields), 'The number of restriction operators does not match with the number of fields'
     assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
-    assert len(system_operators) == len(fields), 'The number of operators does not match with the number of fields'
     list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(restriction_operators)]
-    restriction = system.Restriction('R', fine_grid, coarse_grid, list_of_stencil_generators)
+    restriction = system.Restriction(f'R_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
 
     list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(prolongation_operators)]
-    prolongation = system.Prolongation('P', fine_grid, coarse_grid, list_of_stencil_generators)
+    prolongation = system.Prolongation(f'P_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
 
-    #TODO generate the operator using the available equation and operator information
-    operator = None
+    entries = []
+    for equation in equations:
+        row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, fine_grid)
+        entries.append(row_of_entries)
+
+    operator = system.Operator(f'A_{level}', entries)
 
     return operator, restriction, prolongation
+
 
 class Terminals:
     def __init__(self, operator, approximation, dimension, coarsening_factors, interpolation, restriction,
@@ -226,3 +254,4 @@ def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_f
         add_cycle(pset, terminals, types, i, coarsest)
 
     return pset
+
