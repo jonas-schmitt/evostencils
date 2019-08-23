@@ -132,7 +132,7 @@ class Operator(Entity):
 class Identity(Operator):
     def __init__(self, grid, name='I'):
         from evostencils.stencils.gallery import IdentityGenerator
-        super().__init__(name, grid, IdentityGenerator(grid.dimension))
+        super().__init__(name, grid, IdentityGenerator(grid.dimensionality))
 
     def __repr__(self):
         return f'Identity({repr(self.grid)})'
@@ -141,7 +141,7 @@ class Identity(Operator):
 class ZeroOperator(Operator):
     def __init__(self, grid, shape=None, name='0'):
         from evostencils.stencils.gallery import ZeroGenerator
-        super().__init__(name, grid, ZeroGenerator(grid.dimension))
+        super().__init__(name, grid, ZeroGenerator(grid.dimensionality))
         if shape is not None:
             self._shape = shape
 
@@ -198,7 +198,7 @@ class Approximation(Entity):
 
     @property
     def dimension(self):
-        return len(self.grid.dimension)
+        return len(self.grid.dimensionality)
 
     def generate_stencil(self):
         return constant.get_unit_stencil(self)

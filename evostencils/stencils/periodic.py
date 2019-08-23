@@ -75,7 +75,7 @@ def count_number_of_entries(stencil):
             for element in array:
                 result = chain(result, recursive_descent(element, dimension - 1))
             return result
-    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimension))
+    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimensionality))
 
 
 @convert_constant_stencils
@@ -90,7 +90,7 @@ def get_list_of_entries(stencil):
             for element in array:
                 result = chain(result, recursive_descent(element, dimension - 1))
             return result
-    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimension))
+    return tuple(recursive_descent(stencil.constant_stencils, stencil.dimensionality))
 
 
 @convert_constant_stencils
@@ -106,7 +106,7 @@ def determine_maximal_shape(stencil):
                     if b > max_shape[i]:
                         max_shape[i] = b
             return [len(array)] + max_shape
-    return recursive_descent(stencil.constant_stencils, stencil.dimension)
+    return recursive_descent(stencil.constant_stencils, stencil.dimensionality)
 
 
 @convert_constant_stencils
@@ -203,7 +203,7 @@ def create_empty_multidimensional_array(shape):
 
 def block_diagonal(stencil, block_size):
     stencils = create_empty_multidimensional_array(block_size)
-    empty_stencil = Stencil(stencils, stencil.dimension)
+    empty_stencil = Stencil(stencils, stencil.dimensionality)
 
     def f(constant_stencil, _, index):
         def predicate(offset, _):

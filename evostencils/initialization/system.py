@@ -254,4 +254,3 @@ def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_f
         add_cycle(pset, terminals, types, i, coarsest)
 
     return pset
-
