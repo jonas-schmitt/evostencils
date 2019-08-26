@@ -12,18 +12,73 @@ from evostencils.code_generation import parser
 import sympy
 
 
+def generate_operator_entries_from_equation(equation, operators: list, fields, grid):
+    row_of_operators = []
+    indices = []
+
+    def recursive_descent(expr):
+        if expr.func == sympy.Add:
+            for arg in expr.args:
+                recursive_descent(arg)
+        elif expr.func == sympy.Mul and len(expr.args) == 2 and expr.args[-1] in fields:
+            op_symbol = expr.args[0]
+            field_symbol = expr.args[1]
+            field_index = fields.index(field_symbol)
+            j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
+            row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], lambda _: operators[j].stencil))
+            indices.append(field_index)
+    recursive_descent(equation.sympy_expr)
+    for i in range(len(grid)):
+        if i not in indices:
+            row_of_operators.append(base.ZeroOperator(grid[i]))
+            indices.append(i)
+    result = [operator for (index, operator) in sorted(zip(indices, row_of_operators), key=lambda p: p[0])]
+    return result
+
+
+def generate_operators_from_l2_information(equations: [parser.EquationInfo], operators: [parser.OperatorInfo],
+                                           fields: [sympy.Symbol], level, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
+    operators_on_level = list(filter(lambda x: x.level == level, operators))
+    restriction_operators = []
+    prolongation_operators = []
+    system_operators = []
+    for op_info in operators_on_level:
+        if op_info.operator_type == mg.Restriction:
+            restriction_operators.append(op_info)
+        elif op_info.operator_type == mg.Prolongation:
+            prolongation_operators.append(op_info)
+        else:
+            system_operators.append(op_info)
+    assert len(restriction_operators) == len(fields), 'The number of restriction operators does not match with the number of fields'
+    assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
+    list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(restriction_operators)]
+    restriction = system.Restriction(f'R_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
+
+    list_of_stencil_generators = [lambda _: op_info.stencil for i, op_info in enumerate(prolongation_operators)]
+    prolongation = system.Prolongation(f'P_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
+
+    entries = []
+    for equation in equations:
+        row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, fine_grid)
+        entries.append(row_of_entries)
+
+    operator = system.Operator(f'A_{level}', entries)
+
+    return operator, restriction, prolongation
+
+
 class Terminals:
-    def __init__(self, operator, approximation, dimension, coarsening_factors, interpolation, restriction,
+    def __init__(self, approximation, dimension, coarsening_factors, operator, coarse_operator, restriction, prolongation,
                  coarse_grid_solver_expression=None):
         self.operator = operator
         self.approximation = approximation
         self.grid = approximation.grid
         self.dimension = dimension
         self.coarsening_factor = coarsening_factors
-        self.interpolation = interpolation
+        self.interpolation = prolongation
         self.restriction = restriction
         self.coarse_grid = system.get_coarse_grid(self.approximation.grid, self.coarsening_factor)
-        self.coarse_operator = system.get_coarse_operator(self.operator, self.coarse_grid)
+        self.coarse_operator = coarse_operator
         self.identity = system.Identity(approximation.grid)
         self.coarse_grid_solver = mg.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
@@ -162,15 +217,21 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     """
 
 
-def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_factor,
-                           interpolation, restriction, coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
+def generate_primitive_set(approximation, rhs, dimensionality, coarsening_factors, max_level, equations, operators, fields,
+                           coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
     if depth == 1:
         coarsest = True
         cgs_expression = coarse_grid_solver_expression
-    terminals = Terminals(operator, approximation, dimension, coarsening_factor, interpolation, restriction, cgs_expression)
+    fine_grid = approximation.grid
+    coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
+    operator, restriction, prolongation, = \
+        generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
+    coarse_operator, coarse_restriction, coarse_prolongation, = \
+        generate_operators_from_l2_information(equations, operators, fields, max_level-1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
+    terminals = Terminals(approximation, dimensionality, coarsening_factors, operator, coarse_operator, restriction, restriction, cgs_expression)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
@@ -184,17 +245,22 @@ def generate_primitive_set(operator, approximation, rhs, dimension, coarsening_f
 
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):
-        coarse_approximation = system.ZeroApproximation(terminals.coarse_grid)
-        coarse_interpolation = system.Prolongation('P', terminals.coarse_grid, system.get_coarse_grid(terminals.coarse_grid, coarsening_factor), interpolation.stencil_generator)
-        coarse_restriction = system.Restriction('R', terminals.coarse_grid, system.get_coarse_grid(terminals.coarse_grid, coarsening_factor), restriction.stencil_generator)
+        approximation = system.ZeroApproximation(terminals.coarse_grid)
+        operator = coarse_operator
+        prolongation = coarse_prolongation
+        restriction = coarse_restriction
+        fine_grid = terminals.coarse_grid
+        coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
+        coarse_operator, coarse_restriction, coarse_prolongation = \
+            generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, fine_grid, coarse_grid)
         cgs_expression = None
         coarsest = False
         if i == depth - 1:
             coarsest = True
             cgs_expression = coarse_grid_solver_expression
 
-        terminals = Terminals(terminals.coarse_operator, coarse_approximation, dimension, coarsening_factor,
-                              coarse_interpolation, coarse_restriction, cgs_expression)
+        terminals = Terminals(approximation, dimensionality, coarsening_factors, operator,
+                              restriction, prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
         add_cycle(pset, terminals, types, i, coarsest)
 

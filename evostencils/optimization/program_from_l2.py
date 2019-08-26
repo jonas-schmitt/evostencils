@@ -5,7 +5,7 @@ import random
 import pickle
 import os.path
 import math
-from evostencils.initialization import system as system_initialization
+from evostencils.initialization import multigrid_from_l2 as multigrid_initialization
 from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
@@ -301,11 +301,11 @@ class Optimizer:
                     continue
             approximation = approximations[i]
             rhs = right_hand_sides[i]
-            #TODO Adapt initialization of primitive set to generate operators from l2 information
-            pset = system_initialization.generate_primitive_set(approximation, rhs, self.dimensionality, self.coarsening_factors,
-                                                                coarse_grid_solver_expression=best_expression,
-                                                                depth=levels_per_run, LevelFinishedType=self._FinishedType,
-                                                                LevelNotFinishedType=self._NotFinishedType)
+            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimensionality, self.coarsening_factors,
+                                                                   i, self.equations, self.operators, self.fields,
+                                                                   coarse_grid_solver_expression=best_expression,
+                                                                   depth=levels_per_run, LevelFinishedType=self._FinishedType,
+                                                                   LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             if pass_checkpoint:
                 pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
