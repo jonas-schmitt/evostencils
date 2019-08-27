@@ -1,7 +1,7 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
-from evostencils.evaluation.roofline_system import RooflineEvaluator
+from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.initialization import parser
 import os
 import pickle
