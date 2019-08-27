@@ -5,6 +5,8 @@ import subprocess
 import math
 import csv
 
+# TODO Adapt to new expression classes
+
 
 class CycleStorage:
     def __init__(self, level, grid):

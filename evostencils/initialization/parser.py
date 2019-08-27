@@ -1,71 +1,8 @@
 from sympy.parsing.sympy_parser import parse_expr
-from evostencils.expressions import base,  multigrid
+from evostencils.expressions import base, multigrid
 import re
 from evostencils.stencils import constant
-
-
-class OperatorInfo:
-    def __init__(self, name, level, stencil):
-        self._name = name
-        self._level = level
-        self._stencil = stencil
-        self._associated_field = None
-        if 'gen_restrictionForSol_' in name:
-            self._operator_type = multigrid.Restriction
-        elif 'gen_prolongationForSol_' in name:
-            self._operator_type = multigrid.Prolongation
-        else:
-            self._operator_type = base.Operator
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def level(self):
-        return self._level
-
-    @property
-    def stencil(self):
-        return self._stencil
-
-    @property
-    def operator_type(self):
-        return self._operator_type
-
-
-class EquationInfo:
-    def __init__(self, name: str, level: int, expr_str: str):
-        self._name = name
-        self._level = level
-        transformed_expr = ''
-        tokens = expr_str.split(' ')
-        for token in tokens:
-            transformed_expr += ' ' + token.split('@')[0]
-        tmp = transformed_expr.split('==')
-        self._sympy_expr = parse_expr(tmp[0])
-        self._rhs_name = tmp[1]
-        self._associated_field = None
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def level(self):
-        return self._level
-
-    @property
-    def sympy_expr(self):
-        return self._sympy_expr
-
-    @property
-    def rhs_name(self):
-        return self._rhs_name
-
-    @property
-    def associated_field(self):
-        return self._associated_field
+from evostencils.initialization import multigrid as initialization
 
 
 def parse_stencil_offsets(string):
@@ -106,11 +43,18 @@ def extract_l2_information(file_path, dimension):
                     tokens = line.split('from')
                     if '}' in line:
                         break
-                op_info = OperatorInfo(name, level, constant.Stencil(stencil_entries, dimension))
+                if 'gen_restrictionForSol_' in name:
+                    operator_type = multigrid.Restriction
+                elif 'gen_prolongationForSol_' in name:
+                    operator_type = multigrid.Prolongation
+                else:
+                    operator_type = base.Operator
+                op_info = initialization.OperatorInfo(name, level, constant.Stencil(stencil_entries, dimension),
+                                                 operator_type)
                 operators.append(op_info)
             elif tokens[0] == 'Equation':
                 tmp = tokens[1].split('@')
-                eq_info = EquationInfo(tmp[0], int(tmp[1]), file.readline())
+                eq_info = initialization.EquationInfo(tmp[0], int(tmp[1]), file.readline())
                 equations.append(eq_info)
                 file.readline()
             line = file.readline()
@@ -168,11 +112,3 @@ def extract_settings_information(file_path):
             elif lhs == 'basePathPrefix':
                 base_path = tokens[1].strip(' \n\t"')
     return base_path, config_name
-
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/3D_FV_Stokes_fromL2_debug.exa2', 3)
-extract_l2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Stokes_fromL2_debug.exa2', 2)
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_OptFlow_fromL2_debug.exa2', 2)
-#extract_layer_2_information('/home/jonas/Schreibtisch/exastencils/Examples/Debug/2D_FD_Poisson_fromL2_debug.exa3', 2)
-extract_knowledge_information('/home/jonas/Schreibtisch/exastencils/Examples/Stokes/2D_FD_Stokes_fromL2.knowledge')
-extract_settings_information('/home/jonas/Schreibtisch/exastencils/Examples/Stokes/2D_FD_Stokes_fromL2.settings')
-

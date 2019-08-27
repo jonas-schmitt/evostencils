@@ -4,9 +4,9 @@ from deap import gp, creator, tools
 import random
 import pickle
 import os.path
-from evostencils.initialization import multigrid
-import evostencils.expressions.base as base
-import evostencils.expressions.transformations as transformations
+import math
+from evostencils.initialization import multigrid as multigrid_initialization
+from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
 from evostencils.types import level_control
@@ -22,7 +22,6 @@ class CheckPoint:
         self.population = population
         self.logbooks = logbooks
 
-
     def dump_to_file(self, filename):
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
@@ -34,19 +33,22 @@ def load_checkpoint_from_file(filename):
 
 
 class Optimizer:
-    def __init__(self, op: base.Operator, approximation: base.Approximation, rhs: base.Approximation, dimension, coarsening_factor,
-                 interpolation, restriction, min_level, max_level, convergence_evaluator=None, performance_evaluator=None,
+    def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
+                 convergence_evaluator, performance_evaluator=None,
                  program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
-        self._operator = op
-        self._approximation = approximation
-        self._rhs = rhs
         self._dimension = dimension
+        self._finest_grid = finest_grid
+        solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
+        self._approximation = system.Approximation('x', solution_entries)
+        rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
+        self._rhs = system.RightHandSide('b', rhs_entries)
         self._coarsening_factor = coarsening_factor
-        self._interpolation = interpolation
-        self._restriction = restriction
         self._max_level = max_level
         self._min_level = min_level
+        self._equations = equations
+        self._operators = operators
+        self._fields = fields
         self._convergence_evaluator = convergence_evaluator
         self._performance_evaluator = performance_evaluator
         self._program_generator = program_generator
@@ -77,32 +79,16 @@ class Optimizer:
         # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
 
     @property
-    def operator(self) -> base.Operator:
-        return self._operator
-
-    @property
-    def approximation(self) -> base.Approximation:
-        return self._approximation
-
-    @property
-    def rhs(self) -> base.Approximation:
-        return self._rhs
-
-    @property
     def dimension(self):
         return self._dimension
 
     @property
-    def coarsening_factor(self):
+    def finest_grid(self):
+        return self._finest_grid
+
+    @property
+    def coarsening_factors(self):
         return self._coarsening_factor
-
-    @property
-    def interpolation(self):
-        return self._interpolation
-
-    @property
-    def restriction(self):
-        return self._restriction
 
     @property
     def min_level(self):
@@ -111,6 +97,26 @@ class Optimizer:
     @property
     def max_level(self):
         return self._max_level
+
+    @property
+    def equations(self):
+        return self._equations
+
+    @property
+    def operators(self):
+        return self._operators
+
+    @property
+    def fields(self):
+        return self._fields
+
+    @property
+    def approximation(self):
+        return self._approximation
+
+    @property
+    def rhs(self):
+        return self._rhs
 
     @property
     def convergence_evaluator(self):
@@ -148,18 +154,14 @@ class Optimizer:
             return self.infinity, self.infinity
 
         expression = expression1
-        iteration_matrix = transformations.get_iteration_matrix(expression)
-        spectral_radius = self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+        spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                try:
-                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
-                except RuntimeError as _:
-                    return self.infinity, self.infinity
+                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
@@ -246,7 +248,6 @@ class Optimizer:
             hof.update(pop)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
-                    transformations.invalidate_expression(solver.iteration_matrix)
                     transformations.invalidate_expression(solver)
                 logbooks[-1] = logbook
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
@@ -262,18 +263,16 @@ class Optimizer:
     def default_optimization(self, gp_mu=20, gp_lambda=20, gp_generations=20, gp_crossover_probability=0.7,
                              gp_mutation_probability=0.3, es_generations=50, required_convergence=0.9,
                              restart_from_checkpoint=False):
-        from evostencils.expressions import multigrid as mg_exp
-        import math
 
         levels = self.max_level - self.min_level
         levels_per_run = 2
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
         for i in range(1, levels + 1):
-            approximations.append(mg_exp.get_coarse_approximation(approximations[-1], self.coarsening_factor))
-            right_hand_sides.append(mg_exp.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factor))
+            approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factors))
+            right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factors))
         best_expression = None
-        storages = self._program_generator.generate_storage(levels)
+        # storages = self._program_generator.generate_storage(levels)
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         solver_program = ""
@@ -287,12 +286,12 @@ class Optimizer:
             restart_from_checkpoint = False
         pops = []
         logbooks = []
-        boilerplate_program = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon)
+        # boilerplate_program = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon)
         for i in range(levels - levels_per_run, -1, -levels_per_run):
-            min_level = i
-            max_level = i + levels_per_run - 1
+            min_level = self.max_level - (i + levels_per_run - 1)
+            max_level = self.max_level - i
             pass_checkpoint = False
-            evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
+            # evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
             if restart_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     best_expression = checkpoint.solver
@@ -302,14 +301,11 @@ class Optimizer:
                     continue
             approximation = approximations[i]
             rhs = right_hand_sides[i]
-            operator = mg_exp.get_coarse_operator(self.operator, approximation.grid)
-            interpolation = mg_exp.Prolongation('P', approximations[i].grid, approximations[i + levels_per_run - 1].grid, self.interpolation.stencil_generator)
-            restriction = mg_exp.Restriction('R', approximations[i].grid, approximations[i+levels_per_run-1].grid, self.restriction.stencil_generator)
-            pset = multigrid.generate_primitive_set(operator, approximation, rhs, self.dimension, self.coarsening_factor,
-                                                    interpolation, restriction,
-                                                    coarse_grid_solver_expression=best_expression,
-                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
-                                                    LevelNotFinishedType=self._NotFinishedType)
+            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
+                                                                   max_level, self.equations, self.operators, self.fields,
+                                                                   coarse_grid_solver_expression=best_expression,
+                                                                   depth=levels_per_run, LevelFinishedType=self._FinishedType,
+                                                                   LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             if pass_checkpoint:
                 pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
@@ -336,7 +332,8 @@ class Optimizer:
             best_time = self.infinity
             best_individual = hof[0]
             best_convergence_factor = best_individual.fitness.values[0]
-            base_program = evaluation_boilerplate + solver_program
+            # base_program = evaluation_boilerplate + solver_program
+            """
             if self._program_generator.compiler_available:
                 count = 0
                 for j in range(len(hof)):
@@ -363,26 +360,27 @@ class Optimizer:
                                        "Optimization failed.")
             else:
                 print("No working compiler available. Using LFA Lab for convergence optimization.")
+            """
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             best_expression.evaluate = False
 
-            optimized_weights, optimized_convergence_factor = self.optimize_weights(best_expression, es_generations,
-                                                                                    base_program, storages)
-            if optimized_convergence_factor < best_convergence_factor:
-                weights.set_weights(best_expression, optimized_weights)
-                print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
-            iteration_matrix = transformations.get_iteration_matrix(best_expression)
+            #optimized_weights, optimized_convergence_factor = self.optimize_weights(best_expression, es_generations,
+            #                                                                        base_program, storages)
+            #if optimized_convergence_factor < best_convergence_factor:
+            #    weights.set_weights(best_expression, optimized_weights)
+            #    print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
             # print(repr(iteration_matrix))
-            self.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+            self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)
-            try:
-                solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
-            except Exception as e:
-                print('Ungeneratable program')
-                print(e)
+            #try:
+            #    solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
+            #except Exception as e:
+            #    print('Ungeneratable program')
+            #    print(e)
 
-        return boilerplate_program + solver_program, pops, logbooks
+        #return boilerplate_program + solver_program, pops, logbooks
+        return None, pops, logbooks
 
     def optimize_weights(self, expression, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
