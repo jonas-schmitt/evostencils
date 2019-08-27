@@ -33,11 +33,11 @@ def load_checkpoint_from_file(filename):
 
 
 class Optimizer:
-    def __init__(self, dimensionality, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
+    def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
                  program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
-        self._dimensionality = dimensionality
+        self._dimension = dimension
         self._finest_grid = finest_grid
         solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
         self._approximation = system.Approximation('x', solution_entries)
@@ -79,8 +79,8 @@ class Optimizer:
         # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
 
     @property
-    def dimensionality(self):
-        return self._dimensionality
+    def dimension(self):
+        return self._dimension
 
     @property
     def finest_grid(self):
@@ -301,7 +301,7 @@ class Optimizer:
                     continue
             approximation = approximations[i]
             rhs = right_hand_sides[i]
-            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimensionality, self.coarsening_factors,
+            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
                                                                    i, self.equations, self.operators, self.fields,
                                                                    coarse_grid_solver_expression=best_expression,
                                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,

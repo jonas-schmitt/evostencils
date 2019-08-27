@@ -49,7 +49,10 @@ class Approximation(base.Entity):
     def __init__(self, name, entries):
         self._name = name
         self._entries = entries
-        self._shape = (functools.reduce(lambda a, b: a.shape[0] + b.shape[0], entries), entries[0].shape[1])
+        if len(entries) == 1:
+            self._shape = entries[0].shape
+        else:
+            self._shape = (functools.reduce(lambda a, b: a.shape[0] + b.shape[0], entries), entries[0].shape[1])
         super().__init__()
 
     @property
@@ -113,13 +116,13 @@ def get_coarse_grid(grid: [base.Grid], coarsening_factors: [tuple]):
 
 
 def get_coarse_approximation(approximation: Approximation, coarsening_factors: tuple):
-    return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c)',
+    return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c',
                                                                       multigrid.get_coarse_grid(entry.grid, cf))
                                                    for entry, cf in zip(approximation.entries, coarsening_factors)])
 
 
 def get_coarse_rhs(rhs: RightHandSide, coarsening_factors):
-    return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c)',
+    return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c',
                                                             multigrid.get_coarse_grid(entry.grid, cf))
                                          for entry, cf in zip(rhs.entries, coarsening_factors)])
 

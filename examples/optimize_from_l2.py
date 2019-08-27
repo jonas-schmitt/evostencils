@@ -1,11 +1,10 @@
-from evostencils.optimization.program_system import Optimizer
+from evostencils.optimization.program_from_l2 import Optimizer
 from evostencils.expressions import multigrid, system
 from evostencils.stencils.gallery import *
 from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
 from evostencils.evaluation.roofline_system import RooflineEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 from evostencils.code_generation import parser
-from evostencils.initialization.system import generate_operators_from_l2_information
 import os
 import pickle
 import lfa_lab as lfa
@@ -13,12 +12,12 @@ import sys
 
 
 def main():
-
+    problem_name = '2D_Poisson_fromL2'
     exastencils_path = '/home/jonas/Schreibtisch/exastencils'
     if len(sys.argv[1:]) > 0 and os.path.exists(sys.argv[1]):
         exastencils_path = sys.argv[1]
-    settings_path = f'{exastencils_path}/Examples/Stokes/2D_FD_Stokes_fromL2.settings'
-    knowledge_path = f'{exastencils_path}/Examples/Stokes/2D_FD_Stokes_fromL2.knowledge'
+    settings_path = f'{exastencils_path}/Examples/Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'{exastencils_path}/Examples/Poisson/2D_FD_Poisson_fromL2.knowledge'
     base_path, config_name = parser.extract_settings_information(settings_path)
     dimensionality, min_level, max_level = parser.extract_knowledge_information(knowledge_path)
     l3_path = f'{exastencils_path}/Examples/Debug/{config_name}_debug.exa3'
@@ -29,29 +28,9 @@ def main():
     h = 1/(2**max_level)
     step_size = (h, h)
     coarsening_factor = (2, 2)
-    step_sizes = [step_size, step_size]
-    coarsening_factors = [coarsening_factor, coarsening_factor]
-    grid = base.Grid(grid_size, step_size)
-
-    fine_grids = [grid] * len(fields)
-    coarse_grids = system.get_coarse_grid(fine_grids, [coarsening_factor] * len(fields))
-    res = generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grids, coarse_grids)
-
-    u = system.Approximation('u', [base.ZeroApproximation(grid), base.ZeroApproximation(grid)])
-    f = system.RightHandSide('f', [base.RightHandSide('f_0', grid), base.RightHandSide('f_1', grid)])
-
-    problem_name = 'poisson_2D_constant'
-    stencil_generator = Poisson2D()
-    interpolation_generator = MultilinearInterpolationGenerator(coarsening_factor)
-    restriction_generator = FullWeightingRestrictionGenerator(coarsening_factor)
-
-    laplace = base.Operator('laplace', grid, stencil_generator)
-    I = base.Identity(grid)
-    Z = base.ZeroOperator(grid)
-
-    A = system.Operator('A', [[laplace, I], [Z, laplace]])
-    R = system.Restriction('full-weighting restriction', u.grid, system.get_coarse_grid(u.grid, coarsening_factors), restriction_generator)
-    P = system.Prolongation('multilinear interpolation', u.grid, system.get_coarse_grid(u.grid, coarsening_factors), interpolation_generator)
+    step_sizes = [step_size for _ in range(len(fields))]
+    coarsening_factors = [coarsening_factor for _ in range(len(fields))]
+    finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(fields))]
 
     lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
     convergence_evaluator = ConvergenceEvaluatorSystem(lfa_grids, coarsening_factors, dimension)
@@ -69,7 +48,8 @@ def main():
     checkpoint_directory_path = f'{problem_name}/checkpoints'
     if not os.path.exists(checkpoint_directory_path):
         os.makedirs(checkpoint_directory_path)
-    optimizer = Optimizer(A, u, f, dimension, coarsening_factors, P, R, min_level, max_level, convergence_evaluator=convergence_evaluator,
+    optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
+                          convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True

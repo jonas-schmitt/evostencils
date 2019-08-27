@@ -78,13 +78,13 @@ def diagonal(stencil):
 
 def lower(stencil):
     import numpy as np
-    zero = np.zeros(stencil.dimensionality)
+    zero = np.zeros(stencil.dimension)
     return filter_stencil(stencil, lambda o, v: lexicographical_less(o, zero))
 
 
 def upper(stencil):
     import numpy as np
-    zero = np.zeros(stencil.dimensionality)
+    zero = np.zeros(stencil.dimension)
     return filter_stencil(stencil, lambda o, v: lexicographical_less(zero, o))
 
 
@@ -139,11 +139,11 @@ def mul(stencil1, stencil2):
 
 def get_unit_stencil(grid) -> Stencil:
     offsets = []
-    for i in range(grid.dimensionality):
+    for i in range(grid.dimension):
         offsets.append(0)
     entries = ((tuple(offsets), 1.0),)
     return Stencil(entries)
 
 
 def get_null_stencil(grid) -> Stencil:
-    return Stencil(entries=(), dimension=grid.dimensionality)
+    return Stencil(entries=(), dimension=grid.dimension)

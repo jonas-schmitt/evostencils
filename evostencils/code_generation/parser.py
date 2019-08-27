@@ -82,7 +82,7 @@ def parse_stencil_offsets(string):
     return tuple(offsets)
 
 
-def extract_l2_information(file_path, dimensionality):
+def extract_l2_information(file_path, dimension):
     equations = []
     operators = []
     fields = []
@@ -106,7 +106,7 @@ def extract_l2_information(file_path, dimensionality):
                     tokens = line.split('from')
                     if '}' in line:
                         break
-                op_info = OperatorInfo(name, level, constant.Stencil(stencil_entries, dimensionality))
+                op_info = OperatorInfo(name, level, constant.Stencil(stencil_entries, dimension))
                 operators.append(op_info)
             elif tokens[0] == 'Equation':
                 tmp = tokens[1].split('@')
@@ -126,8 +126,13 @@ def extract_l2_information(file_path, dimensionality):
     for eq_info in equations:
         rhs_name = eq_info.rhs_name
         tmp = rhs_name.split('_')
-        field_name = tmp[1]
-        eq_info._associated_field = next(field for field in fields if field.name == field_name)
+        if len(tmp) == 1:
+            if len(fields) != 1:
+                raise RuntimeError('Could not extract associated field for rhs')
+            eq_info._associated_field = fields[0]
+        else:
+            field_name = tmp[1]
+            eq_info._associated_field = next(field for field in fields if field.name == field_name)
     equations.sort(key=lambda ei: ei.associated_field.name)
     for op_info in operators:
         if op_info.operator_type == multigrid.Restriction or op_info.operator_type == multigrid.Prolongation:
@@ -145,12 +150,12 @@ def extract_knowledge_information(file_path):
             tokens = line.split('=')
             lhs = tokens[0].strip(' \n\t')
             if lhs == 'dimensionality':
-                dimensionality = int(tokens[1].strip(' \n\t'))
+                dimension = int(tokens[1].strip(' \n\t'))
             elif lhs == 'minLevel':
                 min_level = int(tokens[1].strip(' \n\t'))
             elif lhs == 'maxLevel':
                 max_level = int(tokens[1].strip(' \n\t'))
-    return dimensionality, min_level, max_level
+    return dimension, min_level, max_level
 
 
 def extract_settings_information(file_path):

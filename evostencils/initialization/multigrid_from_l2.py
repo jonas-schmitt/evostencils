@@ -75,7 +75,7 @@ class Terminals:
         self.grid = approximation.grid
         self.dimension = dimension
         self.coarsening_factor = coarsening_factors
-        self.interpolation = prolongation
+        self.prolongation = prolongation
         self.restriction = restriction
         self.coarse_grid = system.get_coarse_grid(self.approximation.grid, self.coarsening_factor)
         self.coarse_operator = coarse_operator
@@ -96,7 +96,7 @@ class Types:
         self.RHS = multiple.generate_type_list(*types)
         self.DiagonalOperator = matrix_types.generate_diagonal_operator_type(terminals.operator.shape)
         self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_operator_type(terminals.operator.shape)
-        self.Interpolation = matrix_types.generate_operator_type(terminals.interpolation.shape)
+        self.Prolongation = matrix_types.generate_operator_type(terminals.prolongation.shape)
         self.Restriction = matrix_types.generate_operator_type(terminals.restriction.shape)
         self.CoarseOperator = matrix_types.generate_operator_type(terminals.coarse_operator.shape)
         self.CoarseGridSolver = matrix_types.generate_solver_type(terminals.coarse_operator.shape)
@@ -115,7 +115,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(base.inv(system.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
-    pset.addTerminal(terminals.interpolation, types.Interpolation, f'P_{level}')
+    pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
     OperatorType = types.Operator
@@ -158,7 +158,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       f"apply_{level}")
     if not coarsest:
 
-        pset.addPrimitive(coarse_grid_correction, [types.Interpolation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
+        pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
                           [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished),
@@ -177,10 +177,10 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                                  cycle.predecessor)
             return iterate(new_cycle)
 
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Interpolation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
 
@@ -217,8 +217,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     """
 
 
-def generate_primitive_set(approximation, rhs, dimensionality, coarsening_factors, max_level, equations, operators, fields,
+def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
                            coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
+    #TODO fix level problem
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
@@ -231,7 +232,7 @@ def generate_primitive_set(approximation, rhs, dimensionality, coarsening_factor
         generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
     coarse_operator, coarse_restriction, coarse_prolongation, = \
         generate_operators_from_l2_information(equations, operators, fields, max_level-1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
-    terminals = Terminals(approximation, dimensionality, coarsening_factors, operator, coarse_operator, restriction, restriction, cgs_expression)
+    terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction, prolongation, cgs_expression)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
@@ -259,8 +260,8 @@ def generate_primitive_set(approximation, rhs, dimensionality, coarsening_factor
             coarsest = True
             cgs_expression = coarse_grid_solver_expression
 
-        terminals = Terminals(approximation, dimensionality, coarsening_factors, operator,
-                              restriction, prolongation, cgs_expression)
+        terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction,
+                              prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
         add_cycle(pset, terminals, types, i, coarsest)
 

@@ -457,7 +457,7 @@ class ProgramGenerator:
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
                    f'{storages[i].solution.to_exa3()}))) '
         program += f'where (((i0'
-        for j in range(1, expression.grid.dimensionality):
+        for j in range(1, expression.grid.dimension):
             program += f' + i{j}'
         program += f') % 2) == 0)\n'
         program += f'\t\t{storages[i].solution.to_exa3()} ' \
@@ -465,7 +465,7 @@ class ProgramGenerator:
                    f'({expression.storage.to_exa3()} - ({self.operator.name}@(finest - {i}) * ' \
                    f'{storages[i].solution.to_exa3()}))) '
         program += f'where (((i0'
-        for j in range(1, expression.grid.dimensionality):
+        for j in range(1, expression.grid.dimension):
             program += f' + i{j}'
         program += f') % 2) == 1)\n'
         program += '\t}\n'
@@ -522,11 +522,11 @@ class ProgramGenerator:
                            f'* {operator_str} * {correction_str}'
                 if expression.partitioning == part.RedBlack:
                     program += f'\t{smoother} where (((i0'
-                    for i in range(1, expression.grid.dimensionality):
+                    for i in range(1, expression.grid.dimension):
                         program += f' + i{i}'
                     program += f') % 2) == 0)\n'
                     program += f'\t{smoother} where (((i0'
-                    for i in range(1, expression.grid.dimensionality):
+                    for i in range(1, expression.grid.dimension):
                         program += f' + i{i}'
                     program += f') % 2) == 1)\n'
                 elif expression.partitioning == part.Single:
