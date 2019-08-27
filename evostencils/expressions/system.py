@@ -52,7 +52,10 @@ class Approximation(base.Entity):
         if len(entries) == 1:
             self._shape = entries[0].shape
         else:
-            self._shape = (functools.reduce(lambda a, b: a.shape[0] + b.shape[0], entries), entries[0].shape[1])
+            acc = 0
+            for entry in entries:
+                acc += entry.shape[0]
+            self._shape = tuple((acc, entries[0].shape[1]))
         super().__init__()
 
     @property

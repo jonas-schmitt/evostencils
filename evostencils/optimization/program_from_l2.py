@@ -288,8 +288,8 @@ class Optimizer:
         logbooks = []
         # boilerplate_program = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon)
         for i in range(levels - levels_per_run, -1, -levels_per_run):
-            min_level = i
-            max_level = i + levels_per_run - 1
+            min_level = self.max_level - (i + levels_per_run - 1)
+            max_level = self.max_level - i
             pass_checkpoint = False
             # evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
             if restart_from_checkpoint:
@@ -302,7 +302,7 @@ class Optimizer:
             approximation = approximations[i]
             rhs = right_hand_sides[i]
             pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
-                                                                   i, self.equations, self.operators, self.fields,
+                                                                   max_level, self.equations, self.operators, self.fields,
                                                                    coarse_grid_solver_expression=best_expression,
                                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                                    LevelNotFinishedType=self._NotFinishedType)

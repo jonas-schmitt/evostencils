@@ -12,12 +12,12 @@ import sys
 
 
 def main():
-    problem_name = '2D_Poisson_fromL2'
+    problem_name = '2D_FD_Stokes_fromL2'
     exastencils_path = '/home/jonas/Schreibtisch/exastencils'
     if len(sys.argv[1:]) > 0 and os.path.exists(sys.argv[1]):
         exastencils_path = sys.argv[1]
-    settings_path = f'{exastencils_path}/Examples/Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'{exastencils_path}/Examples/Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'{exastencils_path}/Examples/Stokes/2D_FD_Stokes_fromL2.settings'
+    knowledge_path = f'{exastencils_path}/Examples/Stokes/2D_FD_Stokes_fromL2.knowledge'
     base_path, config_name = parser.extract_settings_information(settings_path)
     dimensionality, min_level, max_level = parser.extract_knowledge_information(knowledge_path)
     l3_path = f'{exastencils_path}/Examples/Debug/{config_name}_debug.exa3'
