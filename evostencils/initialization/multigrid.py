@@ -7,6 +7,7 @@ from evostencils.types import grid as grid_types
 from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
 from evostencils.deap_extension import PrimitiveSetTyped
+from evostencils.stencils import constant
 from deap import gp
 from evostencils.initialization import parser
 import sympy
@@ -19,12 +20,7 @@ class OperatorInfo:
         self._level = level
         self._stencil = stencil
         self._associated_field = None
-        if 'gen_restrictionForSol_' in name:
-            self._operator_type = mg.Restriction
-        elif 'gen_prolongationForSol_' in name:
-            self._operator_type = mg.Prolongation
-        else:
-            self._operator_type = base.Operator
+        self._operator_type = operator_type
 
     @property
     def name(self):
@@ -94,12 +90,19 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
             for arg in expr.args:
                 recursive_descent(arg)
         elif expr.func == sympy.Mul and len(expr.args) == 2 and expr.args[-1] in fields:
+            # TODO handle unit matrices
             op_symbol = expr.args[0]
             field_symbol = expr.args[1]
             field_index = fields.index(field_symbol)
-            j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
-            row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], ConstantStencilGenerator(operators[j].stencil)))
+            if op_symbol.is_Symbol:
+                j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
+                row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], ConstantStencilGenerator(operators[j].stencil)))
+            else:
+                # TODO fix
+                row_of_operators.append(base.Identity(grid[field_index]))
             indices.append(field_index)
+        else:
+            pass
     recursive_descent(equation.sympy_expr)
     for i in range(len(grid)):
         if i not in indices:
