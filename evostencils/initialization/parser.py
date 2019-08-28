@@ -6,7 +6,7 @@ from evostencils.stencils import constant
 from evostencils.initialization import multigrid as initialization
 
 
-def parse_stencil_offsets(string):
+def parse_stencil_offsets(string: str):
     tokens = re.split(r" ?\[ ?| ?\] ?| ?, ?", string)
     tokens = [token for token in tokens if not token == ""]
     offsets = []
@@ -20,7 +20,7 @@ def parse_stencil_offsets(string):
     return tuple(offsets)
 
 
-def extract_l2_information(file_path, dimension):
+def extract_l2_information(file_path: str, dimension: int):
     equations = []
     operators = []
     fields = []
@@ -89,7 +89,7 @@ def extract_l2_information(file_path, dimension):
     return equations, operators, fields
 
 
-def extract_knowledge_information(file_path):
+def extract_knowledge_information(file_path: str):
     with open(file_path, 'r') as file:
         for line in file:
             tokens = line.split('=')
@@ -103,7 +103,21 @@ def extract_knowledge_information(file_path):
     return dimension, min_level, max_level
 
 
-def extract_settings_information(file_path):
+def generate_level_adapted_knowledge_file(input_file_path: str, output_file_path: str, min_level: int, max_level: int):
+    with open(input_file_path, 'r') as input_file:
+        with open(output_file_path, 'w') as output_file:
+            for line in input_file:
+                tokens = line.split('=')
+                lhs = tokens[0].strip(' \n\t')
+                if lhs == 'minLevel':
+                    output_file.write(f'{lhs}\t= {min_level}\n')
+                elif lhs == 'maxLevel':
+                    output_file.write(f'{lhs}\t= {max_level}\n')
+                else:
+                    output_file.write(line)
+
+
+def extract_settings_information(file_path: str):
     with open(file_path, 'r') as file:
         for line in file:
             tokens = line.split('=')

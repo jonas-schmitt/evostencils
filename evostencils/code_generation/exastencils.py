@@ -33,10 +33,14 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, problem_name: str, exastencils_path: str, dimension, finest_grid, coarsening_factor, min_level, max_level, equations,
+    def __init__(self, problem_name: str, exastencils_path: str, knowledge_path: str, settings_path: str, l3_path: str,
+                 dimension, finest_grid, coarsening_factor, min_level, max_level, equations,
                  operators, fields, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
+        self._knowledge_path = knowledge_path
+        self._settings_path = settings_path
+        self._l3_path = l3_path
         self._output_path = output_path
         self._dimension = dimension
         self._finest_grid = finest_grid
@@ -47,7 +51,6 @@ class ProgramGenerator:
         self._operators = operators
         self._fields = fields
         self._compiler_available = False
-        self._performance_estimate_file_name = 'performance_estimate.csv'
         self._compiler_file_name = 'compiler.jar'
         if not os.path.exists(output_path):
             os.makedirs(output_path)
@@ -55,9 +58,6 @@ class ProgramGenerator:
             subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
             if os.path.isfile(f'{exastencils_path}/Compiler/{self.compiler_file_name}'):
                 self._compiler_available = True
-        # Settings and knowledge for execution
-        # Settings and knowledge for performance estimation
-        tmp = f'{problem_name}_performance_estimation'
 
     @property
     def compiler_file_name(self):
@@ -66,6 +66,18 @@ class ProgramGenerator:
     @property
     def exastencils_path(self):
         return self._exastencils_path
+
+    @property
+    def knowledge_path(self):
+        return self._knowledge_path
+
+    @property
+    def settings_path(self):
+        return self._settings_path
+
+    @property
+    def l3_path(self):
+        return self._l3_path
 
     @property
     def compiler_available(self):
@@ -160,17 +172,6 @@ class ProgramGenerator:
                                  f'{self.output_path}/lib/{platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
-
-    def estimate_runtime_per_iteration(self, platform='linux'):
-        self.run_exastencils_compiler(f'{self.problem_name}_performance_estimation', platform)
-        results = []
-        with open(f'{self.output_path}/{self._performance_estimate_file_name}', 'r') as file:
-            reader = csv.reader(file, delimiter=';')
-            for row in reader:
-                if 'cycle' in row[1].lower():
-                    results.append(float(row[2]))
-        estimated_runtime = max(results)
-        return estimated_runtime
 
     def run_c_compiler(self):
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
