@@ -1,4 +1,3 @@
-import evostencils.expressions.base
 from evostencils.expressions import base
 from evostencils.expressions import system
 from evostencils.expressions import partitioning as part
@@ -7,9 +6,7 @@ from evostencils.types import grid as grid_types
 from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
 from evostencils.deap_extension import PrimitiveSetTyped
-from evostencils.stencils import constant
 from deap import gp
-from evostencils.initialization import parser
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
 
@@ -119,7 +116,7 @@ def generate_system_operator_from_l2_information(equations: [EquationInfo], oper
     operators_on_level = list(filter(lambda x: x.level == level, operators))
     system_operators = []
     for op_info in operators_on_level:
-        if op_info.operator_type != evostencils.expressions.base.Restriction and op_info.operator_type != evostencils.expressions.base.Prolongation:
+        if op_info.operator_type != base.Restriction and op_info.operator_type != base.Prolongation:
             system_operators.append(op_info)
     entries = []
     for equation in equations:
@@ -138,9 +135,9 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     prolongation_operators = []
     system_operators = []
     for op_info in operators_on_level:
-        if op_info.operator_type == evostencils.expressions.base.Restriction:
+        if op_info.operator_type == base.Restriction:
             restriction_operators.append(op_info)
-        elif op_info.operator_type == evostencils.expressions.base.Prolongation:
+        elif op_info.operator_type == base.Prolongation:
             prolongation_operators.append(op_info)
         else:
             system_operators.append(op_info)
@@ -175,7 +172,7 @@ class Terminals:
         self.coarse_grid = system.get_coarse_grid(self.approximation.grid, self.coarsening_factor)
         self.coarse_operator = coarse_operator
         self.identity = system.Identity(approximation.grid)
-        self.coarse_grid_solver = evostencils.expressions.base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
+        self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
 
@@ -218,17 +215,17 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     CorrectionType = types.Correction
 
     def coarse_cycle(coarse_grid, cycle, partitioning):
-        result = evostencils.expressions.base.cycle(cycle.approximation, cycle.rhs,
-                                                    evostencils.expressions.base.cycle(coarse_grid, cycle.correction, evostencils.expressions.base.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
+        result = base.cycle(cycle.approximation, cycle.rhs,
+                                                    base.cycle(coarse_grid, cycle.correction, base.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
                                                                                        partitioning), cycle.partitioning, predecessor=cycle.predecessor)
         result.correction.predecessor = result
         return result.correction
 
     def residual(args, partitioning):
-        return evostencils.expressions.base.cycle(args[0], args[1], evostencils.expressions.base.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
+        return base.cycle(args[0], args[1], base.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
 
     def apply(operator, cycle):
-        return evostencils.expressions.base.cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
+        return base.cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
                                                   cycle.predecessor)
 
     def coarse_grid_correction(interpolation, cycle):
@@ -268,7 +265,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     else:
         def solve(cgs, interpolation, cycle):
-            new_cycle = evostencils.expressions.base.cycle(cycle.approximation, cycle.rhs, base.mul(interpolation, base.mul(cgs, cycle.correction)), cycle.partitioning, cycle.weight,
+            new_cycle = base.cycle(cycle.approximation, cycle.rhs, base.mul(interpolation, base.mul(cgs, cycle.correction)), cycle.partitioning, cycle.weight,
                                                            cycle.predecessor)
             return iterate(new_cycle)
 
