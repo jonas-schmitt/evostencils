@@ -1,7 +1,8 @@
 import lfa_lab
+
 import evostencils.stencils.periodic as periodic
 import evostencils.stencils.constant as constant
-from evostencils.expressions import base, multigrid, system, partitioning
+from evostencils.expressions import base, system, partitioning
 from multiprocessing import Process, Queue
 
 
@@ -57,7 +58,7 @@ class ConvergenceEvaluator:
     def transform(self, expression: base.Expression):
         if expression.lfa_symbol is not None:
             return expression.lfa_symbol
-        if isinstance(expression, multigrid.Cycle):
+        if isinstance(expression, base.Cycle):
             correction = self.transform(expression.correction)
             if isinstance(expression.approximation, system.ZeroApproximation):
                 approximation = correction.matching_zero()
@@ -72,7 +73,8 @@ class ConvergenceEvaluator:
                 if isinstance(expression.correction, base.Multiplication):
                     operand1 = expression.correction.operand1
                     operand2 = expression.correction.operand2
-                    if isinstance(operand1, base.Inverse) and isinstance(operand2, multigrid.Residual):
+                    if isinstance(operand1, base.Inverse) and isinstance(operand2,
+                                                                         base.Residual):
                         try:
                             red_entries = []
                             black_entries = []
@@ -109,7 +111,7 @@ class ConvergenceEvaluator:
                     # raise RuntimeError("Computation could not be partitioned.")
             else:
                 raise NotImplementedError("Not implemented")
-        elif isinstance(expression, multigrid.Residual):
+        elif isinstance(expression, base.Residual):
             operator = self.transform(expression.operator)
             if isinstance(expression.rhs, system.RightHandSide):
                 rhs = operator.matching_zero()
@@ -142,7 +144,7 @@ class ConvergenceEvaluator:
             result = self.transform(expression.operand).diag()
         elif isinstance(expression, system.ElementwiseDiagonal):
             result = self.transform(expression.operand).elementwise_diag()
-        elif isinstance(expression, multigrid.CoarseGridSolver):
+        elif isinstance(expression, base.CoarseGridSolver):
             cgs_expression = expression.expression
             if cgs_expression is None or not cgs_expression.evaluate:
                 operator = self.transform(expression.operator)
@@ -156,15 +158,15 @@ class ConvergenceEvaluator:
             for operator_row in expression.entries:
                 lfa_entries.append([])
                 for i, entry in enumerate(operator_row):
-                    if isinstance(entry, multigrid.InterGridOperator):
+                    if isinstance(entry, base.InterGridOperator):
                         operator = entry
                         lfa_fine_grid = self.get_lfa_grid(operator.fine_grid, i)
                         lfa_coarse_grid = self.get_lfa_grid(operator.coarse_grid, i)
                         stencil = operator.generate_stencil()
                         lfa_stencil = stencil_to_lfa(stencil, lfa_fine_grid)
-                        if isinstance(operator, multigrid.Restriction):
+                        if isinstance(operator, base.Restriction):
                             lfa_operator = lfa_lab.injection_restriction(lfa_fine_grid, lfa_coarse_grid) * lfa_stencil
-                        elif isinstance(operator, multigrid.Prolongation):
+                        elif isinstance(operator, base.Prolongation):
                             lfa_operator = lfa_stencil * lfa_lab.injection_interpolation(lfa_fine_grid, lfa_coarse_grid)
                         else:
                             raise NotImplementedError("Not implemented")
@@ -180,9 +182,9 @@ class ConvergenceEvaluator:
 
     def compute_spectral_radius(self, iteration_matrix: base.Expression):
 
-        lfa_expression = self.transform(iteration_matrix)
-        s = lfa_expression.symbol()
-        return s.spectral_radius()
+        # lfa_expression = self.transform(iteration_matrix)
+        # s = lfa_expression.symbol()
+        # return s.spectral_radius()
         try:
             lfa_expression = self.transform(iteration_matrix)
 

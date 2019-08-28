@@ -1,4 +1,4 @@
-from evostencils.expressions import base, multigrid, partitioning, system
+from evostencils.expressions import base, partitioning, system
 import evostencils.stencils.periodic as periodic
 from functools import reduce
 
@@ -49,13 +49,13 @@ class RooflineEvaluator:
     def estimate_runtime(self, expression: base.Expression):
         if expression.runtime is not None:
             return expression.runtime
-        if isinstance(expression, multigrid.Cycle):
+        if isinstance(expression, base.Cycle):
             # Partitions are currently ignored since they do not affect the arithmetic intensity
             # Although beware that in cases where the total data size is too small the memory bandwidth can not be saturated
             # and the maximum bandwidth will not be achieved
             grid = expression.grid
             correction = expression.correction
-            if isinstance(correction, multigrid.Residual):
+            if isinstance(correction, base.Residual):
                 operations_per_cell, words_per_cell = 0, 0
                 runtime = self.estimate_runtime(correction)
             elif isinstance(correction, base.Multiplication):
@@ -70,7 +70,7 @@ class RooflineEvaluator:
             words_per_cell += len(grid) * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             runtime += self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
-        elif isinstance(expression, multigrid.Residual):
+        elif isinstance(expression, base.Residual):
             operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_residual(expression)
             # Store result
             words_per_cell += len(expression.grid) * RooflineEvaluator.words_transferred_for_store()
@@ -90,7 +90,7 @@ class RooflineEvaluator:
                 operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                 runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
-            elif isinstance(expression.operand1, multigrid.CoarseGridSolver):
+            elif isinstance(expression.operand1, base.CoarseGridSolver):
                 cgs = expression.operand1
                 if cgs.expression is not None:
                     if cgs.expression.runtime is None:
@@ -146,7 +146,7 @@ class RooflineEvaluator:
         return 1
 
     @staticmethod
-    def estimate_words_per_operation_for_residual(residual: multigrid.Residual):
+    def estimate_words_per_operation_for_residual(residual: base.Residual):
         grid = residual.grid
         offset_sets = [set() for _ in grid]
         operator = residual.operator
@@ -217,7 +217,7 @@ class RooflineEvaluator:
         words_per_cell = 0
         for row_of_entries in intergrid_operator.entries:
             for entry in row_of_entries:
-                if isinstance(entry, multigrid.ZeroProlongation) or isinstance(entry, multigrid.ZeroRestriction):
+                if isinstance(entry, base.ZeroProlongation) or isinstance(entry, base.ZeroRestriction):
                     continue
                 stencil = entry.generate_stencil()
                 list_of_entries = periodic.get_list_of_entries(stencil)

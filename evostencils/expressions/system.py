@@ -1,5 +1,4 @@
-from evostencils.expressions import base, multigrid
-import functools
+from evostencils.expressions import base
 
 
 class Operator(base.Entity):
@@ -97,13 +96,13 @@ class InterGridOperator(Operator):
 class Restriction(InterGridOperator):
     def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
         super().__init__(name, fine_grid, coarse_grid, stencil_generator,
-                         multigrid.Restriction, multigrid.ZeroRestriction)
+                         base.Restriction, base.ZeroRestriction)
 
 
 class Prolongation(InterGridOperator):
     def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
         super().__init__(name, fine_grid, coarse_grid, stencil_generator,
-                         multigrid.Prolongation, multigrid.ZeroProlongation)
+                         base.Prolongation, base.ZeroProlongation)
 
 
 class Diagonal(base.UnaryExpression):
@@ -115,18 +114,16 @@ class ElementwiseDiagonal(base.UnaryExpression):
 
 
 def get_coarse_grid(grid: [base.Grid], coarsening_factors: [tuple]):
-    return [multigrid.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]
+    return [base.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]
 
 
 def get_coarse_approximation(approximation: Approximation, coarsening_factors: tuple):
-    return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c',
-                                                                      multigrid.get_coarse_grid(entry.grid, cf))
+    return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c', base.get_coarse_grid(entry.grid, cf))
                                                    for entry, cf in zip(approximation.entries, coarsening_factors)])
 
 
 def get_coarse_rhs(rhs: RightHandSide, coarsening_factors):
-    return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c',
-                                                            multigrid.get_coarse_grid(entry.grid, cf))
+    return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c', base.get_coarse_grid(entry.grid, cf))
                                          for entry, cf in zip(rhs.entries, coarsening_factors)])
 
 

@@ -1,4 +1,5 @@
-from evostencils.expressions import base, multigrid as mg, partitioning as part
+import evostencils.expressions.base
+from evostencils.expressions import base, partitioning as part
 from evostencils.stencils import constant, periodic
 import os
 import subprocess
@@ -36,7 +37,7 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, problem_name: str, exastencils_path: str, op: base.Operator, approximation: base.Approximation, rhs: base.Approximation,
-                 identity: base.Identity, interpolation: mg.Prolongation, restriction: mg.Restriction,
+                 identity: base.Identity, interpolation: base.Prolongation, restriction: base.Restriction,
                  dimension, coarsening_factor, min_level, max_level, initialization_information, output_path="./execution"):
         self.problem_name = problem_name
         self._exastencils_path = exastencils_path
@@ -290,9 +291,9 @@ class ProgramGenerator:
         return time_to_solution, convergence_factor
 
     @staticmethod
-    def obtain_coarsest_level(cycle: mg.Cycle, base_level=0) -> int:
+    def obtain_coarsest_level(cycle: base.Cycle, base_level=0) -> int:
         def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
-            if isinstance(expression, mg.Cycle):
+            if isinstance(expression, base.Cycle):
                 if expression.grid.size < current_size:
                     new_size = expression.grid.size
                     new_level = current_level + 1
@@ -302,7 +303,7 @@ class ProgramGenerator:
                 level_iterate = recursive_descent(expression.approximation, new_size, new_level)
                 level_correction = recursive_descent(expression.correction, new_size, new_level)
                 return max(level_iterate, level_correction)
-            elif isinstance(expression, mg.Residual):
+            elif isinstance(expression, base.Residual):
                 level_iterate = recursive_descent(expression.approximation, current_size, current_level)
                 level_rhs = recursive_descent(expression.rhs, current_size, current_level)
                 return max(level_iterate, level_rhs)
@@ -325,7 +326,7 @@ class ProgramGenerator:
         grid = self._approximation.grid
         for level in range(0, maximum_level + 1):
             tmps.append(CycleStorage(level, grid))
-            grid = mg.get_coarse_grid(grid, self.coarsening_factor)
+            grid = base.get_coarse_grid(grid, self.coarsening_factor)
         return tmps
 
     @staticmethod
@@ -344,12 +345,12 @@ class ProgramGenerator:
     # Warning: This function modifies the expression passed to it
     @staticmethod
     def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
-        if isinstance(node, mg.Cycle):
+        if isinstance(node, base.Cycle):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.approximation.storage = storages[i].solution
             node.correction.storage = storages[i].correction
             ProgramGenerator.assign_storage_to_subexpressions(node.correction, storages, i)
-        elif isinstance(node, mg.Residual):
+        elif isinstance(node, base.Residual):
             i = ProgramGenerator.adjust_storage_index(node, storages, i)
             node.approximation.storage = storages[i].solution
             node.rhs.storage = storages[i].rhs
@@ -360,7 +361,7 @@ class ProgramGenerator:
             operand2 = node.operand2
             if ProgramGenerator.needs_storage(operand2):
                 i = ProgramGenerator.adjust_storage_index(operand2, storages, i)
-                if isinstance(operand2, mg.Residual):
+                if isinstance(operand2, base.Residual):
                     operand2.storage = storages[i].residual
                 else:
                     operand2.storage = storages[i].correction
@@ -482,7 +483,7 @@ class ProgramGenerator:
         if expression.storage is not None:
             expression.storage.valid = False
 
-        if isinstance(expression, mg.Cycle):
+        if isinstance(expression, base.Cycle):
             field = expression.storage
             # decimal.getcontext().prec = 14
             # weight = decimal.Decimal(expression.weight)
@@ -492,11 +493,11 @@ class ProgramGenerator:
             if use_global_weights and hasattr(expression, 'global_id'):
                 weight = f'omega_{expression.global_id}'
             if isinstance(expression.correction, base.Multiplication) \
-                    and part.can_be_partitioned(expression.correction.operand1):
+                    and evostencils.expressions.base.can_be_partitioned(expression.correction.operand1):
                 new_iterate_str = expression.storage.to_exa3()
                 iterate_str = expression.approximation.storage.to_exa3()
                 stencil = expression.correction.operand1.generate_stencil()
-                if isinstance(expression.correction.operand2, mg.Residual) and periodic.is_diagonal(stencil):
+                if isinstance(expression.correction.operand2, base.Residual) and periodic.is_diagonal(stencil):
                     residual = expression.correction.operand2
                     program += self.generate_multigrid(residual.approximation, storages, use_global_weights)
                     if not residual.rhs.storage.valid:
@@ -541,7 +542,7 @@ class ProgramGenerator:
                 program += f'\t{field.to_exa3()} = ' \
                            f'{expression.approximation.storage.to_exa3()} + ' \
                            f'({weight}) * {expression.correction.storage.to_exa3()}\n'
-        elif isinstance(expression, mg.Residual):
+        elif isinstance(expression, base.Residual):
             program += self.generate_multigrid(expression.approximation, storages, use_global_weights)
             if not expression.rhs.storage.valid:
                 program += self.generate_multigrid(expression.rhs, storages, use_global_weights)
@@ -570,7 +571,7 @@ class ProgramGenerator:
                 operand1 = expression.operand1
                 operand2 = expression.operand2
                 if expression.operand1.storage is None:
-                    if isinstance(operand1, mg.CoarseGridSolver):
+                    if isinstance(operand1, base.CoarseGridSolver):
                         program += self.generate_multigrid(operand2, storages, use_global_weights)
                         if operand1.expression is not None:
                             level = expression.operand2.storage.level
@@ -612,10 +613,10 @@ class ProgramGenerator:
                 program = f'inverse({self.generate_multigrid(expression.operand, storages, use_global_weights)})'
         elif isinstance(expression, base.Diagonal):
             program = f'diag({self.generate_multigrid(expression.operand, storages, use_global_weights)})'
-        elif isinstance(expression, mg.Restriction):
+        elif isinstance(expression, base.Restriction):
             level_offset = self.determine_operator_level(expression, storages) - 1
             program = f'{expression.name}@(finest - {level_offset})'
-        elif isinstance(expression, mg.Prolongation):
+        elif isinstance(expression, base.Prolongation):
             level_offset = self.determine_operator_level(expression, storages) + 1
             program = f'{expression.name}@(finest - {level_offset})'
         elif isinstance(expression, base.Identity):

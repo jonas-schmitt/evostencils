@@ -1,4 +1,3 @@
-from evostencils.expressions import multigrid as mg
 from evostencils.expressions import base
 
 
@@ -6,14 +5,14 @@ def get_iteration_matrix(expression: base.Expression):
     if expression.iteration_matrix is not None:
         return expression.iteration_matrix
     result = expression.apply(get_iteration_matrix)
-    if isinstance(result, mg.Cycle):
+    if isinstance(result, base.Cycle):
         if isinstance(result.approximation, base.ZeroOperator):
             iteration_matrix = base.scale(result.weight, result.correction)
         elif isinstance(result.correction, base.ZeroOperator):
             iteration_matrix = result.approximation
         else:
             iteration_matrix = result
-    elif isinstance(result, mg.Residual):
+    elif isinstance(result, base.Residual):
         operand1 = result.rhs
         if isinstance(result.approximation, base.ZeroOperator):
             operand2 = result.approximation
@@ -78,12 +77,12 @@ def obtain_iterate(expression: base.Expression):
         return expression
 
 
-def repeat(cycle: mg.Cycle, times):
+def repeat(cycle: base.Cycle, times):
     def replace_iterate(expression: base.Expression, iterate, new_iterate):
-        if isinstance(expression, mg.Residual):
+        if isinstance(expression, base.Residual):
             if expression.approximation.approximation.size == iterate.approximation.size \
                     and expression.approximation.approximation.step_size == iterate.approximation.step_size:
-                return mg.Residual(expression.operator, new_iterate, expression.rhs)
+                return base.Residual(expression.operator, new_iterate, expression.rhs)
             else:
                 return expression.apply(replace_iterate, iterate, new_iterate)
         else:
@@ -91,14 +90,14 @@ def repeat(cycle: mg.Cycle, times):
     new_cycle = cycle
     for _ in range(1, times):
         new_correction = replace_iterate(new_cycle.correction, new_cycle.approximation, new_cycle)
-        new_cycle = mg.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
-                             weight=new_cycle.weight, predecessor=new_cycle.predecessor)
+        new_cycle = base.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
+                                                       weight=new_cycle.weight, predecessor=new_cycle.predecessor)
     return new_cycle
 
 
-def obtain_coarsest_level(cycle: mg.Cycle) -> int:
+def obtain_coarsest_level(cycle: base.Cycle) -> int:
     def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
-        if isinstance(expression, mg.Cycle):
+        if isinstance(expression, base.Cycle):
             if expression.grid.size < current_size:
                 new_size = expression.grid.size
                 new_level = current_level + 1
@@ -108,7 +107,7 @@ def obtain_coarsest_level(cycle: mg.Cycle) -> int:
             level_iterate = recursive_descent(expression.approximation, new_size, new_level)
             level_correction = recursive_descent(expression.correction, new_size, new_level)
             return max(level_iterate, level_correction)
-        elif isinstance(expression, mg.Residual):
+        elif isinstance(expression, base.Residual):
             level_iterate = recursive_descent(expression.approximation, current_size, current_level)
             level_rhs = recursive_descent(expression.rhs, current_size, current_level)
             return max(level_iterate, level_rhs)

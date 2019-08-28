@@ -1,3 +1,4 @@
+import evostencils.expressions.base
 from evostencils.expressions import base, system, multigrid, transformations, partitioning
 from evostencils.stencils.gallery import *
 import lfa_lab
@@ -31,9 +32,9 @@ Z = base.ZeroOperator(grid)
 A = system.Operator('A', [[laplace, I], [Z, laplace]])
 u = system.Approximation('u', [vs, us])
 f = system.RightHandSide('f', [f_v, f_u])
-res = multigrid.Residual(A, u, f)
+res = evostencils.expressions.base.Residual(A, u, f)
 tmp = base.Multiplication(base.Inverse(system.ElementwiseDiagonal(A)), res)
-u_new = multigrid.Cycle(u, f, tmp, weight=0.6, partitioning=partitioning.Single)
+u_new = evostencils.expressions.base.Cycle(u, f, tmp, weight=0.6, partitioning=partitioning.Single)
 convergence_evaluator = ConvergenceEvaluator([lfa_lab.Grid(dimension, step_size), lfa_lab.Grid(dimension, step_size)], coarsening_factors, dimension)
 lfa_node = convergence_evaluator.transform(u_new)
 convergence_factor = convergence_evaluator.compute_spectral_radius(u_new)

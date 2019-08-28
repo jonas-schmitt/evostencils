@@ -1,17 +1,17 @@
 from deap import creator, tools, algorithms, cma
-from evostencils.expressions import base, multigrid as mg, transformations, partitioning as part
+from evostencils.expressions import base, transformations, partitioning as part
 import deap
 import numpy
 from math import log
 
 
 def reset_status(expression: base.Expression):
-    if isinstance(expression, mg.Cycle):
+    if isinstance(expression, base.Cycle):
         expression.iteration_matrix = None
         expression.weight_obtained = False
         expression.weight_set = False
         return reset_status(expression.correction)
-    elif isinstance(expression, mg.Residual):
+    elif isinstance(expression, base.Residual):
         reset_status(expression.rhs)
         reset_status(expression.approximation)
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
@@ -22,7 +22,7 @@ def reset_status(expression: base.Expression):
 
 
 def set_weights(expression: base.Expression, weights: list) -> list:
-    if isinstance(expression, mg.Cycle):
+    if isinstance(expression, base.Cycle):
         if expression.iteration_matrix is not None:
             expression.iteration_matrix = None
         # if len(weights) == 0:
@@ -38,7 +38,7 @@ def set_weights(expression: base.Expression, weights: list) -> list:
         else:
             tail = weights
         return set_weights(expression.correction, tail)
-    elif isinstance(expression, mg.Residual):
+    elif isinstance(expression, base.Residual):
         tail = set_weights(expression.rhs, weights)
         return set_weights(expression.approximation, tail)
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
@@ -52,7 +52,7 @@ def set_weights(expression: base.Expression, weights: list) -> list:
 
 def obtain_weights(expression: base.Expression) -> list:
     weights = []
-    if isinstance(expression, mg.Cycle):
+    if isinstance(expression, base.Cycle):
         # Hack to change the weights after generation
         # if isinstance(expression.correction, mg.Residual) \
         #         or (isinstance(expression.correction, base.Multiplication)
@@ -62,7 +62,7 @@ def obtain_weights(expression: base.Expression) -> list:
             expression.weight_obtained = True
             weights.extend(obtain_weights(expression.correction))
         return weights
-    elif isinstance(expression, mg.Residual):
+    elif isinstance(expression, base.Residual):
         weights.extend(obtain_weights(expression.rhs))
         weights.extend(obtain_weights(expression.approximation))
         return weights

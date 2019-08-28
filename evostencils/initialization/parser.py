@@ -1,5 +1,6 @@
 from sympy.parsing.sympy_parser import parse_expr
-from evostencils.expressions import base, multigrid
+
+from evostencils.expressions import base
 import re
 from evostencils.stencils import constant
 from evostencils.initialization import multigrid as initialization
@@ -44,9 +45,9 @@ def extract_l2_information(file_path, dimension):
                     if '}' in line:
                         break
                 if 'gen_restrictionForSol_' in name:
-                    operator_type = multigrid.Restriction
+                    operator_type = base.Restriction
                 elif 'gen_prolongationForSol_' in name:
-                    operator_type = multigrid.Prolongation
+                    operator_type = base.Prolongation
                 else:
                     operator_type = base.Operator
                 op_info = initialization.OperatorInfo(name, level, constant.Stencil(stencil_entries, dimension),
@@ -79,7 +80,7 @@ def extract_l2_information(file_path, dimension):
             eq_info._associated_field = next(field for field in fields if field.name == field_name)
     equations.sort(key=lambda ei: ei.associated_field.name)
     for op_info in operators:
-        if op_info.operator_type == multigrid.Restriction or op_info.operator_type == multigrid.Prolongation:
+        if op_info.operator_type == base.Restriction or op_info.operator_type == base.Prolongation:
             name = op_info.name
             tmp = name.split('_')
             field_name = tmp[-1]

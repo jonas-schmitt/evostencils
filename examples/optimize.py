@@ -1,5 +1,6 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.stencils.gallery import *
+from evostencils.expressions import base
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.initialization import parser
