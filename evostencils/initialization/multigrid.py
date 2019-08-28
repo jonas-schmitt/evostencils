@@ -90,7 +90,6 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
             for arg in expr.args:
                 recursive_descent(arg)
         elif expr.func == sympy.Mul and len(expr.args) == 2 and expr.args[-1] in fields:
-            # TODO handle unit matrices
             op_symbol = expr.args[0]
             field_symbol = expr.args[1]
             field_index = fields.index(field_symbol)
@@ -98,11 +97,14 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
                 j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
                 row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], ConstantStencilGenerator(operators[j].stencil)))
             else:
-                # TODO fix
-                row_of_operators.append(base.Identity(grid[field_index]))
+                entry = base.Scaling(float(op_symbol.evalf()), base.Identity(grid[field_index]))
+                row_of_operators.append(entry)
             indices.append(field_index)
+        elif expr.is_Symbol and expr in fields:
+            field_index = fields.index(expr)
+            row_of_operators.append(base.Identity(grid[field_index]))
         else:
-            pass
+            raise RuntimeError("Invalid expression")
     recursive_descent(equation.sympy_expr)
     for i in range(len(grid)):
         if i not in indices:

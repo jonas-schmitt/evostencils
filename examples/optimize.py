@@ -1,6 +1,6 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.stencils.gallery import *
-from evostencils.evaluation.convergence import ConvergenceEvaluatorSystem
+from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.initialization import parser
 import os
@@ -31,7 +31,7 @@ def main():
     finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(fields))]
 
     lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
-    convergence_evaluator = ConvergenceEvaluatorSystem(lfa_grids, coarsening_factors, dimension)
+    convergence_evaluator = ConvergenceEvaluator(lfa_grids, coarsening_factors, dimension)
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
