@@ -1,6 +1,6 @@
 from evostencils.expressions import base, partitioning as part, system
 from evostencils.stencils import constant, periodic
-from evostencils.initialization import multigrid
+from evostencils.initialization import multigrid, parser
 import os
 import subprocess
 import math
@@ -33,60 +33,54 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, problem_name: str, exastencils_path: str, knowledge_path: str, settings_path: str, l3_path: str,
-                 dimension, finest_grid, coarsening_factor, min_level, max_level, equations,
-                 operators, fields, output_path="./execution"):
-        self.problem_name = problem_name
-        self._exastencils_path = exastencils_path
-        self._knowledge_path = knowledge_path
-        self._settings_path = settings_path
-        self._l3_path = l3_path
-        self._output_path = output_path
-        self._dimension = dimension
-        self._finest_grid = finest_grid
-        self._coarsening_factor = coarsening_factor
-        self._min_level = min_level
-        self._max_level = max_level
-        self._equations = equations
-        self._operators = operators
-        self._fields = fields
+    def __init__(self, compiler_path: str, base_path: str, relative_settings_path: str, relative_knowledge_path: str,
+                 platform='linux'):
+        self._compiler_path = compiler_path
+        self._base_path = base_path
+        self._relative_knowledge_path = relative_knowledge_path
+        self._relative_settings_path = relative_settings_path
+        parser.extract_settings_information(base_path, relative_settings_path)
+        self._dimension, self._min_level, self._max_level = parser.extract_knowledge_information(base_path, relative_knowledge_path)
+        self._base_path_prefix, self._config_name, self._debug_l3_file = parser.extract_settings_information(base_path, relative_settings_path)
+        self._platform = platform
+        self.run_exastencils_compiler(platform)
+        self._equations, self._operators, self._fields = parser.extract_l2_information(f'{base_path}/{self._base_path_prefix}/{self._debug_l3_file}', self.dimension)
+        size = 2 ** self._max_level
+        grid_size = tuple([size] * self.dimension)
+        h = 1 / (2 ** self._max_level)
+        step_size = tuple([h] * self.dimension)
+        tmp = tuple([2] * self.dimension)
+        self._coarsening_factor = [tmp for _ in range(len(self.fields))]
+        self._finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(self.fields))]
         self._compiler_available = False
-        self._compiler_file_name = 'compiler.jar'
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-        if os.path.exists(exastencils_path):
-            subprocess.run(['cp', '-r', f'{exastencils_path}/Examples/lib', f'{output_path}/'])
-            if os.path.isfile(f'{exastencils_path}/Compiler/{self.compiler_file_name}'):
+        self._compiler_path = compiler_path
+        if os.path.exists(compiler_path):
+            if os.path.isfile(compiler_path):
                 self._compiler_available = True
 
     @property
-    def compiler_file_name(self):
-        return self._compiler_file_name
+    def compiler_path(self):
+        return self._compiler_path
 
     @property
-    def exastencils_path(self):
-        return self._exastencils_path
+    def relative_knowledge_path(self):
+        return self._relative_knowledge_path
 
     @property
-    def knowledge_path(self):
-        return self._knowledge_path
-
-    @property
-    def settings_path(self):
-        return self._settings_path
-
-    @property
-    def l3_path(self):
-        return self._l3_path
+    def relative_settings_path(self):
+        return self._relative_settings_path
 
     @property
     def compiler_available(self):
         return self._compiler_available
 
     @property
-    def output_path(self):
-        return self._output_path
+    def base_path(self):
+        return self._base_path
 
+    @property
+    def platform(self):
+        return self._platform
     @property
     def dimension(self):
         return self._dimension
@@ -162,14 +156,12 @@ class ProgramGenerator:
         with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
             print(program, file=file)
 
-    def run_exastencils_compiler(self, input_name=None, platform='linux'):
-        if input_name is None:
-            input_name = self.problem_name
+    def run_exastencils_compiler(self, platform='linux'):
         result = subprocess.run(['java', '-cp',
-                                 f'{self.exastencils_path}/Compiler/{self.compiler_file_name}', 'Main',
-                                 f'{self.output_path}/{input_name}.settings',
-                                 f'{self.output_path}/{input_name}.knowledge',
-                                 f'{self.output_path}/lib/{platform}.platform'],
+                                 self.compiler_path, 'Main',
+                                 f'{self.base_path}/{self.relative_settings_path}',
+                                 f'{self.base_path}/{self.relative_knowledge_path}',
+                                 f'{self.base_path}/lib/{platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 

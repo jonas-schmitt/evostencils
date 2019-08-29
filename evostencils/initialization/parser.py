@@ -89,8 +89,8 @@ def extract_l2_information(file_path: str, dimension: int):
     return equations, operators, fields
 
 
-def extract_knowledge_information(file_path: str):
-    with open(file_path, 'r') as file:
+def extract_knowledge_information(base_path: str, relative_file_path: str):
+    with open(f'{base_path}/{relative_file_path}', 'r') as file:
         for line in file:
             tokens = line.split('=')
             lhs = tokens[0].strip(' \n\t')
@@ -103,9 +103,10 @@ def extract_knowledge_information(file_path: str):
     return dimension, min_level, max_level
 
 
-def generate_level_adapted_knowledge_file(input_file_path: str, output_file_path: str, min_level: int, max_level: int):
-    with open(input_file_path, 'r') as input_file:
-        with open(output_file_path, 'w') as output_file:
+def generate_level_adapted_knowledge_file(base_path: str, relative_input_file_path: str, relative_output_file_path: str,
+                                          min_level: int, max_level: int, l3_file_name: str):
+    with open(f'{base_path}/{relative_input_file_path}', 'r') as input_file:
+        with open(f'{base_path}{relative_output_file_path}', 'w') as output_file:
             for line in input_file:
                 tokens = line.split('=')
                 lhs = tokens[0].strip(' \n\t')
@@ -113,17 +114,23 @@ def generate_level_adapted_knowledge_file(input_file_path: str, output_file_path
                     output_file.write(f'{lhs}\t= {min_level}\n')
                 elif lhs == 'maxLevel':
                     output_file.write(f'{lhs}\t= {max_level}\n')
+                elif lhs == 'l3file':
+                    pass
                 else:
                     output_file.write(line)
+            output_file.write(f'l3file\t= {l3_file_name}')
 
 
-def extract_settings_information(file_path: str):
-    with open(file_path, 'r') as file:
+def extract_settings_information(base_path: str, relative_file_path: str):
+    with open(f'{base_path}/{relative_file_path}', 'r') as file:
         for line in file:
             tokens = line.split('=')
             lhs = tokens[0].strip(' \n\t')
             if lhs == 'configName':
                 config_name = tokens[1].strip(' \n\t"')
             elif lhs == 'basePathPrefix':
-                base_path = tokens[1].strip(' \n\t"')
-    return base_path, config_name
+                base_path_prefix = tokens[1].strip(' \n\t"')
+            elif lhs == 'debugL3File':
+                debug_l3_file = tokens[1].strip(' \n\t"')
+        debug_l3_file = debug_l3_file.replace('$configName$', config_name)
+    return base_path_prefix, config_name, debug_l3_file

@@ -2,6 +2,7 @@ from evostencils.optimization.program import Optimizer
 from evostencils.expressions import base
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
+from evostencils.code_generation.exastencils import ProgramGenerator
 from evostencils.initialization import parser
 import os
 import pickle
@@ -10,26 +11,12 @@ import sys
 
 
 def main():
-    problem_name = '2D_FD_BiHarmonic_fromL2'
-    exastencils_path = '/home/jonas/Schreibtisch/exastencils'
-    if len(sys.argv[1:]) > 0 and os.path.exists(sys.argv[1]):
-        exastencils_path = sys.argv[1]
-    settings_path = f'{exastencils_path}/Examples/BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    knowledge_path = f'{exastencils_path}/Examples/BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
-    base_path, config_name = parser.extract_settings_information(settings_path)
-    dimensionality, min_level, max_level = parser.extract_knowledge_information(knowledge_path)
-    l3_path = f'{exastencils_path}/Examples/Debug/{config_name}_debug.exa3'
-    equations, operators, fields = parser.extract_l2_information(l3_path, dimensionality)
-    dimension = dimensionality
-    size = 2**max_level
-    grid_size = (size, size)
-    h = 1/(2**max_level)
-    step_size = (h, h)
-    coarsening_factor = (2, 2)
-    step_sizes = [step_size for _ in range(len(fields))]
-    coarsening_factors = [coarsening_factor for _ in range(len(fields))]
-    finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(fields))]
-
+    compiler_path = f'/home/jonas/Schreibtisch/exastencils/Compiler/compiler.jar'
+    base_path = f'/home/jonas/Schreibtisch/exastencils/Examples'
+    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+    """
     lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
     convergence_evaluator = ConvergenceEvaluator(lfa_grids, coarsening_factors, dimension)
     bytes_per_word = 8
@@ -68,7 +55,7 @@ def main():
         # optimizer.plot_minimum_fitness(log)
     # for pop in pops:
     #    optimizer.plot_pareto_front(pop)
-
+"""
 
 if __name__ == "__main__":
     main()
