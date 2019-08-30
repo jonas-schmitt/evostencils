@@ -151,10 +151,11 @@ class ZeroOperator(Operator):
 
 
 class Grid:
-    def __init__(self, size, step_size):
+    def __init__(self, size, step_size, level):
         assert len(size) == len(step_size), "Dimensions of the size and step size must match"
         self._size = size
         self._step_size = step_size
+        self._level = level
 
     @property
     def size(self):
@@ -163,6 +164,10 @@ class Grid:
     @property
     def step_size(self):
         return self._step_size
+
+    @property
+    def level(self):
+        return self._level
 
     @property
     def dimension(self):
@@ -718,7 +723,8 @@ def residual(operator, iterate, rhs):
 def get_coarse_grid(grid: Grid, coarsening_factor):
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
     coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
-    return Grid(coarse_size, coarse_step_size)
+    coarse_level = grid.level - 1
+    return Grid(coarse_size, coarse_step_size, coarse_level)
 
 
 def get_coarse_approximation(approximation: Approximation, coarsening_factor):

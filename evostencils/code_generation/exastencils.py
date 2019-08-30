@@ -1,21 +1,18 @@
 from evostencils.expressions import base, partitioning as part, system
-from evostencils.stencils import constant, periodic
 from evostencils.initialization import multigrid, parser
 import os
 import subprocess
 import math
-import csv
 import sympy
 
 
 class CycleStorage:
-    def __init__(self, level, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grid):
-        self.level = level
+    def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grid):
         self.grid = grid
-        self.solution = [Field(f'{symbol.name}', level, self) for symbol in fields]
-        self.rhs = [Field(f'{eq_info.rhs_name}', level, self) for eq_info in equations]
-        self.residual = [Field(f'Residual_{symbol.name}', level, self) for symbol in fields]
-        self.correction = [Field(f'Correction_{symbol.name}', level, self) for symbol in fields]
+        self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
+        self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grid, equations)]
+        self.residual = [Field(f'Residual_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
+        self.correction = [Field(f'Correction_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
 
 
 class Field:
@@ -53,7 +50,7 @@ class ProgramGenerator:
         step_size = tuple([h] * self.dimension)
         tmp = tuple([2] * self.dimension)
         self._coarsening_factor = [tmp for _ in range(len(self.fields))]
-        self._finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(self.fields))]
+        self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
         self._compiler_available = False
         if os.path.exists(absolute_compiler_path):
             if os.path.isfile(absolute_compiler_path):
@@ -219,26 +216,23 @@ class ProgramGenerator:
         time_to_solution = float(tmp[-2])
         return time_to_solution, convergence_factor
 
-    def generate_storage(self, maximum_level):
-        pass
+    def generate_storage(self, min_level, max_level, finest_grid):
+        storage = []
+        grid = finest_grid
+        for i in range(min_level, max_level):
+            storage.append(CycleStorage(self.equations, self.fields, grid))
+            grid = system.get_coarse_grid(grid, self.coarsening_factor)
+        return storage
 
     @staticmethod
     def needs_storage(expression: base.Expression):
         return expression.shape[1] == 1
 
-    @staticmethod
-    def adjust_storage_index(node, storages, i) -> int:
-        if node.grid.size > storages[i].grid.size:
-            return i-1
-        elif node.grid.size < storages[i].grid.size:
-            return i+1
-        else:
-            return i
-
     # Warning: This function modifies the expression passed to it
     @staticmethod
-    def assign_storage_to_subexpressions(node: base.Expression, storages: [CycleStorage], i: int):
-        pass
+    def assign_storage_to_subexpressions(expression: base.Expression, storages: [CycleStorage], i: int):
+        if expression.storage is not None:
+            return None
 
     def generate_multigrid(self, expression: base.Expression, storages, use_global_weights=False):
         # import decimal
