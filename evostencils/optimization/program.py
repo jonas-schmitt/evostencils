@@ -4,7 +4,6 @@ from deap import gp, creator, tools
 import random
 import pickle
 import os.path
-import math
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST

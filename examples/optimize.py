@@ -1,6 +1,6 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.evaluation.convergence import ConvergenceEvaluator
-from evostencils.evaluation.roofline import RooflineEvaluator
+from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import pickle
@@ -9,12 +9,13 @@ import lfa_lab
 
 def main():
 
-    #TODO adapt to actual path to exastencils project
+    # TODO adapt to actual path to exastencils project
+
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
@@ -39,7 +40,7 @@ def main():
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
     runtime_cgs = 1e-7 # example value
-    performance_evaluator = RooflineEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
+    performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
     required_convergence = 0.9

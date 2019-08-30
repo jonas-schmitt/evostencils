@@ -3,7 +3,7 @@ import evostencils.stencils.periodic as periodic
 from functools import reduce
 
 
-class RooflineEvaluator:
+class PerformanceEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
@@ -61,19 +61,19 @@ class RooflineEvaluator:
             elif isinstance(correction, base.Multiplication):
                 runtime = self.estimate_runtime(correction.operand2)
                 if isinstance(correction.operand1, system.InterGridOperator):
-                    operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
                 else:
-                    operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
+                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
             else:
                 raise RuntimeError("Expected multiplication")
-            operations_per_cell += len(grid) * (RooflineEvaluator.operations_for_addition() + RooflineEvaluator.operations_for_scaling())
-            words_per_cell += len(grid) * (RooflineEvaluator.words_transferred_for_load() + RooflineEvaluator.words_transferred_for_store())
+            operations_per_cell += len(grid) * (PerformanceEvaluator.operations_for_addition() + PerformanceEvaluator.operations_for_scaling())
+            words_per_cell += len(grid) * (PerformanceEvaluator.words_transferred_for_load() + PerformanceEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             runtime += self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
         elif isinstance(expression, base.Residual):
-            operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_residual(expression)
+            operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_residual(expression)
             # Store result
-            words_per_cell += len(expression.grid) * RooflineEvaluator.words_transferred_for_store()
+            words_per_cell += len(expression.grid) * PerformanceEvaluator.words_transferred_for_store()
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
             if not isinstance(expression.rhs, system.RightHandSide):
@@ -87,7 +87,7 @@ class RooflineEvaluator:
             runtime += runtime_rhs + runtime_approximation
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):
-                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
+                operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                 runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
             elif isinstance(expression.operand1, base.CoarseGridSolver):
@@ -99,7 +99,7 @@ class RooflineEvaluator:
                 else:
                     runtime = self.runtime_coarse_grid_solver
             else:
-                operations_per_cell, words_per_cell = RooflineEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
+                operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                 runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
             runtime += self.estimate_runtime(expression.operand2)
@@ -126,8 +126,8 @@ class RooflineEvaluator:
 
     @staticmethod
     def operations_for_stencil_application(number_of_entries):
-        return number_of_entries * RooflineEvaluator.operations_for_multiplication() + \
-               (number_of_entries - 1) * RooflineEvaluator.operations_for_addition()
+        return number_of_entries * PerformanceEvaluator.operations_for_multiplication() + \
+               (number_of_entries - 1) * PerformanceEvaluator.operations_for_addition()
 
     @staticmethod
     def operations_for_scaling():
@@ -135,7 +135,7 @@ class RooflineEvaluator:
 
     @staticmethod
     def words_transferred_for_stencil_application(number_of_entries):
-        return number_of_entries * RooflineEvaluator.words_transferred_for_load()
+        return number_of_entries * PerformanceEvaluator.words_transferred_for_load()
 
     @staticmethod
     def words_transferred_for_load():
@@ -152,7 +152,7 @@ class RooflineEvaluator:
         operator = residual.operator
         operations_per_cell = 0
         # Load right-hand side
-        words_per_cell = len(grid) * RooflineEvaluator.words_transferred_for_load()
+        words_per_cell = len(grid) * PerformanceEvaluator.words_transferred_for_load()
         for row_of_entries in operator.entries:
             for i, entry in enumerate(row_of_entries):
                 stencil = entry.generate_stencil()
@@ -164,9 +164,9 @@ class RooflineEvaluator:
                 for offset, _ in constant_stencil.entries:
                     offset_sets[i].add(offset)
                 number_of_stencil_coefficients = constant_stencil.number_of_entries
-                operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) + RooflineEvaluator.operations_for_subtraction()
+                operations_per_cell += PerformanceEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) + PerformanceEvaluator.operations_for_subtraction()
         for s in offset_sets:
-            words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(len(s))
+            words_per_cell += PerformanceEvaluator.words_transferred_for_stencil_application(len(s))
         return operations_per_cell, words_per_cell
 
     @staticmethod
@@ -178,18 +178,18 @@ class RooflineEvaluator:
 
         if isinstance(expression, system.Diagonal):
             # Decoupled Relaxation
-            operations_per_cell = RooflineEvaluator.operations_for_multiplication() * number_of_variables
-            words_per_cell = RooflineEvaluator.words_transferred_for_load() * number_of_variables
+            operations_per_cell = PerformanceEvaluator.operations_for_multiplication() * number_of_variables
+            words_per_cell = PerformanceEvaluator.words_transferred_for_load() * number_of_variables
         elif isinstance(expression, system.ElementwiseDiagonal):
             # Collective Relaxation
             # Required operations for Gaussian Elimination
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
             multiplications = additions
             divisions = number_of_variables * (number_of_variables + 1) / 2
-            operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
-                multiplications * RooflineEvaluator.operations_for_multiplication() + \
-                divisions * RooflineEvaluator.operations_for_division()
-            words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
+            operations_per_cell = additions * PerformanceEvaluator.operations_for_addition() + \
+                                  multiplications * PerformanceEvaluator.operations_for_multiplication() + \
+                                  divisions * PerformanceEvaluator.operations_for_division()
+            words_per_cell = number_of_variables * PerformanceEvaluator.words_transferred_for_load()
         elif isinstance(expression, system.Operator):
             # Custom Relaxation Operator
             entries = expression.entries
@@ -203,10 +203,10 @@ class RooflineEvaluator:
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
             multiplications = additions
             divisions = number_of_variables * (number_of_variables + 1) / 2
-            operations_per_cell = additions * RooflineEvaluator.operations_for_addition() + \
-                                  multiplications * RooflineEvaluator.operations_for_multiplication() + \
-                                  divisions * RooflineEvaluator.operations_for_division()
-            words_per_cell = number_of_variables * RooflineEvaluator.words_transferred_for_load()
+            operations_per_cell = additions * PerformanceEvaluator.operations_for_addition() + \
+                                  multiplications * PerformanceEvaluator.operations_for_multiplication() + \
+                                  divisions * PerformanceEvaluator.operations_for_division()
+            words_per_cell = number_of_variables * PerformanceEvaluator.words_transferred_for_load()
         else:
             raise NotImplementedError("Smoother currently not supported.")
         return operations_per_cell, words_per_cell
@@ -226,7 +226,7 @@ class RooflineEvaluator:
                     'The offsets must be the same for all operator stencils'
                 constant_stencil = first_constant_stencil
                 number_of_stencil_coefficients = constant_stencil.number_of_entries
-                operations_per_cell += RooflineEvaluator.operations_for_stencil_application(number_of_stencil_coefficients)
-                words_per_cell += RooflineEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients)
+                operations_per_cell += PerformanceEvaluator.operations_for_stencil_application(number_of_stencil_coefficients)
+                words_per_cell += PerformanceEvaluator.words_transferred_for_stencil_application(number_of_stencil_coefficients)
         return operations_per_cell, words_per_cell
 
