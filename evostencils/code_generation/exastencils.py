@@ -52,9 +52,11 @@ class ProgramGenerator:
         self._coarsening_factor = [tmp for _ in range(len(self.fields))]
         self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
         self._compiler_available = False
-        if os.path.exists(absolute_compiler_path):
-            if os.path.isfile(absolute_compiler_path):
-                self._compiler_available = True
+        if os.path.exists(absolute_compiler_path) and os.path.isfile(absolute_compiler_path):
+            self._compiler_available = True
+        else:
+            raise RuntimeError("Compiler not found. Aborting.")
+
 
     @property
     def absolute_compiler_path(self):
@@ -171,6 +173,8 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
         os.chdir(current_path)
+        if result.returncode != 0:
+            raise RuntimeError("Compiler not working. Aborting.")
         return result.returncode
 
     def run_c_compiler(self):

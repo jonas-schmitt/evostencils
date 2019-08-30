@@ -14,8 +14,23 @@ def main():
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
+
+    # 2D Finite difference discretized Poisson
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+
+    # 3D Finite difference discretized Poisson
+    # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
+
+    # 2D Finite volume discretized Poisson
+    # settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
+
+    # 3D Finite volume discretized Poisson
+    # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
+
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
