@@ -131,6 +131,9 @@ def extract_settings_information(base_path: str, relative_file_path: str):
             elif lhs == 'basePathPrefix':
                 base_path_prefix = tokens[1].strip(' \n\t"')
             elif lhs == 'debugL3File':
-                debug_l3_file = tokens[1].strip(' \n\t"')
-        debug_l3_file = debug_l3_file.replace('$configName$', config_name)
-    return base_path_prefix, config_name, debug_l3_file
+                debug_l3_path = tokens[1].strip(' \n\t"')
+            elif lhs == 'outputPath':
+                output_path = tokens[1].strip(' \n\t"')
+        debug_l3_path = f"{base_path_prefix}/{debug_l3_path.replace('$configName$', config_name)}"
+        output_path = f"{base_path_prefix}/{output_path.replace('$configName$', config_name)}"
+    return base_path_prefix, config_name, debug_l3_path, output_path

@@ -33,18 +33,20 @@ class Field:
 
 
 class ProgramGenerator:
-    def __init__(self, compiler_path: str, base_path: str, relative_settings_path: str, relative_knowledge_path: str,
+    def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
                  platform='linux'):
-        self._compiler_path = compiler_path
+        self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
-        self._relative_knowledge_path = relative_knowledge_path
-        self._relative_settings_path = relative_settings_path
-        parser.extract_settings_information(base_path, relative_settings_path)
-        self._dimension, self._min_level, self._max_level = parser.extract_knowledge_information(base_path, relative_knowledge_path)
-        self._base_path_prefix, self._config_name, self._debug_l3_file = parser.extract_settings_information(base_path, relative_settings_path)
+        self._knowledge_path = knowledge_path
+        self._settings_path = settings_path
+        self._dimension, self._min_level, self._max_level = \
+            parser.extract_knowledge_information(base_path, knowledge_path)
+        self._base_path_prefix, self._problem_name, self._debug_l3_path, self._output_path = \
+            parser.extract_settings_information(base_path, settings_path)
         self._platform = platform
-        self.run_exastencils_compiler(platform)
-        self._equations, self._operators, self._fields = parser.extract_l2_information(f'{base_path}/{self._base_path_prefix}/{self._debug_l3_file}', self.dimension)
+        self.run_exastencils_compiler()
+        self._equations, self._operators, self._fields = \
+            parser.extract_l2_information(f'{base_path}/{self._debug_l3_path}', self.dimension)
         size = 2 ** self._max_level
         grid_size = tuple([size] * self.dimension)
         h = 1 / (2 ** self._max_level)
@@ -53,22 +55,21 @@ class ProgramGenerator:
         self._coarsening_factor = [tmp for _ in range(len(self.fields))]
         self._finest_grid = [base.Grid(grid_size, step_size) for _ in range(len(self.fields))]
         self._compiler_available = False
-        self._compiler_path = compiler_path
-        if os.path.exists(compiler_path):
-            if os.path.isfile(compiler_path):
+        if os.path.exists(absolute_compiler_path):
+            if os.path.isfile(absolute_compiler_path):
                 self._compiler_available = True
 
     @property
-    def compiler_path(self):
-        return self._compiler_path
+    def absolute_compiler_path(self):
+        return self._absolute_compiler_path
 
     @property
-    def relative_knowledge_path(self):
-        return self._relative_knowledge_path
+    def knowledge_path(self):
+        return self._knowledge_path
 
     @property
-    def relative_settings_path(self):
-        return self._relative_settings_path
+    def settings_path(self):
+        return self._settings_path
 
     @property
     def compiler_available(self):
@@ -79,8 +80,13 @@ class ProgramGenerator:
         return self._base_path
 
     @property
+    def output_path(self):
+        return self._output_path
+
+    @property
     def platform(self):
         return self._platform
+
     @property
     def dimension(self):
         return self._dimension
@@ -116,7 +122,7 @@ class ProgramGenerator:
     def generate_global_weight_initializations(self, weights):
         # Hack to change the weights after generation
         weights = reversed(weights)
-        path_to_file = f'{self.output_path}/generated/{self.problem_name}/Globals/Globals_initGlobals.cpp'
+        path_to_file = f'{self.base_path}/{self.output_path}/Globals/Globals_initGlobals.cpp'
         subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         with open(path_to_file, 'r') as file:
@@ -135,7 +141,7 @@ class ProgramGenerator:
 
     def restore_global_initializations(self):
         # Hack to change the weights after generation
-        path_to_file = f'{self.output_path}/generated/{self.problem_name}/Globals/Globals_initGlobals.cpp'
+        path_to_file = f'{self.base_path}/{self.output_path}/Globals/Globals_initGlobals.cpp'
         subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -152,27 +158,28 @@ class ProgramGenerator:
         program += '}\n'
         return program
 
-    def write_program_to_file(self, program: str):
-        with open(f'{self.output_path}/{self.problem_name}.exa3', "w") as file:
-            print(program, file=file)
+    def run_exastencils_compiler(self):
 
-    def run_exastencils_compiler(self, platform='linux'):
+        current_path = os.getcwd()
+        os.chdir(self.base_path)
         result = subprocess.run(['java', '-cp',
-                                 self.compiler_path, 'Main',
-                                 f'{self.base_path}/{self.relative_settings_path}',
-                                 f'{self.base_path}/{self.relative_knowledge_path}',
-                                 f'{self.base_path}/lib/{platform}.platform'],
+                                 self.absolute_compiler_path, 'Main',
+                                 f'{self.base_path}/{self.settings_path}',
+                                 f'{self.base_path}/{self.knowledge_path}',
+                                 f'{self.base_path}/lib/{self.platform}.platform'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+        os.chdir(current_path)
         return result.returncode
 
     def run_c_compiler(self):
-        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.output_path}/generated/{self.problem_name}'],
+        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.base_path}/{self.output_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
-    def evaluate(self, platform='linux', infinity=1e100, number_of_samples=1, only_weights_adapted=False):
+    def evaluate(self, infinity=1e100, number_of_samples=1, only_weights_adapted=False):
         if not only_weights_adapted:
-            return_code = self.run_exastencils_compiler(self.problem_name, platform)
+            return_code = self.run_exastencils_compiler()
             if not return_code == 0:
                 return infinity, infinity
         return_code = self.run_c_compiler()
@@ -181,7 +188,7 @@ class ProgramGenerator:
         total_time = 0
         sum_of_convergence_factors = 0
         for i in range(number_of_samples):
-            result = subprocess.run([f'{self.output_path}/generated/{self.problem_name}/exastencils'],
+            result = subprocess.run([f'{self.base_path}/{self.output_path}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not result.returncode == 0:
                 return infinity, infinity

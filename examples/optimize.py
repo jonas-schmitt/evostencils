@@ -16,6 +16,10 @@ def main():
     settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
     knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+    program_generator.run_exastencils_compiler()
+    program_generator.run_c_compiler()
+    time, convergence_factor = program_generator.evaluate()
+    print(f'Time: {time}, Convergence factor: {convergence_factor}')
     """
     lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
     convergence_evaluator = ConvergenceEvaluator(lfa_grids, coarsening_factors, dimension)
