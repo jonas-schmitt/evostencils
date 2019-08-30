@@ -7,7 +7,7 @@ Python >= 3.6
   Follow these instructions: https://hrittich.github.io/lfa-lab/install.html  
 2. Install required Python packages
 ```
-pip install deap sympy jinja2
+pip install deap sympy
 ```
 3. Set up the environment  
 ```

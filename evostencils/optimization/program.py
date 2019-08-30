@@ -272,7 +272,6 @@ class Optimizer:
             approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factors))
             right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factors))
         best_expression = None
-        # storages = self._program_generator.generate_storage(levels)
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         solver_program = ""
@@ -286,12 +285,10 @@ class Optimizer:
             restart_from_checkpoint = False
         pops = []
         logbooks = []
-        # boilerplate_program = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon)
         for i in range(levels - levels_per_run, -1, -levels_per_run):
             min_level = self.max_level - (i + levels_per_run - 1)
             max_level = self.max_level - i
             pass_checkpoint = False
-            # evaluation_boilerplate = self._program_generator.generate_boilerplate(storages, self.dimension, self.epsilon, min_level)
             if restart_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     best_expression = checkpoint.solver
@@ -316,71 +313,18 @@ class Optimizer:
                                             gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=None)
 
-            # pop, log, hof = self.random_search(population_size * 10, generations, mu_, lambda_)
             pops.append(pop)
-            # logbooks.append(log)
 
-            def key_function(ind):
-                rho = ind.fitness.values[0]
-                if rho < 1.0:
-                    tmp = math.log(self.epsilon) / math.log(rho)
-                    tmp = tmp * ind.fitness.values[1]
-                    return tmp
-                else:
-                    return rho * self.infinity
-            hof = sorted(hof, key=key_function)
-            best_time = self.infinity
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             best_individual = hof[0]
             best_convergence_factor = best_individual.fitness.values[0]
-            # base_program = evaluation_boilerplate + solver_program
-            """
-            if self._program_generator.compiler_available:
-                count = 0
-                for j in range(len(hof)):
-                    if count == 50:
-                        break
-                    if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon and \
-                            abs(hof[j].fitness.values[1] - hof[j+1].fitness.values[1] < self.epsilon):
-                        continue
-                    ind = hof[j]
-                    expression = self.compile_individual(ind, pset)[0]
-                    evaluation_program = base_program + self._program_generator.generate_cycle_function(expression, storages)
-                    self._program_generator.write_program_to_file(evaluation_program)
-                    time_to_solution, convergence_factor = self._program_generator.evaluate(number_of_samples=10)
-                    print(f'Time to solution: {time_to_solution}, Convergence factor: {convergence_factor}')
-                    self._program_generator.invalidate_storages(storages)
-                    if time_to_solution < best_time and convergence_factor < required_convergence:
-                        best_time = time_to_solution
-                        best_convergence_factor = convergence_factor
-                        best_individual = ind
-                    count += 1
-                if not best_convergence_factor < required_convergence or math.isnan(best_convergence_factor) \
-                        or math.isinf(best_convergence_factor):
-                    raise RuntimeError("None of the generated solvers did achieve satisfactory convergence. "
-                                       "Optimization failed.")
-            else:
-                print("No working compiler available. Using LFA Lab for convergence optimization.")
-            """
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             best_expression.evaluate = False
-
-            #optimized_weights, optimized_convergence_factor = self.optimize_weights(best_expression, es_generations,
-            #                                                                        base_program, storages)
-            #if optimized_convergence_factor < best_convergence_factor:
-            #    weights.set_weights(best_expression, optimized_weights)
-            #    print(f"Best individual: ({optimized_convergence_factor}), ({best_individual.fitness.values[1]})")
-            # print(repr(iteration_matrix))
             self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)
-            #try:
-            #    solver_program += self._program_generator.generate_cycle_function(best_expression, storages)
-            #except Exception as e:
-            #    print('Ungeneratable program')
-            #    print(e)
 
-        #return boilerplate_program + solver_program, pops, logbooks
-        return None, pops, logbooks
+        return pops, logbooks
 
     def optimize_weights(self, expression, generations, base_program=None, storages=None):
         # expression = self.compile_expression(individual)

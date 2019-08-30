@@ -8,10 +8,13 @@ import lfa_lab
 
 
 def main():
-    compiler_path = f'/home/jonas/Schreibtisch/exastencils/Compiler/compiler.jar'
-    base_path = f'/home/jonas/Schreibtisch/exastencils/Examples'
-    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+
+    #TODO adapt to actual path to exastencils project
+    cwd = os.getcwd()
+    compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
@@ -53,11 +56,9 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
-    #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    _, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20, es_generations=20,
-                                                    required_convergence=required_convergence,
-                                                    restart_from_checkpoint=restart_from_checkpoint)
+    pops, stats = optimizer.default_optimization(gp_mu=40, gp_lambda=40, gp_generations=20, es_generations=20,
+                                                 required_convergence=required_convergence,
+                                                 restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
@@ -69,6 +70,7 @@ def main():
         # optimizer.plot_minimum_fitness(log)
     # for pop in pops:
     #    optimizer.plot_pareto_front(pop)
+
 
 if __name__ == "__main__":
     main()
