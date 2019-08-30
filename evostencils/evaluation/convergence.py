@@ -27,7 +27,7 @@ def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, lfa_grids, coarsening_factors, dimension):
+    def __init__(self, dimension, coarsening_factors, lfa_grids):
         self._lfa_grids = lfa_grids
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
@@ -200,6 +200,8 @@ class ConvergenceEvaluator:
             p = Process(target=evaluate, args=(queue, lfa_expression))
             p.start()
             p.join()
+            if queue.empty():
+                return 0.0
             return queue.get(timeout=1)
         except (ArithmeticError, RuntimeError, MemoryError) as _:
             return 0.0

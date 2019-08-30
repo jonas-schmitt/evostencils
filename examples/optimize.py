@@ -1,13 +1,10 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.expressions import base
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.roofline import RooflineEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
-from evostencils.initialization import parser
 import os
 import pickle
-import lfa_lab as lfa
-import sys
+import lfa_lab
 
 
 def main():
@@ -16,13 +13,25 @@ def main():
     settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
     knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+
+    # Evaluate baseline program
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
     time, convergence_factor = program_generator.evaluate()
     print(f'Time: {time}, Convergence factor: {convergence_factor}')
-    """
-    lfa_grids = [lfa.Grid(dimension, sz) for sz in step_sizes]
-    convergence_evaluator = ConvergenceEvaluator(lfa_grids, coarsening_factors, dimension)
+
+    # Obtain extracted information from program generator
+    dimension = program_generator.dimension
+    finest_grid = program_generator.finest_grid
+    coarsening_factors = program_generator.coarsening_factor
+    min_level = program_generator.min_level
+    max_level = program_generator.max_level
+    equations = program_generator.equations
+    operators = program_generator.operators
+    fields = program_generator.fields
+
+    lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
+    convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
@@ -31,6 +40,7 @@ def main():
     infinity = 1e100
     epsilon = 1e-10
     required_convergence = 0.9
+    problem_name = program_generator.problem_name
 
     if not os.path.exists(problem_name):
         os.makedirs(problem_name)
@@ -45,7 +55,7 @@ def main():
     restart_from_checkpoint = False
     # program, pops, stats = optimizer.default_optimization(es_lambda=10, es_generations=3,
     #                                                       restart_from_checkpoint=restart_from_checkpoint)
-    _, pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=20, es_generations=20,
+    _, pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20, es_generations=20,
                                                     required_convergence=required_convergence,
                                                     restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
@@ -59,7 +69,6 @@ def main():
         # optimizer.plot_minimum_fitness(log)
     # for pop in pops:
     #    optimizer.plot_pareto_front(pop)
-"""
 
 if __name__ == "__main__":
     main()

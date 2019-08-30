@@ -72,6 +72,10 @@ class ProgramGenerator:
         return self._settings_path
 
     @property
+    def problem_name(self):
+        return self._problem_name
+
+    @property
     def compiler_available(self):
         return self._compiler_available
 
