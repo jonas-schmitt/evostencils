@@ -14,8 +14,8 @@ def main():
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
-    settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
@@ -57,7 +57,7 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    pops, stats = optimizer.default_optimization(gp_mu=40, gp_lambda=40, gp_generations=20, es_generations=20,
+    pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=30, es_generations=20,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
