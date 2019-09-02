@@ -11,8 +11,8 @@ class CycleStorage:
         self.grid = grid
         self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
         self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grid, equations)]
-        self.residual = [Field(f'Residual_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
-        self.correction = [Field(f'Correction_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
+        self.residual = [Field(f'gen_residual_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
+        self.correction = [Field(f'gen_error_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
 
 
 class Field:
@@ -23,10 +23,7 @@ class Field:
         self.valid = False
 
     def to_exa3(self):
-        if self.level > 0:
-            return f'{self.name}@(finest - {self.level})'
-        else:
-            return f'{self.name}@finest'
+        return f'{self.name}@{self.level}'
 
 
 class ProgramGenerator:
@@ -148,16 +145,33 @@ class ProgramGenerator:
         subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def generate_cycle_function(self, expression, storages, use_global_weights=False):
-        base_level = 0
-        for i, storage in enumerate(storages):
-            if expression.grid.size == storage.grid.size:
-                expression.storage = storage.solution
-                base_level = i
-                break
-        self.assign_storage_to_subexpressions(expression, storages, base_level)
-        program = f'Function Cycle@(finest - {base_level}) {{\n'
-        program += self.generate_multigrid(expression, storages, use_global_weights)
+    @staticmethod
+    def get_solution_field(storages, index, level):
+        min_level = storages[0].grid[index].level
+        offset = level - min_level
+        return storages[offset].solution[index]
+
+    @staticmethod
+    def get_rhs_field(storages, index, level):
+        min_level = storages[0].grid[index].level
+        offset = level - min_level
+        return storages[offset].rhs[index]
+
+    @staticmethod
+    def get_residual_field(storages, index, level):
+        min_level = storages[0].grid[index].level
+        offset = level - min_level
+        return storages[offset].residual[index]
+
+    @staticmethod
+    def get_correction_field(storages, index, level):
+        min_level = storages[0].grid[index].level
+        offset = level - min_level
+        return storages[offset].correction[index]
+
+    def generate_cycle_function(self, expression, storages, min_level, max_level, use_global_weights=False):
+        program = f'Function Cycle@{expression.grid.level} {{\n'
+        program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
         program += '}\n'
         return program
 
@@ -238,13 +252,17 @@ class ProgramGenerator:
         if expression.storage is not None:
             return None
 
-    def generate_multigrid(self, expression: base.Expression, storages, use_global_weights=False):
+    def generate_multigrid(self, expression: base.Expression, storages, min_level, max_level, use_global_weights=False):
         # import decimal
         # if expression.program is not None:
         #     return expression.program
         program = ''
-        if expression.storage is not None:
-            expression.storage.valid = False
+        if isinstance(expression, base.Cycle):
+            for i, grid in enumerate(expression.grid):
+                level = grid.level
+                solution_field = self.get_solution_field(storages, i, level)
+                #TODO distinguish between smoothing and CGC
+
 
     @staticmethod
     def invalidate_storages(storages: [CycleStorage]):

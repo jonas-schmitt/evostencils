@@ -34,10 +34,10 @@ def main():
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
-    program_generator.run_exastencils_compiler()
-    program_generator.run_c_compiler()
-    time, convergence_factor = program_generator.evaluate()
-    print(f'Time: {time}, Convergence factor: {convergence_factor}')
+    # program_generator.run_exastencils_compiler()
+    # program_generator.run_c_compiler()
+    # time, convergence_factor = program_generator.evaluate()
+    # print(f'Time: {time}, Convergence factor: {convergence_factor}')
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -72,7 +72,7 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=30, es_generations=20,
+    pops, stats = optimizer.default_optimization(gp_mu=1000, gp_lambda=1000, gp_generations=100, es_generations=20,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
