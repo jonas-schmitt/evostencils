@@ -265,13 +265,44 @@ class ProgramGenerator:
                     solution_field = self.get_solution_field(storages, i, level)
                     rhs_field = self.get_rhs_field(storages, i, level)
                     operator = correction.operator
-                    program += f'{solution_field.to_exa()} += {rhs_field.to_exa()}'
-                    for j, op in enumerate(operator.entries[i]):
+                    program += f'{solution_field.to_exa()} += {expression.weight} * ({rhs_field.to_exa()}'
+                    for j, entry in enumerate(operator.entries[i]):
                         field = self.get_solution_field(storages, j, level)
-                        program += f' - {op.name}@{level} * {field.to_exa()}'
+                        if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
+                            program += f' - '
+                            op = entry.operand
+                            program += f'({entry.factor}) * '
+                        elif isinstance(entry, base.Operator):
+                            op = entry
+                            if not isinstance(op, base.ZeroOperator):
+                                program += f' - '
+                        else:
+                            raise RuntimeError("Unexpected system operator entry")
+                        if isinstance(op, base.Identity):
+                            program += field.to_exa()
+                        elif isinstance(op, base.ZeroOperator):
+                            pass
+                        else:
+                            program += f'{op}@{level} * {field.to_exa()}'
+                    program += ')\n'
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
-                    pass
+                    for i, grid in enumerate(expression.grid):
+                        level = grid.level
+                        solution_field = self.get_solution_field(storages, i, level)
+                        operator = correction.operand1
+                        entry = operator.entries[i][i]
+                        if isinstance(entry, base.Prolongation):
+                            op_level = entry.coarse_grid.level
+                        elif isinstance(entry, base.Restriction):
+                            op_level = entry.fine_grid.level
+                        else:
+                            raise RuntimeError("Unexpected entry")
+                        # TODO identify different fields
+                        correction_field = self.get_correction_field(storages, i, op_level)
+                        program += f'{solution_field.to_exa()} += {expression.weight} * ({entry.name}@{op_level} * ' \
+                                   f'{correction_field.to_exa()})'
+                    program += '\n'
                 else:
                     pass
             else:
