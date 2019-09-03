@@ -1,42 +1,57 @@
-import evostencils.expressions.base
-from evostencils.expressions import base, system, multigrid, transformations, partitioning
-from evostencils.stencils.gallery import *
+from evostencils.code_generation.exastencils import ProgramGenerator
+from evostencils.initialization import multigrid, parser
+from evostencils.expressions import base, system
+import os
+import pickle
 import lfa_lab
-from evostencils.evaluation.convergence import ConvergenceEvaluator
 
-dimension = 2
-min_level = 2
-max_level = 10
-size = 2**max_level
-grid_size = (size, size)
-h = 1/(2**max_level)
-step_size = (h, h)
-coarsening_factor = (2, 2)
-coarsening_factors = [coarsening_factor, coarsening_factor]
-grid = base.Grid(grid_size, step_size)
-us = base.ZeroApproximation(grid)
-vs = base.ZeroApproximation(grid)
-f_u = base.RightHandSide('f_u', grid)
-f_v = base.RightHandSide('f_v', grid)
+cwd = os.getcwd()
+compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
+base_path = f'{cwd}/../exastencils/Examples'
 
-problem_name = 'poisson_2D_constant'
-stencil_generator = Poisson2D()
-interpolation_generator = MultilinearInterpolationGenerator(coarsening_factor)
-restriction_generator = FullWeightingRestrictionGenerator(coarsening_factor)
+# 2D Finite difference discretized Poisson
+settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
-laplace = base.Operator('Laplace', grid, stencil_generator)
-I = base.Identity(grid)
-Z = base.ZeroOperator(grid)
+# 3D Finite difference discretized Poisson
+# settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
+# knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
 
+# 2D Finite volume discretized Poisson
+# settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
+# knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
 
-A = system.Operator('A', [[laplace, I], [Z, laplace]])
-u = system.Approximation('u', [vs, us])
-f = system.RightHandSide('f', [f_v, f_u])
-res = evostencils.expressions.base.Residual(A, u, f)
-tmp = base.Multiplication(base.Inverse(system.ElementwiseDiagonal(A)), res)
-u_new = evostencils.expressions.base.Cycle(u, f, tmp, weight=0.6, partitioning=partitioning.Single)
-convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors,
-                                             [lfa_lab.Grid(dimension, step_size), lfa_lab.Grid(dimension, step_size)])
-lfa_node = convergence_evaluator.transform(u_new)
-convergence_factor = convergence_evaluator.compute_spectral_radius(u_new)
-print(f'Spectral radius: {convergence_factor}')
+# 3D Finite volume discretized Poisson
+# settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
+# knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
+
+program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+
+# Evaluate baseline program
+# program_generator.run_exastencils_compiler()
+# program_generator.run_c_compiler()
+# time, convergence_factor = program_generator.evaluate()
+# print(f'Time: {time}, Convergence factor: {convergence_factor}')
+
+# Obtain extracted information from program generator
+dimension = program_generator.dimension
+finest_grid = program_generator.finest_grid
+coarsening_factors = program_generator.coarsening_factor
+coarse_grid = system.get_coarse_grid(finest_grid, coarsening_factors)
+min_level = program_generator.min_level
+max_level = program_generator.max_level
+equations = program_generator.equations
+operators = program_generator.operators
+fields = program_generator.fields
+
+operator, restriction, prolongation, = \
+    multigrid.generate_operators_from_l2_information(equations, operators, fields, max_level, finest_grid, coarse_grid)
+solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
+approximation = system.Approximation('x', solution_entries)
+rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
+rhs = system.RightHandSide('b', rhs_entries)
+residual = base.Residual(operator, approximation, rhs)
+cycle = base.Cycle(approximation, rhs, residual)
+storages = program_generator.generate_storage(min_level, max_level, finest_grid)
+program = program_generator.generate_multigrid(cycle, storages, min_level, max_level)
+print(program)

@@ -102,8 +102,8 @@ class ConvergenceEvaluator:
                             black_filter = lfa_lab.system(black_entries)
                             result = (black_filter + red_filter * tmp) * (red_filter + black_filter * tmp)
                         except RuntimeError as _:
-                            result = tmp
-                            # raise RuntimeError("Computation could not be partitioned.")
+                            # result = tmp
+                            raise RuntimeError("Computation could not be partitioned.")
                     else:
                         result = tmp
                 else:

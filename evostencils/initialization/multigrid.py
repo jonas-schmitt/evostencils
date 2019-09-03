@@ -214,19 +214,23 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     GridType = types.Grid
     CorrectionType = types.Correction
 
-    def coarse_cycle(coarse_grid, cycle, partitioning):
+    def coarse_cycle(coarse_grid, cycle):
         result = base.cycle(cycle.approximation, cycle.rhs,
                                                     base.cycle(coarse_grid, cycle.correction, base.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
-                                                                                       partitioning), cycle.partitioning, predecessor=cycle.predecessor)
+                                                                                       terminals.no_partitioning), cycle.partitioning, predecessor=cycle.predecessor)
         result.correction.predecessor = result
         return result.correction
 
-    def residual(args, partitioning):
-        return base.cycle(args[0], args[1], base.residual(terminals.operator, args[0], args[1]), partitioning, predecessor=args[0].predecessor)
+    def residual(args):
+        return base.cycle(args[0], args[1], base.residual(terminals.operator, args[0], args[1]), terminals.no_partitioning, predecessor=args[0].predecessor)
 
-    def apply(operator, cycle):
-        return base.cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), cycle.partitioning, cycle.weight,
+    def apply(operator, cycle, partitioning):
+        return base.cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), partitioning, cycle.weight,
                                                   cycle.predecessor)
+
+    def restrict(operator, cycle):
+        return base.cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), terminals.no_partitioning, cycle.weight,
+                          cycle.predecessor)
 
     def coarse_grid_correction(interpolation, cycle):
         cycle.predecessor._correction = base.mul(interpolation, cycle)
@@ -240,12 +244,12 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"iterate_{level}")
     pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"iterate_{level}")
 
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished), types.Partitioning], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), types.Partitioning], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
-    pset.addPrimitive(apply, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.Finished)],
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
+    pset.addPrimitive(apply, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning],
                       multiple.generate_type_list(types.Grid, types.Correction, types.Finished),
                       f"apply_{level}")
-    pset.addPrimitive(apply, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished)],
+    pset.addPrimitive(apply, [OperatorType, multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning],
                       multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished),
                       f"apply_{level}")
     if not coarsest:
@@ -253,13 +257,11 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished),
-                           types.Partitioning],
+                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
                           multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
                           f"coarse_cycle_{level}")
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished),
-                           types.Partitioning],
+                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
                           multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
                           f"coarse_cycle_{level}")
 
@@ -293,10 +295,10 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       f'interpolate_{level}')
         """
     # Multigrid recipes
-    pset.addPrimitive(apply, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.Finished)],
+    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.Finished)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished),
                       f'restrict_{level}')
-    pset.addPrimitive(apply, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished)],
+    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished)],
                       multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished),
                       f'restrict_{level}')
     """

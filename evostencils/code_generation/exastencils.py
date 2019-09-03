@@ -22,7 +22,7 @@ class Field:
         self.cycle_storage = cycle_storage
         self.valid = False
 
-    def to_exa3(self):
+    def to_exa(self):
         return f'{self.name}@{self.level}'
 
 
@@ -258,10 +258,43 @@ class ProgramGenerator:
         #     return expression.program
         program = ''
         if isinstance(expression, base.Cycle):
-            for i, grid in enumerate(expression.grid):
-                level = grid.level
-                solution_field = self.get_solution_field(storages, i, level)
-                #TODO distinguish between smoothing and CGC
+            correction = expression.correction
+            if isinstance(correction, base.Residual):
+                for i, grid in enumerate(expression.grid):
+                    level = grid.level
+                    solution_field = self.get_solution_field(storages, i, level)
+                    rhs_field = self.get_rhs_field(storages, i, level)
+                    operator = correction.operator
+                    program += f'{solution_field.to_exa()} += {rhs_field.to_exa()}'
+                    for j, op in enumerate(operator.entries[i]):
+                        field = self.get_solution_field(storages, j, level)
+                        program += f' - {op.name}@{level} * {field.to_exa()}'
+            elif isinstance(correction, base.Multiplication):
+                if isinstance(correction.operand1, system.InterGridOperator):
+                    pass
+                else:
+                    pass
+            else:
+                raise RuntimeError("Expected multiplication")
+        elif isinstance(expression, base.Residual):
+            if not isinstance(expression.rhs, system.RightHandSide):
+                pass
+            else:
+                pass
+            if not isinstance(expression.approximation, system.Approximation):
+                pass
+            else:
+                pass
+        elif isinstance(expression, base.Multiplication):
+            if isinstance(expression.operand1, system.InterGridOperator):
+                pass
+            elif isinstance(expression.operand1, base.CoarseGridSolver):
+                pass
+            else:
+                pass
+        else:
+            raise RuntimeError("Not implemented")
+        return program
 
 
     @staticmethod
