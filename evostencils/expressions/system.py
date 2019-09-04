@@ -80,30 +80,20 @@ class ZeroApproximation(Approximation):
 
 
 class InterGridOperator(Operator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator,
-                 InterGridOperatorType, ZeroOperatorType):
-        assert len(fine_grid) == len(coarse_grid), "Number of fine grids does not match with the number of coarse grids"
-        if isinstance(stencil_generator, list):
-            list_of_stencil_generators = stencil_generator
-        else:
-            list_of_stencil_generators = [stencil_generator] * len(fine_grid)
-        entries = [[InterGridOperatorType(name, fg, cg, list_of_stencil_generators[i])
-                    if i == j else ZeroOperatorType(fg, cg) for j in range(len(fine_grid))]
-                   for i, (fg, cg) in enumerate(zip(fine_grid, coarse_grid))]
+    def __init__(self, name, list_of_intergrid_operators, ZeroOperatorType):
+        entries = [[intergrid_operator if i == j else ZeroOperatorType(intergrid_operator.fine_grid, intergrid_operator.coarse_grid)
+                    for j in range(len(list_of_intergrid_operators))]for i, intergrid_operator in enumerate(list_of_intergrid_operators)]
         super().__init__(name, entries)
 
 
 class Restriction(InterGridOperator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
-        super().__init__(name, fine_grid, coarse_grid, stencil_generator,
-                         base.Restriction, base.ZeroRestriction)
+    def __init__(self, name, list_of_intergrid_operators):
+        super().__init__(name, list_of_intergrid_operators, base.ZeroRestriction)
 
 
 class Prolongation(InterGridOperator):
-    def __init__(self, name, fine_grid: [base.Grid], coarse_grid: [base.Grid], stencil_generator=None):
-        super().__init__(name, fine_grid, coarse_grid, stencil_generator,
-                         base.Prolongation, base.ZeroProlongation)
-
+    def __init__(self, name, list_of_intergrid_operators):
+        super().__init__(name, list_of_intergrid_operators, base.ZeroProlongation)
 
 class Diagonal(base.UnaryExpression):
     pass

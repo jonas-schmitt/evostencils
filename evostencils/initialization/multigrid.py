@@ -143,11 +143,13 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
             system_operators.append(op_info)
     assert len(restriction_operators) == len(fields), 'The number of restriction operators does not match with the number of fields'
     assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
-    list_of_stencil_generators = [ConstantStencilGenerator(op_info.stencil) for i, op_info in enumerate(restriction_operators)]
-    restriction = system.Restriction(f'R_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
+    list_of_restriction_operators = [base.Restriction(op_info.name, fine_grid[i], coarse_grid[i], ConstantStencilGenerator(op_info.stencil))
+                                     for i, op_info in enumerate(restriction_operators)]
+    restriction = system.Restriction(f'R_{level}', list_of_restriction_operators)
 
-    list_of_stencil_generators = [ConstantStencilGenerator(op_info.stencil) for i, op_info in enumerate(prolongation_operators)]
-    prolongation = system.Prolongation(f'P_{level}', fine_grid, coarse_grid, list_of_stencil_generators)
+    list_of_prolongation_operators = [base.Prolongation(op_info.name, fine_grid[i], coarse_grid[i], ConstantStencilGenerator(op_info.stencil))
+                                      for i, op_info in enumerate(prolongation_operators)]
+    prolongation = system.Prolongation(f'P_{level}', list_of_prolongation_operators)
 
     entries = []
     for equation in equations:
@@ -216,8 +218,9 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     def coarse_cycle(coarse_grid, cycle):
         result = base.cycle(cycle.approximation, cycle.rhs,
-                                                    base.cycle(coarse_grid, cycle.correction, base.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
-                                                                                       terminals.no_partitioning), cycle.partitioning, predecessor=cycle.predecessor)
+                            base.cycle(coarse_grid, cycle.correction,
+                                       base.residual(terminals.coarse_operator, coarse_grid, cycle.correction),
+                                       terminals.no_partitioning), cycle.partitioning, predecessor=cycle.predecessor)
         result.correction.predecessor = result
         return result.correction
 

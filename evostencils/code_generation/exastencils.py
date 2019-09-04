@@ -147,26 +147,26 @@ class ProgramGenerator:
 
     @staticmethod
     def get_solution_field(storages, index, level):
-        min_level = storages[0].grid[index].level
-        offset = level - min_level
+        max_level = storages[0].grid[index].level
+        offset = max_level - level
         return storages[offset].solution[index]
 
     @staticmethod
     def get_rhs_field(storages, index, level):
-        min_level = storages[0].grid[index].level
-        offset = level - min_level
+        max_level = storages[0].grid[index].level
+        offset = max_level - level
         return storages[offset].rhs[index]
 
     @staticmethod
     def get_residual_field(storages, index, level):
-        min_level = storages[0].grid[index].level
-        offset = level - min_level
+        max_level = storages[0].grid[index].level
+        offset = max_level - level
         return storages[offset].residual[index]
 
     @staticmethod
     def get_correction_field(storages, index, level):
-        min_level = storages[0].grid[index].level
-        offset = level - min_level
+        max_level = storages[0].grid[index].level
+        offset = max_level - level
         return storages[offset].correction[index]
 
     def generate_cycle_function(self, expression, storages, min_level, max_level, use_global_weights=False):
@@ -258,14 +258,26 @@ class ProgramGenerator:
         #     return expression.program
         program = ''
         if isinstance(expression, base.Cycle):
+            weight = expression.weight
+            # Hack to change the weights after generation
+
+            if use_global_weights and hasattr(expression, 'global_id'):
+                weight = f'omega_{expression.global_id}'
+
             correction = expression.correction
             if isinstance(correction, base.Residual):
+                if not isinstance(expression.correction.approximation, system.Approximation):
+                    program += self.generate_multigrid(expression.approximation, storages, min_level, max_level,
+                                                       use_global_weights)
+                if not isinstance(expression.correction.rhs, system.RightHandSide):
+                    program += self.generate_multigrid(expression.rhs, storages, min_level, max_level,
+                                                       use_global_weights)
                 for i, grid in enumerate(expression.grid):
                     level = grid.level
                     solution_field = self.get_solution_field(storages, i, level)
                     rhs_field = self.get_rhs_field(storages, i, level)
                     operator = correction.operator
-                    program += f'{solution_field.to_exa()} += {expression.weight} * ({rhs_field.to_exa()}'
+                    program += f'{solution_field.to_exa()} += {weight} * ({rhs_field.to_exa()}'
                     for j, entry in enumerate(operator.entries[i]):
                         field = self.get_solution_field(storages, j, level)
                         if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
@@ -287,6 +299,7 @@ class ProgramGenerator:
                     program += ')\n'
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
+                    program += self.generate_multigrid(correction.operand2, storages, min_level, max_level, use_global_weights)
                     for i, grid in enumerate(expression.grid):
                         level = grid.level
                         solution_field = self.get_solution_field(storages, i, level)
@@ -299,26 +312,67 @@ class ProgramGenerator:
                         else:
                             raise RuntimeError("Unexpected entry")
                         # TODO identify different fields
-                        correction_field = self.get_correction_field(storages, i, op_level)
-                        program += f'{solution_field.to_exa()} += {expression.weight} * ({entry.name}@{op_level} * ' \
-                                   f'{correction_field.to_exa()})'
-                    program += '\n'
+                        if isinstance(correction.operand2, base.Residual):
+                            source_field = self.get_residual_field(storages, i, op_level)
+                        else:
+                            source_field = self.get_correction_field(storages, i, op_level)
+                        program += f'{solution_field.to_exa()} += {weight} * ({entry.name}@{op_level} * ' \
+                                   f'{source_field.to_exa()})\n'
                 else:
+                    # TODO generate solve locally
                     pass
             else:
                 raise RuntimeError("Expected multiplication")
         elif isinstance(expression, base.Residual):
-            if not isinstance(expression.rhs, system.RightHandSide):
-                pass
-            else:
-                pass
             if not isinstance(expression.approximation, system.Approximation):
-                pass
-            else:
-                pass
+                program += self.generate_multigrid(expression.approximation, storages, min_level, max_level, use_global_weights)
+            if not isinstance(expression.rhs, system.RightHandSide):
+                program += self.generate_multigrid(expression.rhs, storages, min_level, max_level, use_global_weights)
+            for i, grid in enumerate(expression.grid):
+                level = grid.level
+                residual_field = self.get_residual_field(storages, i, level)
+                rhs_field = self.get_rhs_field(storages, i, level)
+                operator = expression.operator
+                program += f'{residual_field.to_exa()} = {rhs_field.to_exa()}'
+                for j, entry in enumerate(operator.entries[i]):
+                    field = self.get_solution_field(storages, j, level)
+                    if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
+                        program += f' - '
+                        op = entry.operand
+                        program += f'({entry.factor}) * '
+                    elif isinstance(entry, base.Operator):
+                        op = entry
+                        if not isinstance(op, base.ZeroOperator):
+                            program += f' - '
+                    else:
+                        raise RuntimeError("Unexpected system operator entry")
+                    if isinstance(op, base.Identity):
+                        program += field.to_exa()
+                    elif isinstance(op, base.ZeroOperator):
+                        pass
+                    else:
+                        program += f'{op}@{level} * {field.to_exa()}'
+                program += '\n'
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):
-                pass
+                program += self.generate_multigrid(expression.operand2, storages, min_level, max_level,
+                                                   use_global_weights)
+                for i, grid in enumerate(expression.grid):
+                    operator = expression.operand1
+                    entry = operator.entries[i][i]
+                    if isinstance(entry, base.Prolongation):
+                        op_level = entry.coarse_grid.level
+                    elif isinstance(entry, base.Restriction):
+                        op_level = entry.fine_grid.level
+                    else:
+                        raise RuntimeError("Unexpected entry")
+                    if isinstance(expression.operand2, base.Residual):
+                        source_field = self.get_residual_field(storages, i, op_level)
+                    else:
+                        source_field = self.get_correction_field(storages, i, op_level)
+                    target_field = self.get_correction_field(storages, i, grid.level)
+                    program += f'{target_field.to_exa()} = {entry.name}@{op_level} * ' \
+                               f'{source_field.to_exa()}\n'
             elif isinstance(expression.operand1, base.CoarseGridSolver):
                 pass
             else:
