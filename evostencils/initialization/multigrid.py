@@ -46,7 +46,7 @@ class EquationInfo:
             transformed_expr += ' ' + token.split('@')[0]
         tmp = transformed_expr.split('==')
         self._sympy_expr = parse_expr(tmp[0])
-        self._rhs_name = tmp[1]
+        self._rhs_name = tmp[1].strip(' ')
         self._associated_field = None
 
     @property
