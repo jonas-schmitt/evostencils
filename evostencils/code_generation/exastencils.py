@@ -329,8 +329,21 @@ class ProgramGenerator:
                         program += f'\t{solution_field.to_exa()} += {weight} * ({entry.name}@{op_level} * ' \
                                    f'{source_field.to_exa()})\n'
                 else:
-                    # TODO generate solve locally
-                    pass
+                    coloring = False
+                    additional_indent = ''
+                    if expression.partitioning == part.RedBlack:
+                        coloring = True
+                        program += '\tcolor with {\n\t\t(('
+                        for i in range(self.dimension):
+                            program += f'i{i}'
+                            if i < self.dimension - 1:
+                                program += ' + '
+                        program += ') % 2),\n'
+                        additional_indent += '\t'
+                        # TODO generate solve locally
+                    if coloring:
+                        program += '\t\t}\n\t}\n'
+
             else:
                 raise RuntimeError("Expected multiplication")
         elif isinstance(expression, base.Residual):
@@ -395,7 +408,7 @@ class ProgramGenerator:
                     target_field = self.get_correction_field(storages, i, grid.level)
                     program += f'\t{target_field.to_exa()} = {source_field.to_exa()}\n'
             else:
-                pass
+                raise RuntimeError("Not implemented")
         else:
             raise RuntimeError("Not implemented")
         return program
