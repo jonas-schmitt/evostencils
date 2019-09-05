@@ -1,6 +1,6 @@
 from evostencils.code_generation.exastencils import ProgramGenerator
 from evostencils.initialization import multigrid, parser
-from evostencils.expressions import base, system
+from evostencils.expressions import base, system, transformations
 import os
 import pickle
 import lfa_lab
@@ -64,4 +64,7 @@ tmp = base.Multiplication(prolongation, tmp)
 cycle = base.Cycle(approximation, rhs, tmp)
 storages = program_generator.generate_storage(min_level, max_level, finest_grid)
 program = program_generator.generate_cycle_function(cycle, storages, max_level-1, max_level)
+tmp = transformations.obtain_sympy_expression_for_local_system(system.ElementwiseDiagonal(operator), operator, equations, fields)
+for le in tmp:
+    print(le)
 print(program)
