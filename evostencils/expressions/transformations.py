@@ -2,6 +2,7 @@ from evostencils.expressions import base, system
 from evostencils.stencils import constant, periodic
 import sympy
 
+
 def get_iteration_matrix(expression: base.Expression):
     if expression.iteration_matrix is not None:
         return expression.iteration_matrix
@@ -138,47 +139,66 @@ def invalidate_expression(expression: base.Expression):
 
 
 def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator, equations, fields):
+    local_equations = {}
+
+    def recursive_descent(array1, array2, dimension, index, equation, i, j, level):
+        def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f):
+            for offsets, value in constant_stencil.entries:
+                symbol_name = f'{fields[j].name}@{level}@['
+                for idx, o in zip(index[:-1], offsets[:-1]):
+                    symbol_name += f'{int(idx) + int(o)}, '
+                symbol_name += f'{int(index[-1]) + int(offsets[-1])}]'
+                if new:
+                    symbol_name += '_new'
+                equation = f(equation, value * sympy.Symbol(symbol_name))
+            return equation
+
+        max_period = max(len(array1), len(array2))
+        if dimension == 1:
+            for k in range(max_period):
+                index = index + (k,)
+                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x + y)
+                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y)
+                equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y)
+                if (fields[i], index) not in local_equations:
+                    local_equations[(fields[i], index)] = sympy.sympify(0), \
+                                                          sympy.Symbol(f'{equations[i].rhs_name}@{level}')
+                value = local_equations[(fields[i], index)]
+                local_equations[(fields[i], index)] = value[0] + equation, value[1]
+
+        else:
+            for k in range(max_period):
+                recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, index + (k,),
+                                  equation, i, j, level)
     if isinstance(smoothing_operator, system.Diagonal):
-        pass
+        for i, (row1, row2) in enumerate(zip(smoothing_operator.operand.entries, system_operator.entries)):
+            for j, (entry1, entry2) in enumerate(zip(row1, row2)):
+                level = entry2.grid.level
+                if i == j:
+                    stencil1 = periodic.diagonal(entry1.generate_stencil())
+                else:
+                    stencil1 = periodic.map_stencil(constant.get_null_stencil(entry1.grid), lambda x: x)
+                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
+                                  sympy.sympify(0), i, j, level)
     elif isinstance(smoothing_operator, system.ElementwiseDiagonal):
-        local_equations = {}
-        for i, row in enumerate(smoothing_operator.operand.entries):
-            for j, entry in enumerate(row):
-                stencil = entry.generate_stencil()
-                field_symbol = fields[j]
-                level = entry.grid.level
-
-                def recursive_descent(array1, array2, dimension, index, equation):
-                    def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f):
-                        for offsets, value in constant_stencil.entries:
-                            symbol_name = f'{field_symbol.name}@{level}@['
-                            for idx, o in zip(index[:-1], offsets[:-1]):
-                                symbol_name += f'{int(idx) + int(o)}, '
-                            symbol_name += f'{int(index[-1]) + int(offsets[-1])}]'
-                            if new:
-                                symbol_name += '_new'
-                            equation = f(equation, value * sympy.Symbol(symbol_name))
-                        return equation
-
-                    max_period = max(len(array1), len(array2))
-                    if dimension == 1:
-                        for k in range(max_period):
-                            index = index + (k,)
-                            equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x+y)
-                            equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x-y)
-                            equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x+y)
-                            if (fields[i], index) not in local_equations:
-                                local_equations[(fields[i], index)] = sympy.sympify(0)
-                            local_equations[(fields[i], index)] += equation
-
-                    else:
-                        for k in range(max_period):
-                            recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, index + (k,), equation)
-
-                stencil1 = periodic.diagonal(stencil)
-                stencil2 = periodic.map_stencil(stencil, lambda x: x)
-                recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, stencil.dimension, (), sympy.sympify(0))
-        return local_equations
-    else:
+        for i, (row1, row2) in enumerate(zip(smoothing_operator.operand.entries, system_operator.entries)):
+            for j, (entry1, entry2) in enumerate(zip(row1, row2)):
+                level = entry2.grid.level
+                stencil1 = periodic.diagonal(entry1.generate_stencil())
+                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
+                                  sympy.sympify(0), i, j, level)
+    elif isinstance(smoothing_operator, system.Operator):
         # Custom smoothing operator
-        pass
+        for i, (row1, row2) in enumerate(zip(smoothing_operator.entries, system_operator.entries)):
+            for j, (entry1, entry2) in enumerate(zip(row1, row2)):
+                level = entry2.grid.level
+                stencil1 = periodic.map_stencil(entry1.generate_stencil(), lambda x: x)
+                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
+                                  sympy.sympify(0), i, j, level)
+    else:
+        raise RuntimeError("Can not extract equations from smoothing operator")
+
+    return local_equations
