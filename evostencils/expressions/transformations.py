@@ -160,11 +160,11 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
                 equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x + y)
                 equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y)
                 equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y)
-                if (fields[i], index) not in local_equations:
-                    local_equations[(fields[i], index)] = sympy.sympify(0), \
+                if (fields[i], level, index) not in local_equations:
+                    local_equations[(fields[i], level, index)] = sympy.sympify(0), \
                                                           sympy.Symbol(f'{equations[i].rhs_name}@{level}')
-                value = local_equations[(fields[i], index)]
-                local_equations[(fields[i], index)] = value[0] + equation, value[1]
+                value = local_equations[(fields[i], level, index)]
+                local_equations[(fields[i], level, index)] = value[0] + equation, value[1]
 
         else:
             for k in range(max_period):
@@ -202,3 +202,29 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
         raise RuntimeError("Can not extract equations from smoothing operator")
 
     return local_equations
+
+
+def find_independent_equation_sets(equations_dict: dict):
+    independend_set = []
+    dependent_set = []
+    items = equations_dict.items()
+    for i, (key, value) in enumerate(items):
+        free_symbols = value[0].free_symbols
+        unknowns = []
+        for symbol in free_symbols:
+            tokens = symbol.name.split('_')
+            if tokens[-1] == 'new':
+                unknowns.append(symbol)
+        is_independent = True
+        for j, (_, v) in enumerate(items):
+            if i != j:
+                for unknown in unknowns:
+                    if unknown in v[0].free_symbols:
+                        is_independent = False
+        if is_independent:
+            independend_set.append((key, value))
+        else:
+            dependent_set.append((key, value))
+    return dependent_set, independend_set
+
+

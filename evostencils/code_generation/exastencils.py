@@ -1,4 +1,4 @@
-from evostencils.expressions import base, partitioning as part, system
+from evostencils.expressions import base, partitioning as part, system, transformations
 from evostencils.initialization import multigrid, parser
 import os
 import subprocess
@@ -262,6 +262,20 @@ class ProgramGenerator:
         else:
             return self.get_correction_field(storages, i, level)
 
+    def generate_solve_locally(self, lhs, rhs, weight, indentation):
+        program = ''
+        unknown = f'{lhs[0]}@{lhs[1]}['
+        for offset in lhs[2][:-1]:
+            unknown += f'{offset}, '
+        unknown += f'{lhs[2][-1]}]'
+        transformed_equation = rhs[0]
+        for symbol in rhs[0].free_symbols:
+            tokens = symbol.name.split('_')
+            if tokens[-1] == 'new':
+                transformed_equation = transformed_equation.subs(symbol, sympy.Symbol(tokens[0]))
+        program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs[1]}\n'
+        return program
+
     def generate_multigrid(self, expression: base.Expression, storages, min_level, max_level, use_global_weights=False):
         # import decimal
         # if expression.program is not None:
@@ -313,7 +327,8 @@ class ProgramGenerator:
                     program += ')\n'
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
-                    program += self.generate_multigrid(correction.operand2, storages, min_level, max_level, use_global_weights)
+                    program += self.generate_multigrid(correction.operand2, storages, min_level, max_level,
+                                                       use_global_weights)
                     for i, grid in enumerate(expression.grid):
                         level = grid.level
                         solution_field = self.get_solution_field(storages, i, level)
@@ -328,9 +343,39 @@ class ProgramGenerator:
                         source_field = self.obtain_correct_source_field(correction.operand2, storages, i, op_level)
                         program += f'\t{solution_field.to_exa()} += {weight} * ({entry.name}@{op_level} * ' \
                                    f'{source_field.to_exa()})\n'
-                else:
+                elif isinstance(correction.operand1, base.Inverse):
+                    residual = correction.operand2
+                    if not isinstance(residual.approximation, system.Approximation):
+                        program += self.generate_multigrid(residual.approximation, storages, min_level, max_level,
+                                                           use_global_weights)
+                    if not isinstance(residual.rhs, system.RightHandSide):
+                        program += self.generate_multigrid(residual.rhs, storages, min_level, max_level,
+                                                           use_global_weights)
+                    smoothing_operator = correction.operand1.operand
+                    system_operator = correction.operand2.operator
+                    equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
+                                                                                             self.equations, self.fields)
+                    dependent_equations, independent_equations = transformations.find_independent_equation_sets(equation_dict)
+                    for lhs, rhs in independent_equations:
+                        coloring = False
+                        indentation = ''
+                        if expression.partitioning == part.RedBlack:
+                            coloring = True
+                            program += '\tcolor with {\n\t\t(('
+                            for i in range(self.dimension):
+                                program += f'i{i}'
+                                if i < self.dimension - 1:
+                                    program += ' + '
+                            program += ') % 2),\n'
+                            indentation += '\t'
+                        program += f'\t{indentation}solve locally at {lhs[0]}@{lhs[1]} relax {weight} {{\n'
+                        program += self.generate_solve_locally(lhs, rhs, expression.weight, indentation)
+                        program += f'\t{indentation}}}\n'
+                        if coloring:
+                            program += '\t\t}\n\t}\n'
+
                     coloring = False
-                    additional_indent = ''
+                    indentation = ''
                     if expression.partitioning == part.RedBlack:
                         coloring = True
                         program += '\tcolor with {\n\t\t(('
@@ -339,11 +384,16 @@ class ProgramGenerator:
                             if i < self.dimension - 1:
                                 program += ' + '
                         program += ') % 2),\n'
-                        additional_indent += '\t'
-                        # TODO generate solve locally
+                        indentation += '\t'
+                    if len(dependent_equations) > 0:
+                        program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                        for lhs, rhs in dependent_equations:
+                            program += self.generate_solve_locally(lhs, rhs, expression.weight, indentation)
+                        program += f'\t{indentation}}}\n'
                     if coloring:
                         program += '\t\t}\n\t}\n'
-
+                else:
+                    raise RuntimeError("Unsupported operator")
             else:
                 raise RuntimeError("Expected multiplication")
         elif isinstance(expression, base.Residual):
