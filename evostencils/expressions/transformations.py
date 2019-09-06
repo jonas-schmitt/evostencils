@@ -141,19 +141,20 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
     if isinstance(smoothing_operator, system.Diagonal):
         pass
     elif isinstance(smoothing_operator, system.ElementwiseDiagonal):
-        local_equations = []
+        local_equations = {}
         for i, row in enumerate(smoothing_operator.operand.entries):
-            local_equation = sympy.sympify(0)
             for j, entry in enumerate(row):
                 stencil = entry.generate_stencil()
                 field_symbol = fields[j]
+                level = entry.grid.level
 
-                def recursive_descent(array1, array2, dimension, equation):
+                def recursive_descent(array1, array2, dimension, index, equation):
                     def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f):
                         for offsets, value in constant_stencil.entries:
-                            symbol_name = f'{field_symbol.name}'
-                            for offset in offsets:
-                                symbol_name += f'_{int(offset)}'
+                            symbol_name = f'{field_symbol.name}@{level}@['
+                            for idx, o in zip(index[:-1], offsets[:-1]):
+                                symbol_name += f'{int(idx) + int(o)}, '
+                            symbol_name += f'{int(index[-1]) + int(offsets[-1])}]'
                             if new:
                                 symbol_name += '_new'
                             equation = f(equation, value * sympy.Symbol(symbol_name))
@@ -162,20 +163,21 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
                     max_period = max(len(array1), len(array2))
                     if dimension == 1:
                         for k in range(max_period):
+                            index = index + (k,)
                             equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x+y)
                             equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x-y)
                             equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x+y)
-                            return equation
+                            if (fields[i], index) not in local_equations:
+                                local_equations[(fields[i], index)] = sympy.sympify(0)
+                            local_equations[(fields[i], index)] += equation
+
                     else:
                         for k in range(max_period):
-                            equation += recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, equation)
-                        return equation
+                            recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, index + (k,), equation)
 
                 stencil1 = periodic.diagonal(stencil)
                 stencil2 = periodic.map_stencil(stencil, lambda x: x)
-                tmp = recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, stencil.dimension, sympy.sympify(0))
-                local_equation = local_equation + tmp
-            local_equations.append(sympy.Eq(local_equation, sympy.Symbol(equations[i].rhs_name)))
+                recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, stencil.dimension, (), sympy.sympify(0))
         return local_equations
     else:
         # Custom smoothing operator

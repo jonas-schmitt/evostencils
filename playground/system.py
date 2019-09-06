@@ -18,16 +18,16 @@ base_path = f'{cwd}/../exastencils/Examples'
 # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
 
 # 2D Finite volume discretized Poisson
-# settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-# knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
+settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
+knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
 
 # 3D Finite volume discretized Poisson
 # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
 # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
 # 2D Finite difference discretized biharmonic equation
-settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+# settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+# knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
 program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
@@ -65,6 +65,6 @@ cycle = base.Cycle(approximation, rhs, tmp)
 storages = program_generator.generate_storage(min_level, max_level, finest_grid)
 program = program_generator.generate_cycle_function(cycle, storages, max_level-1, max_level)
 tmp = transformations.obtain_sympy_expression_for_local_system(system.ElementwiseDiagonal(operator), operator, equations, fields)
-for le in tmp:
-    print(le)
+for k, v in tmp.items():
+    print(k, v)
 print(program)
