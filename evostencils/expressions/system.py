@@ -95,6 +95,7 @@ class Prolongation(InterGridOperator):
     def __init__(self, name, list_of_intergrid_operators):
         super().__init__(name, list_of_intergrid_operators, base.ZeroProlongation)
 
+
 class Diagonal(base.UnaryExpression):
     pass
 

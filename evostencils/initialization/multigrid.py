@@ -1,6 +1,7 @@
 from evostencils.expressions import base
 from evostencils.expressions import system
 from evostencils.expressions import partitioning as part
+from evostencils.expressions.base import ConstantStencilGenerator
 from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
 from evostencils.types import multiple
@@ -68,14 +69,6 @@ class EquationInfo:
     @property
     def associated_field(self):
         return self._associated_field
-
-
-class ConstantStencilGenerator:
-    def __init__(self, stencil):
-        self._stencil = stencil
-
-    def generate_stencil(self, _):
-        return self._stencil
 
 
 def generate_operator_entries_from_equation(equation, operators: list, fields, grid):

@@ -262,18 +262,22 @@ class ProgramGenerator:
         else:
             return self.get_correction_field(storages, i, level)
 
-    def generate_solve_locally(self, lhs, rhs, weight, indentation):
+    @staticmethod
+    def generate_solve_locally(key, value, indentation):
         program = ''
-        unknown = f'{lhs[0]}@{lhs[1]}['
-        for offset in lhs[2][:-1]:
+        rhs = f'{value[1]}@['
+        unknown = f'{key[0]}@{key[1]}@['
+        for offset in key[2][:-1]:
             unknown += f'{offset}, '
-        unknown += f'{lhs[2][-1]}]'
-        transformed_equation = rhs[0]
-        for symbol in rhs[0].free_symbols:
+            rhs += f'{offset}, '
+        unknown += f'{key[2][-1]}]'
+        rhs += f'{key[2][-1]}]'
+        transformed_equation = value[0]
+        for symbol in value[0].free_symbols:
             tokens = symbol.name.split('_')
             if tokens[-1] == 'new':
                 transformed_equation = transformed_equation.subs(symbol, sympy.Symbol(tokens[0]))
-        program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs[1]}\n'
+        program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
 
     def generate_multigrid(self, expression: base.Expression, storages, min_level, max_level, use_global_weights=False):
@@ -356,7 +360,7 @@ class ProgramGenerator:
                     equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
                                                                                              self.equations, self.fields)
                     dependent_equations, independent_equations = transformations.find_independent_equation_sets(equation_dict)
-                    for lhs, rhs in independent_equations:
+                    for key, value in independent_equations:
                         coloring = False
                         indentation = ''
                         if expression.partitioning == part.RedBlack:
@@ -368,8 +372,8 @@ class ProgramGenerator:
                                     program += ' + '
                             program += ') % 2),\n'
                             indentation += '\t'
-                        program += f'\t{indentation}solve locally at {lhs[0]}@{lhs[1]} relax {weight} {{\n'
-                        program += self.generate_solve_locally(lhs, rhs, expression.weight, indentation)
+                        program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
+                        program += self.generate_solve_locally(key, value, indentation)
                         program += f'\t{indentation}}}\n'
                         if coloring:
                             program += '\t\t}\n\t}\n'
@@ -387,8 +391,8 @@ class ProgramGenerator:
                         indentation += '\t'
                     if len(dependent_equations) > 0:
                         program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
-                        for lhs, rhs in dependent_equations:
-                            program += self.generate_solve_locally(lhs, rhs, expression.weight, indentation)
+                        for key, value in dependent_equations:
+                            program += self.generate_solve_locally(key, value, indentation)
                         program += f'\t{indentation}}}\n'
                     if coloring:
                         program += '\t\t}\n\t}\n'

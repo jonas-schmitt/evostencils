@@ -785,3 +785,11 @@ def can_be_partitioned(expression: Expression):
         return True
     else:
         return False
+
+
+class ConstantStencilGenerator:
+    def __init__(self, stencil):
+        self._stencil = stencil
+
+    def generate_stencil(self, _):
+        return self._stencil

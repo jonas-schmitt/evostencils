@@ -1,6 +1,6 @@
 from evostencils.code_generation.exastencils import ProgramGenerator
 from evostencils.initialization import multigrid, parser
-from evostencils.expressions import base, system, transformations
+from evostencils.expressions import base, system, smoother
 import os
 import pickle
 import lfa_lab
@@ -10,16 +10,16 @@ compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
 base_path = f'{cwd}/../exastencils/Examples'
 
 # 2D Finite difference discretized Poisson
-# settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-# knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+#settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+#knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
 # 3D Finite difference discretized Poisson
 # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
 # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
 
 # 2D Finite volume discretized Poisson
-# settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-# knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
+settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
+knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
 
 # 3D Finite volume discretized Poisson
 # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
@@ -30,8 +30,8 @@ base_path = f'{cwd}/../exastencils/Examples'
 # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
 # 2D Finite difference discretized Stokes
-settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
-knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
+#settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
+#knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
 
 program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
@@ -68,9 +68,7 @@ tmp = base.Multiplication(cgs, tmp)
 tmp = base.Multiplication(prolongation, tmp)
 cycle = base.Cycle(approximation, rhs, tmp)
 new_approximation = cycle
-new_residual = base.Residual(operator, new_approximation, rhs)
-tmp = base.Multiplication(base.Inverse(system.ElementwiseDiagonal(operator)), new_residual)
-new_cycle = base.Cycle(new_approximation, rhs, tmp)
+new_cycle = smoother.collective_block_jacobi(operator, new_approximation, rhs, (2, 2))
 storages = program_generator.generate_storage(min_level, max_level, finest_grid)
 program = program_generator.generate_cycle_function(new_cycle, storages, max_level-1, max_level)
 print(program)

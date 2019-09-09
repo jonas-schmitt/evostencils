@@ -93,7 +93,7 @@ def repeat(cycle: base.Cycle, times):
     for _ in range(1, times):
         new_correction = replace_iterate(new_cycle.correction, new_cycle.approximation, new_cycle)
         new_cycle = base.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
-                                                       weight=new_cycle.weight, predecessor=new_cycle.predecessor)
+                               weight=new_cycle.weight, predecessor=new_cycle.predecessor)
     return new_cycle
 
 
@@ -142,7 +142,7 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
     local_equations = {}
 
     def recursive_descent(array1, array2, dimension, index, equation, i, j, level):
-        def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f):
+        def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f, index):
             for offsets, value in constant_stencil.entries:
                 symbol_name = f'{fields[j].name}@{level}@['
                 for idx, o in zip(index[:-1], offsets[:-1]):
@@ -156,16 +156,16 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
         max_period = max(len(array1), len(array2))
         if dimension == 1:
             for k in range(max_period):
-                index = index + (k,)
-                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x + y)
-                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y)
-                equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y)
-                if (fields[i], level, index) not in local_equations:
-                    local_equations[(fields[i], level, index)] = sympy.sympify(0), \
+                index_center = index + (k,)
+                equation = sympy.sympify(0)
+                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x + y, index_center)
+                equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y, index_center)
+                equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y, index_center)
+                if (fields[i], level, index_center) not in local_equations:
+                    local_equations[(fields[i], level, index_center)] = sympy.sympify(0), \
                                                           sympy.Symbol(f'{equations[i].rhs_name}@{level}')
-                value = local_equations[(fields[i], level, index)]
-                local_equations[(fields[i], level, index)] = value[0] + equation, value[1]
-
+                value = local_equations[(fields[i], level, index_center)]
+                local_equations[(fields[i], level, index_center)] = value[0] + equation, value[1]
         else:
             for k in range(max_period):
                 recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, index + (k,),
@@ -205,7 +205,7 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
 
 
 def find_independent_equation_sets(equations_dict: dict):
-    independend_set = []
+    independent_set = []
     dependent_set = []
     items = equations_dict.items()
     for i, (key, value) in enumerate(items):
@@ -222,9 +222,9 @@ def find_independent_equation_sets(equations_dict: dict):
                     if unknown in v[0].free_symbols:
                         is_independent = False
         if is_independent:
-            independend_set.append((key, value))
+            independent_set.append((key, value))
         else:
             dependent_set.append((key, value))
-    return dependent_set, independend_set
+    return dependent_set, independent_set
 
 

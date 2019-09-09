@@ -8,6 +8,7 @@ a = [ ((-1,0),-1), ((0, -1), -1),
       ((0,0), 4), ((0,1), -1), ((1,0), -1) ]
 A = operator.from_stencil(a, grid)
 
+d = block_jacobi(A, (2, 2))
 # Define the block diagonal part of A
 d = NdArray(shape=(2, 1))
 d[0,0] = [((0,0), 4), ((1,0), 0)]
