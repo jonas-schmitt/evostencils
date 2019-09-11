@@ -1,4 +1,5 @@
 from evostencils.expressions import base
+from typing import List, Tuple
 
 
 class Operator(base.Entity):
@@ -104,16 +105,16 @@ class ElementwiseDiagonal(base.UnaryExpression):
     pass
 
 
-def get_coarse_grid(grid: [base.Grid], coarsening_factors: [tuple]):
+def get_coarse_grid(grid: [base.Grid], coarsening_factors: List[Tuple[int, ...]]):
     return [base.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]
 
 
-def get_coarse_approximation(approximation: Approximation, coarsening_factors: tuple):
+def get_coarse_approximation(approximation: Approximation, coarsening_factors: List[Tuple[int, ...]]):
     return Approximation(f'{approximation.name}', [base.Approximation(f'{entry.name}_c', base.get_coarse_grid(entry.grid, cf))
                                                    for entry, cf in zip(approximation.entries, coarsening_factors)])
 
 
-def get_coarse_rhs(rhs: RightHandSide, coarsening_factors):
+def get_coarse_rhs(rhs: RightHandSide, coarsening_factors: List[Tuple[int, ...]]):
     return RightHandSide(f'{rhs.name}', [base.RightHandSide(f'{entry.name}_c', base.get_coarse_grid(entry.grid, cf))
                                          for entry, cf in zip(rhs.entries, coarsening_factors)])
 
