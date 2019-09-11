@@ -5,7 +5,6 @@ import evostencils.stencils.constant as constant
 from evostencils.expressions import base, system, partitioning
 from multiprocessing import Process, Queue
 
-
 @periodic.convert_constant_stencils
 def stencil_to_lfa(stencil: periodic.Stencil, grid):
     def recursive_descent(array, dimension):
@@ -102,12 +101,15 @@ class ConvergenceEvaluator:
                             black_filter = lfa_lab.system(black_entries)
                             result = (black_filter + red_filter * tmp) * (red_filter + black_filter * tmp)
                         except RuntimeError as _:
-                            # result = tmp
-                            raise RuntimeError("Computation could not be partitioned.")
+                            result = tmp
+                            expression.ignore_partitioning = True
+                            # raise RuntimeError("Computation could not be partitioned.")
                     else:
                         result = tmp
+                        expression.ignore_partitioning = True
                 else:
                     result = tmp
+                    expression.ignore_partitioning = True
                     # raise RuntimeError("Computation could not be partitioned.")
             else:
                 raise NotImplementedError("Not implemented")
@@ -182,9 +184,10 @@ class ConvergenceEvaluator:
 
     def compute_spectral_radius(self, iteration_matrix: base.Expression):
 
-        # lfa_expression = self.transform(iteration_matrix)
-        # s = lfa_expression.symbol()
-        # return s.spectral_radius()
+        #lfa_expression = self.transform(iteration_matrix)
+        #s = lfa_expression.symbol()
+        #spectral_radius = s.spectral_radius()
+        #return spectral_radius
         try:
             lfa_expression = self.transform(iteration_matrix)
 

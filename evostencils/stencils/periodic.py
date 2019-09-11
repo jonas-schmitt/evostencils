@@ -202,6 +202,7 @@ def create_empty_multidimensional_array(shape):
 
 
 def block_diagonal(stencil, block_size):
+    assert len(block_size) == stencil.dimension, 'Block size does not match dimension of the problem'
     stencils = create_empty_multidimensional_array(block_size)
     empty_stencil = Stencil(stencils, stencil.dimension)
 

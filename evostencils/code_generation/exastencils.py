@@ -363,7 +363,7 @@ class ProgramGenerator:
                     for key, value in independent_equations:
                         coloring = False
                         indentation = ''
-                        if expression.partitioning == part.RedBlack:
+                        if expression.partitioning == part.RedBlack and expression.ignore_partitioning is False:
                             coloring = True
                             program += '\tcolor with {\n\t\t(('
                             for i in range(self.dimension):
@@ -380,7 +380,7 @@ class ProgramGenerator:
 
                     coloring = False
                     indentation = ''
-                    if expression.partitioning == part.RedBlack:
+                    if expression.partitioning == part.RedBlack and expression.ignore_partitioning is False:
                         coloring = True
                         program += '\tcolor with {\n\t\t(('
                         for i in range(self.dimension):

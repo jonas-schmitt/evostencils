@@ -84,7 +84,6 @@ class PrimitiveSetTyped(deap.gp.PrimitiveSetTyped):
             if ret_type not in dict_:
                 new_list = []
                 for type_, list_ in dict_.items():
-                    # if type_.issubtype(ret_type):
                     if ret_type.issubtype(type_):
                         for item in list_:
                             if item not in new_list:

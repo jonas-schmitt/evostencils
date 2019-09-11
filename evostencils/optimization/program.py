@@ -10,6 +10,31 @@ from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
 from evostencils.types import level_control
 
+from contextlib import contextmanager,redirect_stderr,redirect_stdout
+from os import devnull
+
+
+# Define a context manager to suppress stdout and stderr.
+class suppress_stdout_stderr(object):
+    def __init__(self):
+        # Open a pair of null files
+        self.null_fds =  [os.open(os.devnull,os.O_RDWR) for x in range(2)]
+        # Save the actual stdout (1) and stderr (2) file descriptors.
+        self.save_fds = [os.dup(1), os.dup(2)]
+
+    def __enter__(self):
+        # Assign the null pointers to stdout and stderr.
+        os.dup2(self.null_fds[0],1)
+        os.dup2(self.null_fds[1],2)
+
+    def __exit__(self, *_):
+        # Re-assign the real stdout/stderr back to (1) and (2)
+        os.dup2(self.save_fds[0],1)
+        os.dup2(self.save_fds[1],2)
+        # Close all file descriptors
+        for fd in self.null_fds + self.save_fds:
+            os.close(fd)
+
 
 class CheckPoint:
     def __init__(self, min_level, max_level, generation, program, solver, population, logbooks):
@@ -66,14 +91,14 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=5, max_height=10)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=1, max_height=5)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         # self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
-        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
+        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=2, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
         # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
 
@@ -153,7 +178,8 @@ class Optimizer:
             return self.infinity, self.infinity
 
         expression = expression1
-        spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
+        with suppress_stdout_stderr():
+            spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
@@ -250,7 +276,7 @@ class Optimizer:
                     transformations.invalidate_expression(solver)
                 logbooks[-1] = logbook
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
-                checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
+                # checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
             # Select the next generation population
             pop = toolbox.select(pop + offspring, mu_)
             record = mstats.compile(pop)

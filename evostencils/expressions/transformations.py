@@ -79,24 +79,6 @@ def obtain_iterate(expression: base.Expression):
         return expression
 
 
-def repeat(cycle: base.Cycle, times):
-    def replace_iterate(expression: base.Expression, iterate, new_iterate):
-        if isinstance(expression, base.Residual):
-            if expression.approximation.approximation.size == iterate.approximation.size \
-                    and expression.approximation.approximation.step_size == iterate.approximation.step_size:
-                return base.Residual(expression.operator, new_iterate, expression.rhs)
-            else:
-                return expression.apply(replace_iterate, iterate, new_iterate)
-        else:
-            return expression.apply(replace_iterate, iterate, new_iterate)
-    new_cycle = cycle
-    for _ in range(1, times):
-        new_correction = replace_iterate(new_cycle.correction, new_cycle.approximation, new_cycle)
-        new_cycle = base.cycle(new_cycle, new_cycle.rhs, new_correction, partitioning=new_cycle.partitioning,
-                               weight=new_cycle.weight, predecessor=new_cycle.predecessor)
-    return new_cycle
-
-
 def obtain_coarsest_level(cycle: base.Cycle) -> int:
     def recursive_descent(expression: base.Expression, current_size: tuple, current_level: int):
         if isinstance(expression, base.Cycle):

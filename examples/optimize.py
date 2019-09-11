@@ -31,6 +31,11 @@ def main():
     # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
+
+    # 2D Finite difference discretized Bi-Harmonic Equation
+    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
     # Evaluate baseline program
@@ -72,7 +77,7 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    pops, stats = optimizer.default_optimization(gp_mu=500, gp_lambda=500, gp_generations=100, es_generations=20,
+    pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=50, es_generations=20,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
