@@ -187,6 +187,7 @@ class ProgramGenerator:
 
         os.chdir(current_path)
         if result.returncode != 0:
+            print(result.stderr.decode('utf8'))
             raise RuntimeError("Compiler not working. Aborting.")
         return result.returncode
 
@@ -388,7 +389,7 @@ class ProgramGenerator:
                                 if i < self.dimension - 1:
                                     program += ' + '
                             program += ') % 2),\n'
-                        indentation += '\t'
+                            indentation += '\t'
                         program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
                         for key, value in dependent_equations:
                             program += self.generate_solve_locally(key, value, indentation)
@@ -449,17 +450,17 @@ class ProgramGenerator:
             elif isinstance(expression.operand1, base.CoarseGridSolver):
                 program += self.generate_multigrid(expression.operand2, storages, min_level, max_level, use_global_weights)
                 for i, grid in enumerate(expression.operand2.grid):
-                    solution_field = self.get_solution_field(storages, i, grid.level)
-                    rhs_field = self.get_rhs_field(storages, i, grid.level)
+                    # solution_field = self.get_solution_field(storages, i, grid.level)
+                    # rhs_field = self.get_rhs_field(storages, i, grid.level)
                     source_field = self.obtain_correct_source_field(expression.operand2, storages, i, grid.level)
-                    program += f'\t{solution_field.to_exa()} = 0\n'
-                    tmp = rhs_field.to_exa()
-                    program += f'\t{tmp} = {source_field.to_exa()}\n'
-                program += f'\tgen_mgCycle@{min_level-1}()\n'
+                    # program += f'\t{solution_field.to_exa()} = 0\n'
+                    # tmp = rhs_field.to_exa()
+                    program += f'\tgen_rhs_{self.fields[i]}@{min_level} = {source_field.to_exa()}\n'
+                    program += f'\tgen_error_{self.fields[i]}@{min_level} = 0\n'
+                program += f'\tgen_mgCycle@{min_level}()\n'
                 for i, grid in enumerate(expression.grid):
-                    source_field = self.get_solution_field(storages, i, grid.level)
                     target_field = self.get_correction_field(storages, i, grid.level)
-                    program += f'\t{target_field.to_exa()} = {source_field.to_exa()}\n'
+                    program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{min_level}\n'
             else:
                 raise RuntimeError("Not implemented")
         else:
@@ -474,4 +475,59 @@ class ProgramGenerator:
                 rhs.valid = False
                 solution.valid = False
                 correction.valid = False
+
+    def generate_l3_file(self, program, min_level):
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
+        subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with open(f'{self.base_path}/{self._debug_l3_path}', 'r') as input_file:
+            with open(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3', 'w+') as output_file:
+                line = input_file.readline()
+                while line:
+                    # TODO perform this check in a more accurate way
+                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{min_level}' not in line)\
+                            or 'Function InitFields' in line:
+                        while line and line[0] is not '}':
+                            line = input_file.readline()
+                        line = input_file.readline()
+                    output_file.write(line)
+                    line = input_file.readline()
+                output_file.write(program)
+
+    def generate_level_adapted_knowledge_file(self, min_level: int, max_level: int):
+        base_path = self.base_path
+        relative_input_file_path = self.knowledge_path
+        relative_output_file_path = f'{self.knowledge_path}.tmp'
+        with open(f'{base_path}/{relative_input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{relative_output_file_path}', 'w+') as output_file:
+                for line in input_file:
+                    tokens = line.split('=')
+                    lhs = tokens[0].strip(' \n\t')
+                    if lhs == 'minLevel':
+                        output_file.write(f'{lhs}\t= {min_level}\n')
+                    elif lhs == 'maxLevel':
+                        output_file.write(f'{lhs}\t= {max_level}\n')
+                    else:
+                        output_file.write(line)
+
+        subprocess.run(['cp', f'{self.base_path}/{relative_input_file_path}', f'{self.base_path}/{relative_input_file_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        subprocess.run(['cp', f'{self.base_path}/{relative_output_file_path}', f'{self.base_path}/{relative_input_file_path}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def restore_files(self):
+        subprocess.run(['cp', f'{self.base_path}/{self.knowledge_path}.backup', f'{self.base_path}/{self.knowledge_path}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
+        subprocess.run(['cp', l3_path, f'{l3_path}.generated'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['cp', f'{l3_path}.backup', l3_path],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.tmp'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['rm', f'{l3_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 

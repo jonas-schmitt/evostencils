@@ -103,24 +103,6 @@ def extract_knowledge_information(base_path: str, relative_file_path: str):
     return dimension, min_level, max_level
 
 
-def generate_level_adapted_knowledge_file(base_path: str, relative_input_file_path: str, relative_output_file_path: str,
-                                          min_level: int, max_level: int, l3_file_name: str):
-    with open(f'{base_path}/{relative_input_file_path}', 'r') as input_file:
-        with open(f'{base_path}{relative_output_file_path}', 'w') as output_file:
-            for line in input_file:
-                tokens = line.split('=')
-                lhs = tokens[0].strip(' \n\t')
-                if lhs == 'minLevel':
-                    output_file.write(f'{lhs}\t= {min_level}\n')
-                elif lhs == 'maxLevel':
-                    output_file.write(f'{lhs}\t= {max_level}\n')
-                elif lhs == 'l3file':
-                    pass
-                else:
-                    output_file.write(line)
-            output_file.write(f'l3file\t= {l3_file_name}')
-
-
 def extract_settings_information(base_path: str, relative_file_path: str):
     with open(f'{base_path}/{relative_file_path}', 'r') as file:
         for line in file:
