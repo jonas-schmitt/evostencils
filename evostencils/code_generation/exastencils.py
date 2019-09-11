@@ -54,7 +54,6 @@ class ProgramGenerator:
         else:
             raise RuntimeError("Compiler not found. Aborting.")
 
-
     @property
     def absolute_compiler_path(self):
         return self._absolute_compiler_path
@@ -237,7 +236,7 @@ class ProgramGenerator:
     def generate_storage(self, min_level, max_level, finest_grid):
         storage = []
         grid = finest_grid
-        for i in range(min_level, max_level):
+        for i in range(min_level, max_level+1):
             storage.append(CycleStorage(self.equations, self.fields, grid))
             grid = system.get_coarse_grid(grid, self.coarsening_factor)
         return storage
@@ -363,7 +362,7 @@ class ProgramGenerator:
                     for key, value in independent_equations:
                         coloring = False
                         indentation = ''
-                        if expression.partitioning == part.RedBlack and expression.ignore_partitioning is False:
+                        if expression.partitioning == part.RedBlack:
                             coloring = True
                             program += '\tcolor with {\n\t\t(('
                             for i in range(self.dimension):
@@ -376,26 +375,26 @@ class ProgramGenerator:
                         program += self.generate_solve_locally(key, value, indentation)
                         program += f'\t{indentation}}}\n'
                         if coloring:
-                            program += '\t\t}\n\t}\n'
+                            program += '\t}\n'
 
                     coloring = False
                     indentation = ''
-                    if expression.partitioning == part.RedBlack and expression.ignore_partitioning is False:
-                        coloring = True
-                        program += '\tcolor with {\n\t\t(('
-                        for i in range(self.dimension):
-                            program += f'i{i}'
-                            if i < self.dimension - 1:
-                                program += ' + '
-                        program += ') % 2),\n'
-                        indentation += '\t'
                     if len(dependent_equations) > 0:
+                        if expression.partitioning == part.RedBlack:
+                            coloring = True
+                            program += '\tcolor with {\n\t\t(('
+                            for i in range(self.dimension):
+                                program += f'i{i}'
+                                if i < self.dimension - 1:
+                                    program += ' + '
+                            program += ') % 2),\n'
+                        indentation += '\t'
                         program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
                         for key, value in dependent_equations:
                             program += self.generate_solve_locally(key, value, indentation)
                         program += f'\t{indentation}}}\n'
-                    if coloring:
-                        program += '\t\t}\n\t}\n'
+                        if coloring:
+                            program += '\t}\n'
                 else:
                     raise RuntimeError("Unsupported operator")
             else:
@@ -456,7 +455,7 @@ class ProgramGenerator:
                     program += f'\t{solution_field.to_exa()} = 0\n'
                     tmp = rhs_field.to_exa()
                     program += f'\t{tmp} = {source_field.to_exa()}\n'
-                program += f'\tgen_mgCycle@{min_level}()\n'
+                program += f'\tgen_mgCycle@{min_level-1}()\n'
                 for i, grid in enumerate(expression.grid):
                     source_field = self.get_solution_field(storages, i, grid.level)
                     target_field = self.get_correction_field(storages, i, grid.level)

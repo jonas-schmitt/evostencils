@@ -10,9 +10,6 @@ from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
 from evostencils.types import level_control
 
-from contextlib import contextmanager,redirect_stderr,redirect_stdout
-from os import devnull
-
 
 # Define a context manager to suppress stdout and stderr.
 class suppress_stdout_stderr(object):
@@ -310,6 +307,7 @@ class Optimizer:
             restart_from_checkpoint = False
         pops = []
         logbooks = []
+        storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         for i in range(levels - levels_per_run, -1, -levels_per_run):
             min_level = self.max_level - (i + levels_per_run - 1)
             max_level = self.max_level - i
@@ -345,6 +343,8 @@ class Optimizer:
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
+            program = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
+            print(program)
             best_expression.evaluate = False
             self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)

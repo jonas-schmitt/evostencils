@@ -655,7 +655,6 @@ class Cycle(Expression):
         self.global_id = None
         self.weight_obtained = False
         self.weight_set = False
-        self.ignore_partitioning = False
         super().__init__()
 
     @property

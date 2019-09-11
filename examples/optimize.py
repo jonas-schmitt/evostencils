@@ -73,11 +73,11 @@ def main():
         os.makedirs(checkpoint_directory_path)
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator,
+                          performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    pops, stats = optimizer.default_optimization(gp_mu=100, gp_lambda=100, gp_generations=50, es_generations=20,
+    pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=2, es_generations=20,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
     log_dir_name = f'{problem_name}/data'
