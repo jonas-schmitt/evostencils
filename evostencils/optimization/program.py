@@ -296,6 +296,7 @@ class Optimizer:
         best_expression = None
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
+        storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         solver_program = ""
         if restart_from_checkpoint and os.path.isfile(checkpoint_file_path):
             try:
@@ -328,24 +329,41 @@ class Optimizer:
                                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                                    LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
+            tmp = None
             if pass_checkpoint:
-                pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
-                                            gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
-                                            checkpoint_frequency=5, checkpoint=checkpoint)
-            else:
-                pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
-                                            gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
-                                            checkpoint_frequency=5, checkpoint=None)
+                tmp = checkpoint
+
+            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                        gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
+                                        checkpoint_frequency=5, checkpoint=tmp)
 
             pops.append(pop)
 
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+            best_time = self.infinity
             best_individual = hof[0]
+            for j in range(0, min(50, len(hof))):
+                individual = hof[j]
+                expression = self.compile_individual(individual, pset)[0]
+                cycle_function = self._program_generator.generate_cycle_function(expression, storages, min_level, max_level)
+                self._program_generator.generate_level_adapted_knowledge_file(min_level, max_level)
+                self._program_generator.run_exastencils_compiler()
+                self._program_generator.generate_l3_file(solver_program + cycle_function, min_level)
+                self._program_generator.run_c_compiler()
+                self._program_generator.restore_files()
+                time, convergence_factor = self._program_generator.evaluate(number_of_samples=1)
+                print(f'Time: {time}, Convergence factor: {convergence_factor}')
+                individual.fitness.values = convergence_factor, individual.fitness.values[1]
+                if time < best_time:
+                    best_individual = individual
+                    best_time = time
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
-            program = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
-            print(program)
+            #program = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
+            cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
+            solver_program += cycle_function
+            print(solver_program)
             best_expression.evaluate = False
             self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)

@@ -485,7 +485,7 @@ class ProgramGenerator:
                 line = input_file.readline()
                 while line:
                     # TODO perform this check in a more accurate way
-                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{min_level}' not in line)\
+                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{min_level-1}' not in line)\
                             or 'Function InitFields' in line:
                         while line and line[0] is not '}':
                             line = input_file.readline()
