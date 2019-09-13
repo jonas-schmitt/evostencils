@@ -12,6 +12,8 @@ from evostencils.deap_extension import PrimitiveSetTyped
 from deap import gp
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
+import itertools
+import typing
 
 
 class OperatorInfo:
@@ -176,18 +178,14 @@ class Terminals:
 
 class Types:
     def __init__(self, terminals: Terminals, FinishedType, NotFinishedType):
-        self.Operator = matrix_types.generate_operator_type(terminals.operator.shape)
         types = [grid_types.generate_grid_type(grid.size) for grid in terminals.grid]
         self.Grid = multiple.generate_type_list(*types)
         types = [grid_types.generate_correction_type(grid.size) for grid in terminals.grid]
         self.Correction = multiple.generate_type_list(*types)
         types = [grid_types.generate_rhs_type(grid.size) for grid in terminals.grid]
         self.RHS = multiple.generate_type_list(*types)
-        self.DiagonalOperator = matrix_types.generate_diagonal_operator_type(terminals.operator.shape)
-        self.BlockDiagonalOperator = matrix_types.generate_block_diagonal_operator_type(terminals.operator.shape)
-        self.Prolongation = matrix_types.generate_operator_type(terminals.prolongation.shape)
-        self.Restriction = matrix_types.generate_operator_type(terminals.restriction.shape)
-        self.CoarseOperator = matrix_types.generate_operator_type(terminals.coarse_operator.shape)
+        self.Prolongation = matrix_types.generate_inter_grid_operator_type(terminals.prolongation.shape)
+        self.Restriction = matrix_types.generate_inter_grid_operator_type(terminals.restriction.shape)
         self.CoarseGridSolver = matrix_types.generate_solver_type(terminals.coarse_operator.shape)
         types = [grid_types.generate_grid_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseGrid = multiple.generate_type_list(*types)
@@ -196,6 +194,7 @@ class Types:
         types = [grid_types.generate_correction_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseCorrection = multiple.generate_type_list(*types)
         self.Partitioning = partitioning.generate_any_partitioning_type()
+        self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
         self.Finished = FinishedType
         self.NotFinished = NotFinishedType
 
@@ -203,11 +202,9 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, coarsest=False):
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
-    pset.addTerminal(base.inv(system.Diagonal(terminals.operator)), types.DiagonalOperator, f'D_inv_{level}')
     pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
-    OperatorType = types.Operator
     GridType = types.Grid
     CorrectionType = types.Correction
 
@@ -267,8 +264,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
     pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
 
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), TypeWrapper(tuple)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), TypeWrapper(tuple)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
 
     if not coarsest:
 
@@ -307,7 +304,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       f'restrict_{level}')
 
 
-def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
+def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields, maximum_block_size=2,
                            coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
@@ -331,20 +328,27 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
-    relaxation_factor_range_of_values = 40
-    step_size = 2.0 / relaxation_factor_range_of_values
-    # pset.addTerminal(1.0, wrapper.TypeWrapper(float))
-    for i in range(1, relaxation_factor_range_of_values+1):
-        pset.addTerminal(i * step_size, TypeWrapper(float))
+    pset.addTerminal(1.0, TypeWrapper(float))
+    # Incorporate relaxation factors into the expression optimization
+    # relaxation_factor_range_of_values = 40
+    # step_size = 2.0 / relaxation_factor_range_of_values
+    # for i in range(1, relaxation_factor_range_of_values+1):
+    #     pset.addTerminal(i * step_size, TypeWrapper(float))
 
-    def generate_block_size(block_size, block_size_max, dimension):
-        if dimension == 1:
-            for k in range(1, block_size_max + 1):
-                pset.addTerminal(block_size + (k,), TypeWrapper(tuple))
-        else:
-            for k in range(1, block_size_max + 1):
-                generate_block_size(block_size + (k,), block_size_max, dimension-1)
-    generate_block_size((), 2, dimension)
+    block_sizes = []
+    for i in range(len(fields)):
+        block_sizes.append([])
+
+        def generate_block_size(block_size, block_size_max, dimension):
+            if dimension == 1:
+                for k in range(1, block_size_max + 1):
+                    block_sizes[-1].append(block_size + (k,))
+            else:
+                for k in range(1, block_size_max + 1):
+                    generate_block_size(block_size + (k,), block_size_max, dimension - 1)
+        generate_block_size((), maximum_block_size, dimension)
+    for block_size_permutation in itertools.product(*block_sizes):
+        pset.addTerminal(block_size_permutation, types.BlockSize)
 
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):

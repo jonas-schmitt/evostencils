@@ -455,12 +455,12 @@ class ProgramGenerator:
                     source_field = self.obtain_correct_source_field(expression.operand2, storages, i, grid.level)
                     # program += f'\t{solution_field.to_exa()} = 0\n'
                     # tmp = rhs_field.to_exa()
-                    program += f'\tgen_rhs_{self.fields[i]}@{min_level} = {source_field.to_exa()}\n'
-                    program += f'\tgen_error_{self.fields[i]}@{min_level} = 0\n'
-                program += f'\tgen_mgCycle@{min_level}()\n'
+                    program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
+                    program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
+                program += f'\tgen_mgCycle@{min_level - 1}()\n'
                 for i, grid in enumerate(expression.grid):
                     target_field = self.get_correction_field(storages, i, grid.level)
-                    program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{min_level}\n'
+                    program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{grid.level}\n'
             else:
                 raise RuntimeError("Not implemented")
         else:

@@ -14,8 +14,8 @@ settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
 knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
 # 3D Finite difference discretized Poisson
-#settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
-#knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
+# settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
+# knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
 
 # 2D Finite volume discretized Poisson
 # settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
@@ -53,6 +53,8 @@ equations = program_generator.equations
 operators = program_generator.operators
 fields = program_generator.fields
 
+block_sizes = [(1, 1), (2, 1), (2, 2)]
+
 operator, restriction, prolongation, = \
     multigrid.generate_operators_from_l2_information(equations, operators, fields, max_level, finest_grid, coarse_grid)
 solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
@@ -60,7 +62,7 @@ approximation = system.Approximation('x', solution_entries)
 rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
 rhs = system.RightHandSide('b', rhs_entries)
 residual = base.Residual(operator, approximation, rhs)
-tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, (2, 1)))
+tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, block_sizes))
 new_correction = base.Multiplication(tmp, residual)
 cycle = base.Cycle(approximation, rhs, new_correction, partitioning=part.RedBlack, weight=0.8)
 new_approximation = cycle
@@ -74,12 +76,12 @@ tmp = base.Multiplication(prolongation, tmp)
 cycle = base.Cycle(approximation, rhs, tmp)
 new_approximation = cycle
 new_residual = base.Residual(operator, new_approximation, rhs)
-tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, (2, 1)))
+tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, block_sizes))
 new_correction = base.Multiplication(tmp, new_residual)
 new_cycle = base.Cycle(new_approximation, rhs, new_correction, partitioning=part.RedBlack, weight=0.8)
 new_approximation = new_cycle
 new_residual = base.Residual(operator, new_approximation, rhs)
-tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, (1, 2)))
+tmp = base.Inverse(smoother.generate_collective_block_jacobi(operator, block_sizes))
 new_correction = base.Multiplication(tmp, new_residual)
 new_cycle = base.Cycle(new_approximation, rhs, new_correction, partitioning=part.RedBlack, weight=0.8)
 storages = program_generator.generate_storage(min_level, max_level, finest_grid)
