@@ -10,7 +10,7 @@ class Expression(abc.ABC):
     def __init__(self):
         self.iteration_matrix = None
         self.lfa_symbol = None
-        self.storage = None
+        self.valid = False
         self.runtime = None
         self.program = None
         self.evaluate = True

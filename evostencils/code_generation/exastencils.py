@@ -246,15 +246,13 @@ class ProgramGenerator:
     def needs_storage(expression: base.Expression):
         return expression.shape[1] == 1
 
-    # Warning: This function modifies the expression passed to it
-    @staticmethod
-    def assign_storage_to_subexpressions(expression: base.Expression, storages: [CycleStorage], i: int):
-        if expression.storage is not None:
-            return None
-
-    def obtain_correct_source_field(self, expression, storages, i, level):
+    def obtain_correct_source_field(self, expression, storages, i, level, max_level):
         if isinstance(expression, system.Approximation) or isinstance(expression, base.Cycle):
-            return self.get_solution_field(storages, i, level)
+            if level < max_level:
+                solution_field = self.get_correction_field(storages, i, level)
+            else:
+                solution_field = self.get_solution_field(storages, i, level)
+            return solution_field
         elif isinstance(expression, base.Residual):
             return self.get_residual_field(storages, i, level)
         elif isinstance(expression, system.RightHandSide):
@@ -263,10 +261,14 @@ class ProgramGenerator:
             return self.get_correction_field(storages, i, level)
 
     @staticmethod
-    def generate_solve_locally(key, value, indentation):
+    def generate_solve_locally(key, value, indentation, max_level):
         program = ''
         rhs = f'{value[1]}@['
-        unknown = f'{key[0]}@{key[1]}@['
+        if key[1] < max_level:
+            unknown = f'gen_error_'
+        else:
+            unknown = ''
+        unknown += f'{key[0]}@{key[1]}@['
         for offset in key[2][:-1]:
             unknown += f'{offset}, '
             rhs += f'{offset}, '
@@ -277,6 +279,11 @@ class ProgramGenerator:
             tokens = symbol.name.split('_')
             if tokens[-1] == 'new':
                 transformed_equation = transformed_equation.subs(symbol, sympy.Symbol(tokens[0]))
+        if key[1] < max_level:
+            tmp = transformed_equation
+            for symbol in transformed_equation.free_symbols:
+                tmp = tmp.subs(symbol, sympy.Symbol(f'gen_error_{symbol.name}'))
+            transformed_equation = tmp
         program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
 
@@ -285,6 +292,7 @@ class ProgramGenerator:
         # if expression.program is not None:
         #     return expression.program
         program = ''
+        # expression.valid = False
         if isinstance(expression, base.Cycle):
             weight = expression.weight
             # Hack to change the weights after generation
@@ -293,25 +301,36 @@ class ProgramGenerator:
                 weight = f'omega_{expression.global_id}'
 
             correction = expression.correction
-            if isinstance(expression.approximation, system.ZeroApproximation):
-                for i, grid in enumerate(expression.grid):
-                    solution_field = self.get_solution_field(storages, i, grid.level)
-                    program += f'\t{solution_field.to_exa()} = 0\n'
             if isinstance(correction, base.Residual):
+                if not isinstance(expression.correction.rhs, system.RightHandSide) and not expression.rhs.valid:
+                    program += self.generate_multigrid(expression.rhs, storages, min_level, max_level,
+                                                       use_global_weights)
+                    expression.rhs.valid = True
                 if not isinstance(expression.correction.approximation, system.Approximation):
                     program += self.generate_multigrid(expression.approximation, storages, min_level, max_level,
                                                        use_global_weights)
-                if not isinstance(expression.correction.rhs, system.RightHandSide):
-                    program += self.generate_multigrid(expression.rhs, storages, min_level, max_level,
-                                                       use_global_weights)
+                if isinstance(expression.approximation, system.ZeroApproximation):
+                    for i, grid in enumerate(expression.grid):
+                        if grid.level < max_level:
+                            solution_field = self.get_correction_field(storages, i, grid.level)
+                        else:
+                            solution_field = self.get_solution_field(storages, i, grid.level)
+                        program += f'\t{solution_field.to_exa()} = 0\n'
                 for i, grid in enumerate(expression.grid):
                     level = grid.level
-                    solution_field = self.get_solution_field(storages, i, level)
+                    if grid.level < max_level:
+                        solution_field = self.get_correction_field(storages, i, grid.level)
+                    else:
+                        solution_field = self.get_solution_field(storages, i, grid.level)
                     rhs_field = self.get_rhs_field(storages, i, level)
                     operator = correction.operator
                     program += f'\t{solution_field.to_exa()} += {weight} * ({rhs_field.to_exa()}'
                     for j, entry in enumerate(operator.entries[i]):
-                        field = self.get_solution_field(storages, j, level)
+
+                        if grid.level < max_level:
+                            field = self.get_correction_field(storages, i, grid.level)
+                        else:
+                            field = self.get_solution_field(storages, i, grid.level)
                         if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
                             program += f' - '
                             op = entry.operand
@@ -334,8 +353,10 @@ class ProgramGenerator:
                     program += self.generate_multigrid(correction.operand2, storages, min_level, max_level,
                                                        use_global_weights)
                     for i, grid in enumerate(expression.grid):
-                        level = grid.level
-                        solution_field = self.get_solution_field(storages, i, level)
+                        if grid.level < max_level:
+                            solution_field = self.get_correction_field(storages, i, grid.level)
+                        else:
+                            solution_field = self.get_solution_field(storages, i, grid.level)
                         operator = correction.operand1
                         entry = operator.entries[i][i]
                         if isinstance(entry, base.Prolongation):
@@ -344,17 +365,25 @@ class ProgramGenerator:
                             op_level = entry.fine_grid.level
                         else:
                             raise RuntimeError("Unexpected entry")
-                        source_field = self.obtain_correct_source_field(correction.operand2, storages, i, op_level)
+                        source_field = self.obtain_correct_source_field(correction.operand2, storages, i, op_level, max_level)
                         program += f'\t{solution_field.to_exa()} += {weight} * ({entry.name}@{op_level} * ' \
                                    f'{source_field.to_exa()})\n'
                 elif isinstance(correction.operand1, base.Inverse):
                     residual = correction.operand2
+                    if not isinstance(residual.rhs, system.RightHandSide) and not residual.rhs.valid:
+                        program += self.generate_multigrid(residual.rhs, storages, min_level, max_level,
+                                                           use_global_weights)
+                        residual.rhs.valid = True
                     if not isinstance(residual.approximation, system.Approximation):
                         program += self.generate_multigrid(residual.approximation, storages, min_level, max_level,
                                                            use_global_weights)
-                    if not isinstance(residual.rhs, system.RightHandSide):
-                        program += self.generate_multigrid(residual.rhs, storages, min_level, max_level,
-                                                           use_global_weights)
+                    if isinstance(expression.approximation, system.ZeroApproximation):
+                        for i, grid in enumerate(expression.grid):
+                            if grid.level < max_level:
+                                solution_field = self.get_correction_field(storages, i, grid.level)
+                            else:
+                                solution_field = self.get_solution_field(storages, i, grid.level)
+                            program += f'\t{solution_field.to_exa()} = 0\n'
                     smoothing_operator = correction.operand1.operand
                     system_operator = correction.operand2.operator
                     equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
@@ -372,8 +401,11 @@ class ProgramGenerator:
                                     program += ' + '
                             program += ') % 2),\n'
                             indentation += '\t'
-                        program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
-                        program += self.generate_solve_locally(key, value, indentation)
+                        if key[1] < max_level:
+                            program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
+                        else:
+                            program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
+                        program += self.generate_solve_locally(key, value, indentation, max_level)
                         program += f'\t{indentation}}}\n'
                         if coloring:
                             program += '\t}\n'
@@ -390,9 +422,13 @@ class ProgramGenerator:
                                     program += ' + '
                             program += ') % 2),\n'
                             indentation += '\t'
-                        program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                        level = dependent_equations[0][0][1]
+                        if level < max_level:
+                            program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                        else:
+                            program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
                         for key, value in dependent_equations:
-                            program += self.generate_solve_locally(key, value, indentation)
+                            program += self.generate_solve_locally(key, value, indentation, max_level)
                         program += f'\t{indentation}}}\n'
                         if coloring:
                             program += '\t}\n'
@@ -401,10 +437,18 @@ class ProgramGenerator:
             else:
                 raise RuntimeError("Expected multiplication")
         elif isinstance(expression, base.Residual):
-            if not isinstance(expression.approximation, system.Approximation):
-                program += self.generate_multigrid(expression.approximation, storages, min_level, max_level, use_global_weights)
             if not isinstance(expression.rhs, system.RightHandSide):
                 program += self.generate_multigrid(expression.rhs, storages, min_level, max_level, use_global_weights)
+                expression.rhs.valid = True
+            if not isinstance(expression.approximation, system.Approximation):
+                program += self.generate_multigrid(expression.approximation, storages, min_level, max_level, use_global_weights)
+            if isinstance(expression.approximation, system.ZeroApproximation):
+                for i, grid in enumerate(expression.grid):
+                    if grid.level < max_level:
+                        solution_field = self.get_correction_field(storages, i, grid.level)
+                    else:
+                        solution_field = self.get_solution_field(storages, i, grid.level)
+                    program += f'\t{solution_field.to_exa()} = 0\n'
             for i, grid in enumerate(expression.grid):
                 level = grid.level
                 residual_field = self.get_residual_field(storages, i, level)
@@ -412,7 +456,10 @@ class ProgramGenerator:
                 operator = expression.operator
                 program += f'\t{residual_field.to_exa()} = {rhs_field.to_exa()}'
                 for j, entry in enumerate(operator.entries[i]):
-                    field = self.get_solution_field(storages, j, level)
+                    if grid.level < max_level:
+                        field = self.get_correction_field(storages, i, grid.level)
+                    else:
+                        field = self.get_solution_field(storages, i, grid.level)
                     if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
                         program += f' - '
                         op = entry.operand
@@ -443,8 +490,11 @@ class ProgramGenerator:
                         op_level = entry.fine_grid.level
                     else:
                         raise RuntimeError("Unexpected entry")
-                    source_field = self.obtain_correct_source_field(expression.operand2, storages, i, op_level)
-                    target_field = self.get_correction_field(storages, i, grid.level)
+                    source_field = self.obtain_correct_source_field(expression.operand2, storages, i, op_level, max_level)
+                    if isinstance(operator, system.Restriction):
+                        target_field = self.get_rhs_field(storages, i, grid.level)
+                    else:
+                        target_field = self.get_correction_field(storages, i, grid.level)
                     program += f'\t{target_field.to_exa()} = {entry.name}@{op_level} * ' \
                                f'{source_field.to_exa()}\n'
             elif isinstance(expression.operand1, base.CoarseGridSolver):
@@ -452,15 +502,31 @@ class ProgramGenerator:
                 for i, grid in enumerate(expression.operand2.grid):
                     # solution_field = self.get_solution_field(storages, i, grid.level)
                     # rhs_field = self.get_rhs_field(storages, i, grid.level)
-                    source_field = self.obtain_correct_source_field(expression.operand2, storages, i, grid.level)
+                    source_field = self.get_rhs_field(storages, i, grid.level)
                     # program += f'\t{solution_field.to_exa()} = 0\n'
                     # tmp = rhs_field.to_exa()
-                    program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
-                    program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
+                    if grid.level == self.min_level:
+                        program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
+                        program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
+                    else:
+
+                        if grid.level < max_level:
+                            solution_field = self.get_correction_field(storages, i, grid.level)
+                        else:
+                            solution_field = self.get_solution_field(storages, i, grid.level)
+                        program += f'\t{solution_field.to_exa()} = 0\n'
                 program += f'\tgen_mgCycle@{min_level - 1}()\n'
                 for i, grid in enumerate(expression.grid):
                     target_field = self.get_correction_field(storages, i, grid.level)
-                    program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{grid.level}\n'
+                    if grid.level == self.min_level:
+                        pass
+                        # program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{grid.level}\n'
+                    else:
+                        if grid.level < max_level:
+                            solution_field = self.get_correction_field(storages, i, grid.level)
+                        else:
+                            solution_field = self.get_solution_field(storages, i, grid.level)
+                        program += f'\t{target_field.to_exa()} = {solution_field.to_exa()}\n'
             else:
                 raise RuntimeError("Not implemented")
         else:
@@ -476,7 +542,7 @@ class ProgramGenerator:
                 solution.valid = False
                 correction.valid = False
 
-    def generate_l3_file(self, program, min_level):
+    def generate_l3_file(self, program):
         l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
         subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -485,7 +551,7 @@ class ProgramGenerator:
                 line = input_file.readline()
                 while line:
                     # TODO perform this check in a more accurate way
-                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{min_level-1}' not in line)\
+                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{self.min_level}' not in line)\
                             or 'Function InitFields' in line:
                         while line and line[0] is not '}':
                             line = input_file.readline()
@@ -494,7 +560,7 @@ class ProgramGenerator:
                     line = input_file.readline()
                 output_file.write(program)
 
-    def generate_level_adapted_knowledge_file(self, min_level: int, max_level: int):
+    def generate_level_adapted_knowledge_file(self, max_level: int):
         base_path = self.base_path
         relative_input_file_path = self.knowledge_path
         relative_output_file_path = f'{self.knowledge_path}.tmp'
@@ -504,7 +570,7 @@ class ProgramGenerator:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'minLevel':
-                        output_file.write(f'{lhs}\t= {min_level}\n')
+                        output_file.write(f'{lhs}\t= {self.min_level}\n')
                     elif lhs == 'maxLevel':
                         output_file.write(f'{lhs}\t= {max_level}\n')
                     else:

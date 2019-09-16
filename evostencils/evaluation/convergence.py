@@ -5,6 +5,7 @@ import evostencils.stencils.constant as constant
 from evostencils.expressions import base, system, partitioning
 from multiprocessing import Process, Queue
 
+
 @periodic.convert_constant_stencils
 def stencil_to_lfa(stencil: periodic.Stencil, grid):
     def recursive_descent(array, dimension):
@@ -35,8 +36,11 @@ class ConvergenceEvaluator:
     def lfa_grids(self):
         return self._lfa_grids
 
-    def set_grids(self, new_lfa_grids):
+    def set_lfa_grids(self, new_lfa_grids):
         self._lfa_grids = new_lfa_grids
+
+    def reinitialize_lfa_grids(self, finest_grid):
+        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.step_size) for g in finest_grid]
 
     @property
     def coarsening_factors(self):

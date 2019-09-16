@@ -9,6 +9,7 @@ from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST
 import evostencils.optimization.weights as weights
 from evostencils.types import level_control
+import math
 
 
 # Define a context manager to suppress stdout and stderr.
@@ -296,7 +297,6 @@ class Optimizer:
         best_expression = None
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
-        storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         solver_program = ""
         if restart_from_checkpoint and os.path.isfile(checkpoint_file_path):
             try:
@@ -321,6 +321,7 @@ class Optimizer:
                 elif min_level > checkpoint.min_level:
                     continue
             approximation = approximations[i]
+            # self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
             rhs = right_hand_sides[i]
             pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
                                                                    max_level, self.equations, self.operators, self.fields,
@@ -333,35 +334,53 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
 
-            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+            pop, log, hof = self.nsgaII(2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                         gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                         checkpoint_frequency=5, checkpoint=tmp)
 
             pops.append(pop)
 
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+            def key_function(ind):
+                rho = ind.fitness.values[0]
+                if rho < 1.0:
+                    retval = math.log(self.epsilon) / math.log(rho) * ind.fitness.values[1]
+                    return retval
+                else:
+                    return rho * self.infinity
+            hof = sorted(hof, key=key_function)
             best_time = self.infinity
             best_individual = hof[0]
-            for j in range(0, min(50, len(hof))):
+            # for j in range(0, min(50, len(hof))):
+            for j in range(0, min(10, len(hof))):
+                if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
+                        abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
+                    continue
                 individual = hof[j]
                 expression = self.compile_individual(individual, pset)[0]
                 cycle_function = self._program_generator.generate_cycle_function(expression, storages, min_level, max_level)
-                self._program_generator.generate_level_adapted_knowledge_file(min_level, max_level)
-                self._program_generator.run_exastencils_compiler()
-                self._program_generator.generate_l3_file(solver_program + cycle_function, min_level)
-                self._program_generator.run_c_compiler()
-                self._program_generator.restore_files()
-                time, convergence_factor = self._program_generator.evaluate(number_of_samples=1)
-                print(f'Time: {time}, Convergence factor: {convergence_factor}')
-                individual.fitness.values = convergence_factor, individual.fitness.values[1]
-                if time < best_time:
-                    best_individual = individual
-                    best_time = time
+                try:
+                    self._program_generator.generate_level_adapted_knowledge_file(max_level)
+                    self._program_generator.run_exastencils_compiler()
+                    self._program_generator.generate_l3_file(solver_program + cycle_function)
+                    self._program_generator.run_exastencils_compiler()
+                    self._program_generator.run_c_compiler()
+                    time, convergence_factor = self._program_generator.evaluate(number_of_samples=5)
+                    print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
+                          f'Measured convergence factor: {convergence_factor}')
+                    print(cycle_function)
+                    individual.fitness.values = (convergence_factor, individual.fitness.values[1])
+                    if time < best_time and convergence_factor < required_convergence:
+                        best_individual = individual
+                        best_time = time
+                    self._program_generator.restore_files()
+                except Exception as e:
+                    self._program_generator.restore_files()
+                    raise e
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
-            #program = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
-            cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level, max_level)
+            cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
+                                                                             self.max_level)
             solver_program += cycle_function
             print(solver_program)
             best_expression.evaluate = False
