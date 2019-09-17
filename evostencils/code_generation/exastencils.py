@@ -168,8 +168,8 @@ class ProgramGenerator:
         offset = max_level - level
         return storages[offset].correction[index]
 
-    def generate_cycle_function(self, expression, storages, min_level, max_level, use_global_weights=False):
-        program = f'Function gen_mgCycle@{max_level} {{\n'
+    def generate_cycle_function(self, expression, storages, min_level, max_level_run, max_level, use_global_weights=False):
+        program = f'Function gen_mgCycle@{max_level_run} {{\n'
         program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
         program += '}\n'
         return program

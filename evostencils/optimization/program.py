@@ -351,13 +351,15 @@ class Optimizer:
             best_time = self.infinity
             best_individual = hof[0]
             # for j in range(0, min(50, len(hof))):
-            for j in range(0, min(10, len(hof))):
+            for j in range(0, min(3, len(hof))):
                 if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
                         abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
                     continue
                 individual = hof[j]
+                if individual.fitness.values[0] > 1.0:
+                    continue
                 expression = self.compile_individual(individual, pset)[0]
-                cycle_function = self._program_generator.generate_cycle_function(expression, storages, min_level, max_level)
+                cycle_function = self._program_generator.generate_cycle_function(expression, storages, min_level, max_level, max_level)
                 try:
                     self._program_generator.generate_level_adapted_knowledge_file(max_level)
                     self._program_generator.run_exastencils_compiler()
@@ -367,7 +369,7 @@ class Optimizer:
                     time, convergence_factor = self._program_generator.evaluate(number_of_samples=5)
                     print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
                           f'Measured convergence factor: {convergence_factor}')
-                    print(cycle_function)
+                    # print(cycle_function)
                     individual.fitness.values = (convergence_factor, individual.fitness.values[1])
                     if time < best_time and convergence_factor < required_convergence:
                         best_individual = individual
@@ -380,7 +382,7 @@ class Optimizer:
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
-                                                                             self.max_level)
+                                                                             max_level, self.max_level)
             solver_program += cycle_function
             print(solver_program)
             best_expression.evaluate = False
