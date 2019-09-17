@@ -80,8 +80,8 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    maximum_block_size = 2
-    pops, stats = optimizer.default_optimization(gp_mu=40, gp_lambda=40, gp_generations=50, es_generations=20,
+    maximum_block_size = 3
+    pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20, es_generations=20,
                                                  maximum_block_size=maximum_block_size,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
