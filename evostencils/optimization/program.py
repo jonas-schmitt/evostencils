@@ -94,8 +94,9 @@ class Optimizer:
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
-        # self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
+        self._toolbox.register("mate", gp.cxOnePoint)
+        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
+        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
         self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
         # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
@@ -322,8 +323,10 @@ class Optimizer:
                 elif min_level > checkpoint.min_level:
                     continue
             approximation = approximations[i]
-            # Not clear if needed
+
+            # Not entirely clear if needed
             self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
+
             rhs = right_hand_sides[i]
             pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
                                                                    max_level, self.equations, self.operators, self.fields,
@@ -354,8 +357,6 @@ class Optimizer:
             self._program_generator._counter = 0
             self._program_generator._average_generation_time = 0
             try:
-                self._program_generator.generate_level_adapted_knowledge_file(max_level)
-                self._program_generator.run_exastencils_compiler()
                 for j in range(0, min(50, len(hof))):
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
                             abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
