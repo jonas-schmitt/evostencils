@@ -4,6 +4,7 @@ import os
 import subprocess
 import math
 import sympy
+import time
 
 
 class CycleStorage:
@@ -29,6 +30,8 @@ class Field:
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
                  platform='linux'):
+        self._average_generation_time = 0
+        self._counter = 0
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
         self._knowledge_path = knowledge_path
@@ -177,13 +180,22 @@ class ProgramGenerator:
 
         current_path = os.getcwd()
         os.chdir(self.base_path)
-        result = subprocess.run(['java', '-cp',
-                                 self.absolute_compiler_path, 'Main',
-                                 f'{self.base_path}/{self.settings_path}',
-                                 f'{self.base_path}/{self.knowledge_path}',
-                                 f'{self.base_path}/lib/{self.platform}.platform'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
+        if self._counter == 0:
+            timeout = None
+        else:
+            timeout = 10 * self._average_generation_time
+            if self._counter < 5:
+                timeout = 1.5 * timeout - self._counter * self._average_generation_time
+        try:
+            result = subprocess.run(['java', '-cp',
+                                     self.absolute_compiler_path, 'Main',
+                                     f'{self.base_path}/{self.settings_path}',
+                                     f'{self.base_path}/{self.knowledge_path}',
+                                     f'{self.base_path}/lib/{self.platform}.platform'],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                    timeout=timeout)
+        except subprocess.TimeoutExpired as e:
+            raise e
         os.chdir(current_path)
         if result.returncode != 0:
             print(result.stderr.decode('utf8'))
@@ -191,6 +203,7 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self):
+
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.base_path}/{self.output_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
@@ -221,14 +234,31 @@ class ProgramGenerator:
     def generate_and_evaluate(self, expression, storages, min_level, max_level, solver_program,
                               infinity=1e100, number_of_samples=1, only_weights_adapted=False):
         self.generate_level_adapted_knowledge_file(max_level)
-        self.run_exastencils_compiler()
+        if self._counter == 0:
+            start_time = time.time()
+            self.run_exastencils_compiler()
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            self._counter += 1
+            self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
+        else:
+            self.run_exastencils_compiler()
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, max_level)
         self.generate_l3_file(solver_program + cycle_function)
-        self.run_exastencils_compiler()
+        try:
+            start_time = time.time()
+            self.run_exastencils_compiler()
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+        except subprocess.TimeoutExpired:
+            self.restore_files()
+            return infinity, infinity
+        self._counter += 1
+        self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         self.run_c_compiler()
-        time, convergence_factor = self.evaluate(infinity, number_of_samples, only_weights_adapted)
+        runtime, convergence_factor = self.evaluate(infinity, number_of_samples, only_weights_adapted)
         self.restore_files()
-        return time, convergence_factor
+        return runtime, convergence_factor
 
     @staticmethod
     def parse_output(output: str):
@@ -319,26 +349,17 @@ class ProgramGenerator:
                                                        use_global_weights)
                 if isinstance(expression.approximation, system.ZeroApproximation):
                     for i, grid in enumerate(expression.grid):
-                        if grid.level < max_level:
-                            solution_field = self.get_correction_field(storages, i, grid.level)
-                        else:
-                            solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         program += f'\t{solution_field.to_exa()} = 0\n'
                 for i, grid in enumerate(expression.grid):
                     level = grid.level
-                    if grid.level < max_level:
-                        solution_field = self.get_correction_field(storages, i, grid.level)
-                    else:
-                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                    solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                     rhs_field = self.get_rhs_field(storages, i, level)
                     operator = correction.operator
                     program += f'\t{solution_field.to_exa()} += {weight} * ({rhs_field.to_exa()}'
                     for j, entry in enumerate(operator.entries[i]):
 
-                        if grid.level < max_level:
-                            field = self.get_correction_field(storages, i, grid.level)
-                        else:
-                            field = self.get_solution_field(storages, i, grid.level, max_level)
+                        field = self.get_solution_field(storages, j, grid.level, max_level)
                         if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
                             program += f' - '
                             op = entry.operand
@@ -361,10 +382,7 @@ class ProgramGenerator:
                     program += self.generate_multigrid(correction.operand2, storages, min_level, max_level,
                                                        use_global_weights)
                     for i, grid in enumerate(expression.grid):
-                        if grid.level < max_level:
-                            solution_field = self.get_correction_field(storages, i, grid.level)
-                        else:
-                            solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         operator = correction.operand1
                         entry = operator.entries[i][i]
                         if isinstance(entry, base.Prolongation):
@@ -387,10 +405,7 @@ class ProgramGenerator:
                                                            use_global_weights)
                     if isinstance(expression.approximation, system.ZeroApproximation):
                         for i, grid in enumerate(expression.grid):
-                            if grid.level < max_level:
-                                solution_field = self.get_correction_field(storages, i, grid.level)
-                            else:
-                                solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                            solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                             program += f'\t{solution_field.to_exa()} = 0\n'
                     smoothing_operator = correction.operand1.operand
                     system_operator = correction.operand2.operator
@@ -452,10 +467,7 @@ class ProgramGenerator:
                 program += self.generate_multigrid(expression.approximation, storages, min_level, max_level, use_global_weights)
             if isinstance(expression.approximation, system.ZeroApproximation):
                 for i, grid in enumerate(expression.grid):
-                    if grid.level < max_level:
-                        solution_field = self.get_correction_field(storages, i, grid.level)
-                    else:
-                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                    solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                     program += f'\t{solution_field.to_exa()} = 0\n'
             for i, grid in enumerate(expression.grid):
                 level = grid.level
@@ -464,10 +476,7 @@ class ProgramGenerator:
                 operator = expression.operator
                 program += f'\t{residual_field.to_exa()} = {rhs_field.to_exa()}'
                 for j, entry in enumerate(operator.entries[i]):
-                    if grid.level < max_level:
-                        field = self.get_correction_field(storages, i, grid.level)
-                    else:
-                        field = self.get_solution_field(storages, i, grid.level, max_level)
+                    field = self.get_solution_field(storages, j, grid.level, max_level)
                     if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
                         program += f' - '
                         op = entry.operand
@@ -517,11 +526,7 @@ class ProgramGenerator:
                         program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
                         program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
                     else:
-
-                        if grid.level < max_level:
-                            solution_field = self.get_correction_field(storages, i, grid.level)
-                        else:
-                            solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         program += f'\t{solution_field.to_exa()} = 0\n'
                 program += f'\tgen_mgCycle@{min_level - 1}()\n'
                 for i, grid in enumerate(expression.grid):
@@ -530,10 +535,7 @@ class ProgramGenerator:
                         pass
                         # program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{grid.level}\n'
                     else:
-                        if grid.level < max_level:
-                            solution_field = self.get_correction_field(storages, i, grid.level)
-                        else:
-                            solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                        solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         program += f'\t{target_field.to_exa()} = {solution_field.to_exa()}\n'
             else:
                 raise RuntimeError("Not implemented")

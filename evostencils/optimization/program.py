@@ -322,6 +322,7 @@ class Optimizer:
                 elif min_level > checkpoint.min_level:
                     continue
             approximation = approximations[i]
+            # Not clear if needed
             self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
             rhs = right_hand_sides[i]
             pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
@@ -335,7 +336,7 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
 
-            pop, log, hof = self.nsgaII(2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                         gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                         checkpoint_frequency=5, checkpoint=tmp)
 
@@ -350,6 +351,8 @@ class Optimizer:
             hof = sorted(hof, key=estimated_solving_time)
             best_time = self.infinity
             best_individual = hof[0]
+            self._program_generator._counter = 0
+            self._program_generator._average_generation_time = 0
             try:
                 self._program_generator.generate_level_adapted_knowledge_file(max_level)
                 self._program_generator.run_exastencils_compiler()
@@ -361,6 +364,7 @@ class Optimizer:
                     if individual.fitness.values[0] > 1.0:
                         break
                     expression = self.compile_individual(individual, pset)[0]
+
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=5)

@@ -179,11 +179,6 @@ class ConvergenceEvaluator:
         return result
 
     def compute_spectral_radius(self, iteration_matrix: base.Expression):
-
-        #lfa_expression = self.transform(iteration_matrix)
-        #s = lfa_expression.symbol()
-        #spectral_radius = s.spectral_radius()
-        #return spectral_radius
         try:
             lfa_expression = self.transform(iteration_matrix)
 

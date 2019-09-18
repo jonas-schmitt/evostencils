@@ -16,8 +16,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -32,8 +32,8 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite difference discretized Stokes
     # settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
@@ -80,8 +80,8 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    maximum_block_size = 3
-    pops, stats = optimizer.default_optimization(gp_mu=20, gp_lambda=20, gp_generations=20, es_generations=20,
+    maximum_block_size = 2
+    pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=100, es_generations=20,
                                                  maximum_block_size=maximum_block_size,
                                                  required_convergence=required_convergence,
                                                  restart_from_checkpoint=restart_from_checkpoint)
