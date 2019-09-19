@@ -81,10 +81,17 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     maximum_block_size = 2
-    pops, stats = optimizer.default_optimization(gp_mu=200, gp_lambda=200, gp_generations=100, es_generations=20,
-                                                 maximum_block_size=maximum_block_size,
-                                                 required_convergence=required_convergence,
-                                                 restart_from_checkpoint=restart_from_checkpoint)
+    program, pops, stats = optimizer.default_optimization(gp_mu=500, gp_lambda=500, gp_generations=100, es_generations=100,
+                                                          maximum_block_size=maximum_block_size,
+                                                          required_convergence=required_convergence,
+                                                          restart_from_checkpoint=restart_from_checkpoint)
+    program_generator.generate_level_adapted_knowledge_file(max_level)
+    program_generator.generate_l3_file(program)
+    program_generator.run_exastencils_compiler()
+    program_generator.run_c_compiler()
+    runtime, convergence_factor = program_generator.evaluate(infinity, 10)
+    print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n')
+    print(f'ExaSlang representation:\n{program}\n')
     log_dir_name = f'{problem_name}/data'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
@@ -96,7 +103,7 @@ def main():
         # optimizer.plot_minimum_fitness(log)
     # for pop in pops:
     #    optimizer.plot_pareto_front(pop)
-
+    program_generator.restore_files()
 
 if __name__ == "__main__":
     main()

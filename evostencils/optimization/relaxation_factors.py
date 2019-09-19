@@ -21,7 +21,7 @@ def reset_status(expression: base.Expression):
         reset_status(expression.operand2)
 
 
-def set_weights(expression: base.Expression, weights: list) -> list:
+def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, base.Cycle):
         if expression.iteration_matrix is not None:
             expression.iteration_matrix = None
@@ -37,20 +37,20 @@ def set_weights(expression: base.Expression, weights: list) -> list:
             expression.global_id = len(tail)
         else:
             tail = weights
-        return set_weights(expression.correction, tail)
+        return set_relaxation_factors(expression.correction, tail)
     elif isinstance(expression, base.Residual):
-        tail = set_weights(expression.rhs, weights)
-        return set_weights(expression.approximation, tail)
+        tail = set_relaxation_factors(expression.rhs, weights)
+        return set_relaxation_factors(expression.approximation, tail)
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
-        return set_weights(expression.operand, weights)
+        return set_relaxation_factors(expression.operand, weights)
     elif isinstance(expression, base.BinaryExpression):
-        tail = set_weights(expression.operand1, weights)
-        return set_weights(expression.operand2, tail)
+        tail = set_relaxation_factors(expression.operand1, weights)
+        return set_relaxation_factors(expression.operand2, tail)
     else:
         return weights
 
 
-def obtain_weights(expression: base.Expression) -> list:
+def obtain_relaxation_factors(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, base.Cycle):
         # Hack to change the weights after generation
@@ -60,24 +60,24 @@ def obtain_weights(expression: base.Expression) -> list:
         if not expression.weight_obtained:
             weights.append(expression.weight)
             expression.weight_obtained = True
-            weights.extend(obtain_weights(expression.correction))
+            weights.extend(obtain_relaxation_factors(expression.correction))
         return weights
     elif isinstance(expression, base.Residual):
-        weights.extend(obtain_weights(expression.rhs))
-        weights.extend(obtain_weights(expression.approximation))
+        weights.extend(obtain_relaxation_factors(expression.rhs))
+        weights.extend(obtain_relaxation_factors(expression.approximation))
         return weights
     elif isinstance(expression, base.UnaryExpression) or isinstance(expression, base.Scaling):
-        weights.extend(obtain_weights(expression.operand))
+        weights.extend(obtain_relaxation_factors(expression.operand))
         return weights
     elif isinstance(expression, base.BinaryExpression):
-        weights.extend(obtain_weights(expression.operand1))
-        weights.extend(obtain_weights(expression.operand2))
+        weights.extend(obtain_relaxation_factors(expression.operand1))
+        weights.extend(obtain_relaxation_factors(expression.operand2))
         return weights
     else:
         return weights
 
 
-def restrict_weights(weights, minimum, maximum):
+def restrict_relaxation_factors(weights, minimum, maximum):
     for i, w in enumerate(weights):
         if w < minimum:
             weights[i] = minimum
@@ -88,29 +88,28 @@ def restrict_weights(weights, minimum, maximum):
 class Optimizer:
     def __init__(self, gp_optimizer):
         creator.create("FitnessMin", deap.base.Fitness, weights=(-1.0,))
-        creator.create("Weights", list, fitness=creator.FitnessMin)
+        creator.create("RelaxationFactors", list, fitness=creator.FitnessMin)
         self._toolbox = deap.base.Toolbox()
         self._gp_optimizer = gp_optimizer
 
-    def optimize(self, expression: base.Expression, problem_size, generations, base_program=None, storages=None):
+    def optimize(self, expression: base.Expression, problem_size, generations, storages=None):
         def evaluate(weights):
-            tail = set_weights(expression, weights)
+            tail = set_relaxation_factors(expression, weights)
             reset_status(expression)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
             generator = self._gp_optimizer.program_generator
-            if generator is not None and generator.compiler_available and base_program is not None and \
+            if generator is not None and generator.compiler_available and \
                     storages is not None:
                 # evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
                 # generator.write_program_to_file(evaluation_program)
                 generator.generate_global_weight_initializations(weights)
-                _, convergence_factor = generator.evaluate(only_weights_adapted=True)
+                generator.run_c_compiler()
+                _, convergence_factor = generator.evaluate()
                 generator.restore_global_initializations()
-                generator.invalidate_storages(storages)
                 return convergence_factor,
             else:
-                iteration_matrix = transformations.get_iteration_matrix(expression)
-                spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(iteration_matrix)
+                spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(expression)
                 if spectral_radius == 0.0:
                     return self._gp_optimizer.infinity,
                 else:
@@ -123,9 +122,12 @@ class Optimizer:
         stats.register("std", numpy.std)
         stats.register("min", numpy.min)
         stats.register("max", numpy.max)
-        self._toolbox.register("generate", strategy.generate, creator.Weights)
+        self._toolbox.register("generate", strategy.generate, creator.RelaxationFactors)
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
+        generator = self._gp_optimizer.program_generator
+        generator.run_exastencils_compiler()
         algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
+        generator.restore_files()
         return hof[0]
 

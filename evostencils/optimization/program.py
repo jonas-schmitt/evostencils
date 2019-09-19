@@ -7,7 +7,7 @@ import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST
-import evostencils.optimization.weights as weights
+import evostencils.optimization.relaxation_factors as weights
 from evostencils.types import level_control
 import math
 
@@ -381,6 +381,7 @@ class Optimizer:
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
             best_expression = self.compile_individual(best_individual, pset)[0]
+            self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function
@@ -389,21 +390,22 @@ class Optimizer:
             self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)
 
-        return pops, logbooks
+        return solver_program, pops, logbooks
 
-    def optimize_weights(self, expression, generations, base_program=None, storages=None):
+    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
-        initial_weights = weights.obtain_weights(expression)
-        weights.set_weights(expression, initial_weights)
+        initial_weights = weights.obtain_relaxation_factors(expression)
+        weights.set_relaxation_factors(expression, initial_weights)
         weights.reset_status(expression)
         n = len(initial_weights)
         if base_program is not None and storages is not None:
-            tmp = base_program + self.program_generator.generate_global_weights(n)
-            evaluation_program = tmp + self.program_generator.generate_cycle_function(expression, storages,
-                                                                                      use_global_weights=True)
-            self.program_generator.write_program_to_file(evaluation_program)
+            self.program_generator.generate_level_adapted_knowledge_file(max_level)
             self.program_generator.run_exastencils_compiler()
-        best_individual = self._weight_optimizer.optimize(expression, n, generations, base_program, storages)
+            tmp = base_program + self.program_generator.generate_global_weights(n)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(tmp + cycle_function)
+        best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
         # print(best_weights)

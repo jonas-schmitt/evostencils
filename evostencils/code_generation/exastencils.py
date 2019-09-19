@@ -121,6 +121,15 @@ class ProgramGenerator:
     def max_level(self):
         return self._max_level
 
+    @staticmethod
+    def generate_global_weights(n):
+        # Hack to change the weights after generation
+        program = 'Globals {\n'
+        for i in range(0, n):
+            program += f'\tVar omega_{i} : Real = 1.0\n'
+        program += '}\n'
+        return program
+
     def generate_global_weight_initializations(self, weights):
         # Hack to change the weights after generation
         weights = reversed(weights)
@@ -208,14 +217,7 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
-    def evaluate(self, infinity=1e100, number_of_samples=1, only_weights_adapted=False):
-        if not only_weights_adapted:
-            return_code = self.run_exastencils_compiler()
-            if not return_code == 0:
-                return infinity, infinity
-        return_code = self.run_c_compiler()
-        if not return_code == 0:
-            return infinity, infinity
+    def evaluate(self, infinity=1e100, number_of_samples=1):
         total_time = 0
         sum_of_convergence_factors = 0
         for i in range(number_of_samples):
@@ -225,14 +227,14 @@ class ProgramGenerator:
                 return infinity, infinity
             output = result.stdout.decode('utf8')
             time_to_solution, convergence_factor = self.parse_output(output)
-            if math.isinf(convergence_factor) or math.isnan(convergence_factor) or not convergence_factor < 1:
+            if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples
 
     def generate_and_evaluate(self, expression, storages, min_level, max_level, solver_program,
-                              infinity=1e100, number_of_samples=1, only_weights_adapted=False):
+                              infinity=1e100, number_of_samples=1):
         self.generate_level_adapted_knowledge_file(max_level)
         if self._counter == 0:
             start_time = time.time()
@@ -256,7 +258,7 @@ class ProgramGenerator:
         self._counter += 1
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         self.run_c_compiler()
-        runtime, convergence_factor = self.evaluate(infinity, number_of_samples, only_weights_adapted)
+        runtime, convergence_factor = self.evaluate(infinity, number_of_samples)
         self.restore_files()
         return runtime, convergence_factor
 
@@ -542,15 +544,6 @@ class ProgramGenerator:
         else:
             raise RuntimeError("Not implemented")
         return program
-
-    @staticmethod
-    def invalidate_storages(storages: [CycleStorage]):
-        for storage in storages:
-            for residual, rhs, solution, correction in zip(storage.residual, storage.rhs, storage.solution, storage.correction):
-                residual.valid = False
-                rhs.valid = False
-                solution.valid = False
-                correction.valid = False
 
     def generate_l3_file(self, program):
         l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'

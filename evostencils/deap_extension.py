@@ -5,15 +5,15 @@ import deap.gp
 
 class AST(deap.gp.PrimitiveTree):
     def __init__(self, content):
-        self._weights = None
+        self._relaxation_factors = None
         super(AST, self).__init__(content)
 
     @property
-    def weights(self):
-        return self._weights
+    def relaxation_factors(self):
+        return self._relaxation_factors
 
-    def set_weights(self, weights):
-        self._weights = weights
+    def set_relaxation_factors(self, relaxation_factors):
+        self._relaxation_factors = relaxation_factors
 
 
 def generate(pset, min_height, max_height, condition, type_=None):
