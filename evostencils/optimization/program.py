@@ -94,8 +94,8 @@ class Optimizer:
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
-        self._toolbox.register("mate", gp.cxOnePoint)
-        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
+        # self._toolbox.register("mate", gp.cxOnePoint)
+        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
         # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
         self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
@@ -285,12 +285,11 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def default_optimization(self, gp_mu=20, gp_lambda=20, gp_generations=20, gp_crossover_probability=0.7,
-                             gp_mutation_probability=0.3, es_generations=50, required_convergence=0.9,
-                             restart_from_checkpoint=False, maximum_block_size=2):
+    def evolutionary_optimization(self, levels_per_run=1, gp_mu=100, gp_lambda=100, gp_generations=100, gp_crossover_probability=0.7,
+                                  gp_mutation_probability=0.3, es_generations=100, required_convergence=0.7,
+                                  restart_from_checkpoint=False, maximum_block_size=2):
 
         levels = self.max_level - self.min_level
-        levels_per_run = 2
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
         for i in range(1, levels + 1):
