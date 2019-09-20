@@ -5,15 +5,16 @@ import subprocess
 import math
 import sympy
 import time
+from typing import List
 
 
 class CycleStorage:
-    def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grid):
-        self.grid = grid
-        self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
-        self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grid, equations)]
-        self.residual = [Field(f'gen_residual_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
-        self.correction = [Field(f'gen_error_{symbol.name}', g.level, self) for g, symbol in zip(grid, fields)]
+    def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grids: List[base.Grid]):
+        self.grid = grids
+        self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
+        self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grids, equations)]
+        self.residual = [Field(f'gen_residual_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
+        self.correction = [Field(f'gen_error_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
 
 
 class Field:
@@ -21,7 +22,6 @@ class Field:
         self.name = name
         self.level = level
         self.cycle_storage = cycle_storage
-        self.valid = False
 
     def to_exa(self):
         return f'{self.name}@{self.level}'
@@ -122,7 +122,7 @@ class ProgramGenerator:
         return self._max_level
 
     @staticmethod
-    def generate_global_weights(n):
+    def generate_global_weights(n: int):
         # Hack to change the weights after generation
         program = 'Globals {\n'
         for i in range(0, n):
@@ -130,10 +130,10 @@ class ProgramGenerator:
         program += '}\n'
         return program
 
-    def generate_global_weight_initializations(self, weights):
+    def generate_global_weight_initializations(self, weights: List[float]):
         # Hack to change the weights after generation
         weights = reversed(weights)
-        path_to_file = f'{self.base_path}/{self.output_path}/Globals/Globals_initGlobals.cpp'
+        path_to_file = f'{self.base_path}/{self.output_path}/Global/Global_initGlobals.cpp'
         subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         with open(path_to_file, 'r') as file:
@@ -157,7 +157,7 @@ class ProgramGenerator:
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     @staticmethod
-    def get_solution_field(storages, index, level, max_level):
+    def get_solution_field(storages: List[CycleStorage], index: int, level: int, max_level: int):
         offset = storages[0].grid[index].level - level
         if level < max_level:
             return storages[offset].correction[index]
@@ -165,21 +165,22 @@ class ProgramGenerator:
             return storages[offset].solution[index]
 
     @staticmethod
-    def get_rhs_field(storages, index, level):
+    def get_rhs_field(storages: List[CycleStorage], index: int, level: int):
         offset = storages[0].grid[index].level - level
         return storages[offset].rhs[index]
 
     @staticmethod
-    def get_residual_field(storages, index, level):
+    def get_residual_field(storages: List[CycleStorage], index: int, level: int):
         offset = storages[0].grid[index].level - level
         return storages[offset].residual[index]
 
     @staticmethod
-    def get_correction_field(storages, index, level):
+    def get_correction_field(storages: List[CycleStorage], index: int, level: int):
         offset = storages[0].grid[index].level - level
         return storages[offset].correction[index]
 
-    def generate_cycle_function(self, expression, storages, min_level, level, max_level, use_global_weights=False):
+    def generate_cycle_function(self, expression: base.Expression, storages: List[CycleStorage], min_level: int, level,
+                                max_level: int, use_global_weights=False):
         program = f'Function gen_mgCycle@{level} {{\n'
         program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
         program += '}\n'
@@ -233,7 +234,8 @@ class ProgramGenerator:
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples
 
-    def generate_and_evaluate(self, expression, storages, min_level, max_level, solver_program,
+    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+                              max_level: int, solver_program: str,
                               infinity=1e100, number_of_samples=1):
         self.generate_level_adapted_knowledge_file(max_level)
         if self._counter == 0:
@@ -277,29 +279,27 @@ class ProgramGenerator:
         time_to_solution = float(tmp[-2])
         return time_to_solution, convergence_factor
 
-    def generate_storage(self, min_level, max_level, finest_grid):
+    def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
         storage = []
-        grid = finest_grid
+        grid = finest_grids
         for i in range(min_level, max_level+1):
             storage.append(CycleStorage(self.equations, self.fields, grid))
             grid = system.get_coarse_grid(grid, self.coarsening_factor)
         return storage
 
-    @staticmethod
-    def needs_storage(expression: base.Expression):
-        return expression.shape[1] == 1
-
-    def obtain_correct_source_field(self, expression, storages, i, level, max_level):
+    def obtain_correct_source_field(self, expression: base.Expression, storages: List[CycleStorage], index: int, level: int,
+                                    max_level: int):
         if isinstance(expression, system.Approximation) or isinstance(expression, base.Cycle):
-            solution_field = self.get_solution_field(storages, i, level, max_level)
+            solution_field = self.get_solution_field(storages, index, level, max_level)
             return solution_field
         elif isinstance(expression, base.Residual):
-            return self.get_residual_field(storages, i, level)
+            return self.get_residual_field(storages, index, level)
         elif isinstance(expression, system.RightHandSide):
-            return self.get_rhs_field(storages, i, level)
+            return self.get_rhs_field(storages, index, level)
         else:
-            return self.get_correction_field(storages, i, level)
+            return self.get_correction_field(storages, index, level)
 
+    # TODO add type annotations
     @staticmethod
     def generate_solve_locally(key, value, indentation, max_level):
         program = ''
@@ -327,7 +327,8 @@ class ProgramGenerator:
         program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
 
-    def generate_multigrid(self, expression: base.Expression, storages, min_level, max_level, use_global_weights=False):
+    def generate_multigrid(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+                           max_level: int, use_global_weights=False):
         # import decimal
         # if expression.program is not None:
         #     return expression.program
@@ -545,7 +546,7 @@ class ProgramGenerator:
             raise RuntimeError("Not implemented")
         return program
 
-    def generate_l3_file(self, program):
+    def generate_l3_file(self, program: str):
         l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
         subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

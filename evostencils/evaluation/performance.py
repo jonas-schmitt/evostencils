@@ -7,7 +7,7 @@ class PerformanceEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance, peak_bandwidth, bytes_per_word, runtime_coarse_grid_solver=0):
+    def __init__(self, peak_performance: float, peak_bandwidth: float, bytes_per_word: int, runtime_coarse_grid_solver=0):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word
@@ -29,16 +29,16 @@ class PerformanceEvaluator:
     def runtime_coarse_grid_solver(self):
         return self._runtime_coarse_grid_solver
 
-    def set_runtime_of_coarse_grid_solver(self, runtime_coarse_grid_solver):
+    def set_runtime_of_coarse_grid_solver(self, runtime_coarse_grid_solver: float):
         self._runtime_coarse_grid_solver = runtime_coarse_grid_solver
 
-    def compute_performance(self, intensity):
+    def compute_performance(self, intensity: float):
         return min(self.peak_performance, intensity * self.peak_bandwidth)
 
-    def compute_arithmetic_intensity(self, operations, words):
+    def compute_arithmetic_intensity(self, operations: float, words: float):
         return operations / (words * self.bytes_per_word)
 
-    def compute_runtime(self, operations, words, problem_size):
+    def compute_runtime(self, operations: float, words: float, problem_size: float):
         arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
         if arithmetic_intensity > 0.0:
             runtime = problem_size / self.compute_performance(arithmetic_intensity)

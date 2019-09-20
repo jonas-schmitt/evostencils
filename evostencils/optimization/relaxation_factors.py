@@ -1,5 +1,5 @@
 from deap import creator, tools, algorithms, cma
-from evostencils.expressions import base, transformations, partitioning as part
+from evostencils.expressions import base
 import deap
 import numpy
 from math import log
@@ -98,15 +98,15 @@ class Optimizer:
             reset_status(expression)
             if len(tail) > 0:
                 raise RuntimeError("Incorrect number of weights")
-            generator = self._gp_optimizer.program_generator
-            if generator is not None and generator.compiler_available and \
+            program_generator = self._gp_optimizer.program_generator
+            if program_generator is not None and program_generator.compiler_available and \
                     storages is not None:
                 # evaluation_program = base_program + generator.generate_cycle_function(expression, storages)
                 # generator.write_program_to_file(evaluation_program)
-                generator.generate_global_weight_initializations(weights)
-                generator.run_c_compiler()
-                _, convergence_factor = generator.evaluate()
-                generator.restore_global_initializations()
+                program_generator.generate_global_weight_initializations(weights)
+                program_generator.run_c_compiler()
+                _, convergence_factor = program_generator.evaluate()
+                program_generator.restore_global_initializations()
                 return convergence_factor,
             else:
                 spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(expression)

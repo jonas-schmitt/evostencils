@@ -35,9 +35,9 @@ def main():
     settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
     knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
-    # 2D Finite difference discretized Stokes
-    # settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
-    # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
+    # 2D Finite volume discretized Stokes
+    # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
+    # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
@@ -62,7 +62,7 @@ def main():
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    runtime_cgs = 1e-7 # example value
+    runtime_cgs = 0.2 * 1e-3 # example value
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
