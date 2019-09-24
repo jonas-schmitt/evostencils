@@ -152,7 +152,7 @@ class ProgramGenerator:
 
     def restore_global_initializations(self):
         # Hack to change the weights after generation
-        path_to_file = f'{self.base_path}/{self.output_path}/Globals/Globals_initGlobals.cpp'
+        path_to_file = f'{self.base_path}/{self.output_path}/Global/Global_initGlobals.cpp'
         subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -463,7 +463,7 @@ class ProgramGenerator:
             else:
                 raise RuntimeError("Expected multiplication")
         elif isinstance(expression, base.Residual):
-            if not isinstance(expression.rhs, system.RightHandSide):
+            if not isinstance(expression.rhs, system.RightHandSide) and not expression.rhs.valid:
                 program += self.generate_multigrid(expression.rhs, storages, min_level, max_level, use_global_weights)
                 expression.rhs.valid = True
             if not isinstance(expression.approximation, system.Approximation):
