@@ -7,7 +7,7 @@ import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow, AST
-import evostencils.optimization.relaxation_factors as weights
+import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math
 
@@ -80,7 +80,7 @@ class Optimizer:
         self._FinishedType = level_control.generate_finished_type()
         self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
-        self._weight_optimizer = weights.Optimizer(self)
+        self._weight_optimizer = relaxation_factor_optimization.Optimizer(self)
 
     @staticmethod
     def _init_creator():
@@ -94,8 +94,8 @@ class Optimizer:
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
-        # self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
+        self._toolbox.register("mate", gp.cxOnePoint)
+        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
         # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
         self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=8)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
@@ -379,23 +379,25 @@ class Optimizer:
                 raise e
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
+            relaxation_factors, _ = self.optimize_relaxation_factors(best_individual, pset, es_generations, min_level, max_level, solver_program, storages)
             best_expression = self.compile_individual(best_individual, pset)[0]
-            self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
+            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function
-            print(f"ExaSlang representation:\n{cycle_function}\n")
+            # print(f"ExaSlang representation:\n{cycle_function}\n")
             best_expression.evaluate = False
             self.convergence_evaluator.compute_spectral_radius(best_expression)
             self.performance_evaluator.estimate_runtime(best_expression)
 
         return solver_program, pops, logbooks
 
-    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program=None, storages=None):
+    def optimize_relaxation_factors(self, best_individual, pset, generations, min_level, max_level, base_program=None, storages=None):
         # expression = self.compile_expression(individual)
-        initial_weights = weights.obtain_relaxation_factors(expression)
-        weights.set_relaxation_factors(expression, initial_weights)
-        weights.reset_status(expression)
+        expression = self.compile_individual(best_individual, pset)[0]
+        initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
+        relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
+        relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
         if base_program is not None and storages is not None:
             self.program_generator.generate_level_adapted_knowledge_file(max_level)
@@ -407,8 +409,8 @@ class Optimizer:
         best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
         best_weights = list(best_individual)
         spectral_radius, = best_individual.fitness.values
-        # print(best_weights)
-        # print(spectral_radius)
+        # print(f'Best weights: {best_weights}')
+        # print(f'Best spectral radius: {spectral_radius}')
         return best_weights, spectral_radius
 
     @staticmethod

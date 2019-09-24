@@ -35,6 +35,9 @@ def main():
     settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
     knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
+    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_scalar_fromL2.settings'
+    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_scalar_fromL2.knowledge'
+
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
@@ -62,7 +65,7 @@ def main():
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    runtime_cgs = 0.34 * 1e-3 # example value
+    runtime_cgs = 0.5 * 1e-3 # example value
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
@@ -80,8 +83,8 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 0.7
-    maximum_block_size = 2
+    required_convergence = 0.9
+    maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=1000, gp_lambda=1000,
                                                                gp_generations=100,
                                                                es_generations=200,
