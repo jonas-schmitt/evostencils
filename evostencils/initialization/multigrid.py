@@ -330,8 +330,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+
     # pset.addTerminal(1.0, TypeWrapper(float))
-    relaxation_factor_range_of_values = 40
+    relaxation_factor_range_of_values = 100
     step_size = 2.0 / relaxation_factor_range_of_values
     for i in range(1, relaxation_factor_range_of_values+1):
         pset.addTerminal(i * step_size, TypeWrapper(float))

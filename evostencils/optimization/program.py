@@ -361,8 +361,6 @@ class Optimizer:
                             abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
                         continue
                     individual = hof[j]
-                    if individual.fitness.values[0] > 1.0:
-                        break
                     expression = self.compile_individual(individual, pset)[0]
 
                     time, convergence_factor = \
