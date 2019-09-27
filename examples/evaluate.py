@@ -3,16 +3,16 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 
 
 def main():
-    if len(sys.argv[1:]) == 2 and os.path.exists(sys.argv[2]):
-        problem_name = sys.argv[1]
-        exastencils_path = sys.argv[2]
-        dimensions = 2
-        min_level = 2
-        max_level = 10
-        program_generator = ProgramGenerator(problem_name, exastencils_path,
-                                             None, None, None, None, None, None, dimensions, None, min_level, max_level, None)
-        time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=10)
-        print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}')
+
+    cwd = os.getcwd()
+    compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
+    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+    program_generator.run_c_compiler()
+    time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=10)
+    print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}')
 
 
 if __name__ == "__main__":
