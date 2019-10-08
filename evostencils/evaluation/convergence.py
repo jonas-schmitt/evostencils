@@ -17,8 +17,7 @@ def stencil_to_lfa(stencil: periodic.Stencil, grid: base.Grid):
     tmp = recursive_descent(stencil.constant_stencils, stencil.dimension)
 
     ndarray = lfa_lab.NdArray(tmp)
-    tmp = lfa_lab.PeriodicStencil(ndarray)
-    return lfa_lab.from_periodic_stencil(tmp, grid)
+    return lfa_lab.from_periodic_stencil(ndarray, grid)
 
 
 def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):

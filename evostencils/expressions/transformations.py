@@ -3,75 +3,6 @@ from evostencils.stencils import constant, periodic
 import sympy
 
 
-def get_iteration_matrix(expression: base.Expression):
-    if expression.iteration_matrix is not None:
-        return expression.iteration_matrix
-    result = expression.apply(get_iteration_matrix)
-    if isinstance(result, base.Cycle):
-        if isinstance(result.approximation, base.ZeroOperator):
-            iteration_matrix = base.scale(result.weight, result.correction)
-        elif isinstance(result.correction, base.ZeroOperator):
-            iteration_matrix = result.approximation
-        else:
-            iteration_matrix = result
-    elif isinstance(result, base.Residual):
-        operand1 = result.rhs
-        if isinstance(result.approximation, base.ZeroOperator):
-            operand2 = result.approximation
-        else:
-            operand2 = base.mul(result.operator, result.approximation)
-        # Inefficient but sufficient for now
-        if isinstance(operand1, base.ZeroOperator):
-            if isinstance(operand2, base.ZeroOperator):
-                iteration_matrix = operand2
-            else:
-                iteration_matrix = base.Scaling(-1, operand2)
-        elif isinstance(operand2, base.ZeroOperator):
-            iteration_matrix = operand1
-        else:
-            iteration_matrix = base.Subtraction(operand1, operand2)
-
-    elif isinstance(result, base.Addition):
-        if isinstance(result.operand1, base.ZeroOperator):
-            iteration_matrix = result.operand2
-        elif isinstance(result.operand2, base.ZeroOperator):
-            iteration_matrix = result.operand1
-        else:
-            iteration_matrix = result
-    elif isinstance(result, base.Subtraction):
-        if isinstance(result.operand1, base.ZeroOperator):
-            if isinstance(result.operand2, base.ZeroOperator):
-                iteration_matrix = result.operand2
-            else:
-                iteration_matrix = base.Scaling(-1, result.operand2)
-        elif isinstance(result.operand2, base.ZeroOperator):
-            iteration_matrix = result.operand1
-        else:
-            iteration_matrix = result
-    elif isinstance(result, base.Multiplication):
-        if isinstance(result.operand1, base.ZeroOperator) or isinstance(result.operand2, base.ZeroOperator):
-            iteration_matrix = base.ZeroOperator(result.grid)
-        elif isinstance(result.operand1, base.Identity):
-            iteration_matrix = result.operand2
-        elif isinstance(result.operand2, base.Identity):
-            iteration_matrix = result.operand1
-        else:
-            iteration_matrix = result
-    elif isinstance(result, base.Scaling):
-        if isinstance(result.operand, base.ZeroOperator):
-            iteration_matrix = result.operand
-        else:
-            iteration_matrix = result
-    elif isinstance(result, base.ZeroApproximation) or isinstance(result, base.RightHandSide):
-        iteration_matrix = base.ZeroOperator(result.grid)
-    elif isinstance(result, base.Approximation):
-        iteration_matrix = base.Identity(result.grid)
-    else:
-        iteration_matrix = result
-    expression.iteration_matrix = iteration_matrix
-    return iteration_matrix
-
-
 def obtain_iterate(expression: base.Expression):
     if isinstance(expression, base.BinaryExpression):
         return obtain_iterate(expression.operand2)
@@ -113,8 +44,8 @@ def obtain_coarsest_level(cycle: base.Cycle) -> int:
 def invalidate_expression(expression: base.Expression):
     def f(expr):
         expr.lfa_symbol = None
-        expr.program = None
-        expr.iteration_matrix = None
+        expr.runtime = None
+        expr.valid = False
     if expression is not None:
         f(expression)
         expression.mutate(invalidate_expression)

@@ -23,13 +23,6 @@ def reset_status(expression: base.Expression):
 
 def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, base.Cycle):
-        if expression.iteration_matrix is not None:
-            expression.iteration_matrix = None
-        # if len(weights) == 0:
-        #     raise RuntimeError("Too few weights have been supplied")
-        # if isinstance(expression.correction, mg.Residual) \
-        #         or (isinstance(expression.correction, base.Multiplication)
-        #             and part.can_be_partitioned(expression.correction.operand1)) and \
         if not expression.weight_set:
             head, *tail = weights
             expression._weight = head
@@ -53,10 +46,6 @@ def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
 def obtain_relaxation_factors(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, base.Cycle):
-        # Hack to change the weights after generation
-        # if isinstance(expression.correction, mg.Residual) \
-        #         or (isinstance(expression.correction, base.Multiplication)
-        #             and part.can_be_partitioned(expression.correction.operand1)) and
         if not expression.weight_obtained:
             weights.append(expression.weight)
             expression.weight_obtained = True

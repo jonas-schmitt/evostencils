@@ -345,14 +345,15 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
         generate_block_size((), maximum_block_size, dimension)
-    maximum_number_of_generatable_terms = 8
+    # maximum_number_of_generatable_terms = 8
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-
-        if number_of_terms < maximum_number_of_generatable_terms:
-            pset.addTerminal(block_size_permutation, types.BlockSize)
+        # Use when the number of generatable terms is restricted
+        # if number_of_terms < maximum_number_of_generatable_terms:
+        #     pset.addTerminal(block_size_permutation, types.BlockSize)
+        pset.addTerminal(block_size_permutation, types.BlockSize)
 
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):

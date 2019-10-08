@@ -329,11 +329,7 @@ class ProgramGenerator:
 
     def generate_multigrid(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                            max_level: int, use_global_weights=False):
-        # import decimal
-        # if expression.program is not None:
-        #     return expression.program
         program = ''
-        # expression.valid = False
         if isinstance(expression, base.Cycle):
             weight = expression.weight
             # Hack to change the weights after generation

@@ -16,8 +16,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -32,8 +32,8 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
@@ -82,9 +82,9 @@ def main():
     levels_per_run = 2
     required_convergence = 1.0
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=1000, gp_lambda=1000,
-                                                               gp_generations=100,
-                                                               es_generations=200,
+    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=100, gp_lambda=100,
+                                                               gp_generations=30,
+                                                               es_generations=30,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

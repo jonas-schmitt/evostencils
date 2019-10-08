@@ -57,7 +57,7 @@ def load_checkpoint_from_file(filename):
 class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
-                 program_generator=None, epsilon=1e-20, infinity=1e100, checkpoint_directory_path='./'):
+                 program_generator=None, epsilon=1e-10, infinity=1e100, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
