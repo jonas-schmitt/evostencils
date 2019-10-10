@@ -3,19 +3,6 @@ from inspect import isclass
 import deap.gp
 
 
-class AST(deap.gp.PrimitiveTree):
-    def __init__(self, content):
-        self._relaxation_factors = None
-        super(AST, self).__init__(content)
-
-    @property
-    def relaxation_factors(self):
-        return self._relaxation_factors
-
-    def set_relaxation_factors(self, relaxation_factors):
-        self._relaxation_factors = relaxation_factors
-
-
 def generate(pset, min_height, max_height, condition, type_=None):
     """Generate a Tree as a list of list. The tree is build
     from the root to the leaves, and it stop growing when the

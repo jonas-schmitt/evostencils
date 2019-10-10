@@ -6,7 +6,7 @@ import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
-from evostencils.deap_extension import genGrow, AST
+from evostencils.deap_extension import genGrow
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math
@@ -79,7 +79,7 @@ class Optimizer:
     @staticmethod
     def _init_creator():
         creator.create("Fitness", deap.base.Fitness, weights=(-1.0, -1.0))
-        creator.create("Individual", AST, fitness=creator.Fitness)
+        creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
