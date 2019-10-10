@@ -77,14 +77,15 @@ def main():
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
+
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
     required_convergence = 1.0
-    maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=100, gp_lambda=100,
-                                                               gp_generations=30,
-                                                               es_generations=30,
+    maximum_block_size = 2
+    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=20, gp_lambda=20,
+                                                               gp_generations=10,
+                                                               es_generations=5,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

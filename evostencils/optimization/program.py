@@ -12,25 +12,19 @@ from evostencils.types import level_control
 import math
 
 
-# Define a context manager to suppress stdout and stderr.
-class suppress_stdout_stderr(object):
+class suppress_output(object):
     def __init__(self):
-        # Open a pair of null files
-        self.null_fds =  [os.open(os.devnull,os.O_RDWR) for x in range(2)]
-        # Save the actual stdout (1) and stderr (2) file descriptors.
-        self.save_fds = [os.dup(1), os.dup(2)]
+        self.null_file_descriptor = [os.open(os.devnull, os.O_RDWR) for _ in range(2)]
+        self.save_file_descriptor = [os.dup(1), os.dup(2)]
 
     def __enter__(self):
-        # Assign the null pointers to stdout and stderr.
-        os.dup2(self.null_fds[0],1)
-        os.dup2(self.null_fds[1],2)
+        os.dup2(self.null_file_descriptor[0], 1)
+        os.dup2(self.null_file_descriptor[1], 2)
 
     def __exit__(self, *_):
-        # Re-assign the real stdout/stderr back to (1) and (2)
-        os.dup2(self.save_fds[0],1)
-        os.dup2(self.save_fds[1],2)
-        # Close all file descriptors
-        for fd in self.null_fds + self.save_fds:
+        os.dup2(self.save_file_descriptor[0], 1)
+        os.dup2(self.save_file_descriptor[1], 2)
+        for fd in self.null_file_descriptor + self.save_file_descriptor:
             os.close(fd)
 
 
@@ -177,7 +171,7 @@ class Optimizer:
             return self.infinity, self.infinity
 
         expression = expression1
-        with suppress_stdout_stderr():
+        with suppress_output():
             spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
@@ -271,12 +265,15 @@ class Optimizer:
                 ind.fitness.values = fit
             hof.update(pop)
             if gen % checkpoint_frequency == 0:
-                # TODO fix problem with invalidate expression
                 if solver is not None:
                     transformations.invalidate_expression(solver)
                 logbooks[-1] = logbook
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
-                # checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
+                try:
+                    checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
+                except (pickle.PickleError, TypeError) as e:
+                    print(e)
+                    print('Skipping checkpoint')
             # Select the next generation population
             pop = toolbox.select(pop + offspring, mu_)
             record = mstats.compile(pop)
@@ -356,7 +353,7 @@ class Optimizer:
             self._program_generator._counter = 0
             self._program_generator._average_generation_time = 0
             try:
-                for j in range(0, min(50, len(hof))):
+                for j in range(0, min(5, len(hof))):
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
                             abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
                         continue

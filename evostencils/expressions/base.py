@@ -635,7 +635,8 @@ class Residual(Expression):
 
     def mutate(self, f: callable, *args):
         # We already mutate within the cycle node
-        pass
+        f(self.rhs, *args)
+        f(self.approximation, *args)
 
 
 class Cycle(Expression):
@@ -703,8 +704,6 @@ class Cycle(Expression):
         return Cycle(approximation, rhs, correction, self.partitioning, self.weight, self.predecessor)
 
     def mutate(self, f: callable, *args):
-        f(self.approximation, *args)
-        f(self.rhs, *args)
         f(self.correction, *args)
 
 

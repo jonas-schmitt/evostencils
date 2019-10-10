@@ -42,12 +42,9 @@ def obtain_coarsest_level(cycle: base.Cycle) -> int:
 
 
 def invalidate_expression(expression: base.Expression):
-    def f(expr):
-        expr.lfa_symbol = None
-        expr.runtime = None
-        expr.valid = False
     if expression is not None:
-        f(expression)
+        expression.lfa_symbol = None
+        expression.valid = False
         expression.mutate(invalidate_expression)
 
 
