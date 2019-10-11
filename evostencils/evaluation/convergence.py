@@ -142,14 +142,8 @@ class ConvergenceEvaluator:
         elif isinstance(expression, system.ElementwiseDiagonal):
             result = self.transform(expression.operand).elementwise_diag()
         elif isinstance(expression, base.CoarseGridSolver):
-            cgs_expression = expression.expression
-            if cgs_expression is None or not cgs_expression.evaluate:
-                operator = self.transform(expression.operator)
-                result = operator.inverse()
-            else:
-                if cgs_expression.iteration_matrix is None or cgs_expression.iteration_matrix.lfa_symbol is None:
-                    raise RuntimeError("Not evaluated")
-                result = cgs_expression.iteration_matrix.lfa_symbol
+            operator = self.transform(expression.operator)
+            result = operator.inverse()
         elif isinstance(expression, system.Operator):
             lfa_entries = []
             for operator_row in expression.entries:
