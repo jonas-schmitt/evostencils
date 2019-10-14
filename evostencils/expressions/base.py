@@ -640,14 +640,14 @@ class Residual(Expression):
 
 
 class Cycle(Expression):
-    def __init__(self, approximation, rhs, correction, partitioning=part.Single, weight=1.0, predecessor=None):
+    def __init__(self, approximation, rhs, correction, partitioning=part.Single, relaxation_factor=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
         self._approximation = approximation
         self._rhs = rhs
         self._correction = correction
-        self._weight = weight
+        self._relaxation_factor = relaxation_factor
         self._partitioning = partitioning
         self.predecessor = predecessor
         self.global_id = None
@@ -676,8 +676,8 @@ class Cycle(Expression):
         return self._correction
 
     @property
-    def weight(self):
-        return self._weight
+    def relaxation_factor(self):
+        return self._relaxation_factor
 
     @property
     def partitioning(self):
@@ -688,11 +688,11 @@ class Cycle(Expression):
         return None
 
     def generate_expression(self):
-        return Addition(self.approximation, Scaling(self.weight, self.correction))
+        return Addition(self.approximation, Scaling(self.relaxation_factor, self.correction))
 
     def __repr__(self):
         return f'Cycle({repr(self.approximation)}, {repr(self.rhs)}, {repr(self.correction)}, ' \
-               f'{repr(self.partitioning)}, {repr(self.weight)}'
+               f'{repr(self.partitioning)}, {repr(self.relaxation_factor)}'
 
     def __str__(self):
         return str(self.generate_expression())
@@ -701,19 +701,10 @@ class Cycle(Expression):
         approximation = transform(self.approximation, *args)
         rhs = transform(self.rhs, *args)
         correction = transform(self.correction, *args)
-        return Cycle(approximation, rhs, correction, self.partitioning, self.weight, self.predecessor)
+        return Cycle(approximation, rhs, correction, self.partitioning, self.relaxation_factor, self.predecessor)
 
     def mutate(self, f: callable, *args):
         f(self.correction, *args)
-
-
-def cycle(iterate, rhs, correction, partitioning=part.Single, weight=1, predecessor=None):
-    return Cycle(iterate, rhs, correction, partitioning, weight, predecessor)
-
-
-def residual(operator, iterate, rhs):
-    # return Subtraction(rhs, Multiplication(operator, iterate))
-    return Residual(operator, iterate, rhs)
 
 
 def get_coarse_grid(grid: Grid, coarsening_factor):
@@ -733,54 +724,6 @@ def get_coarse_rhs(rhs: RightHandSide, coarsening_factor):
 
 def get_coarse_operator(operator, coarse_grid):
     return Operator(f'{operator.name}', coarse_grid, operator.stencil_generator)
-
-
-def is_intergrid_operation(expression: Expression) -> bool:
-    return isinstance(expression, Restriction) or isinstance(expression, Prolongation) \
-           or isinstance(expression, CoarseGridSolver)
-
-
-def contains_intergrid_operation(expression: Expression) -> bool:
-    if isinstance(expression, BinaryExpression):
-        return contains_intergrid_operation(expression.operand1) or contains_intergrid_operation(expression.operand2)
-    elif isinstance(expression, UnaryExpression):
-        return contains_intergrid_operation(expression.operand)
-    elif isinstance(expression, Scaling):
-        return contains_intergrid_operation(expression.operand)
-    elif isinstance(expression, CoarseGridSolver):
-        return True
-    elif isinstance(expression, Operator):
-        return is_intergrid_operation(expression)
-    else:
-        raise RuntimeError("Expression does not only contain operators")
-
-
-def determine_maximum_tree_depth(expression: Expression) -> int:
-    if isinstance(expression, Entity):
-        return 0
-    elif isinstance(expression, UnaryExpression) or isinstance(expression, Scaling):
-        return determine_maximum_tree_depth(expression.operand) + 1
-    elif isinstance(expression, BinaryExpression):
-        return max(determine_maximum_tree_depth(expression.operand1), determine_maximum_tree_depth(expression.operand2)) + 1
-    elif isinstance(expression, Residual):
-        return max(determine_maximum_tree_depth(expression.rhs), determine_maximum_tree_depth(expression.approximation) + 1) + 1
-    elif isinstance(expression, Cycle):
-        return max(determine_maximum_tree_depth(expression.approximation), determine_maximum_tree_depth(expression.correction) + 1) + 1
-    else:
-        raise RuntimeError("Case not implemented")
-
-
-def can_be_partitioned(expression: Expression):
-    if is_intergrid_operation(expression):
-        return False
-    elif isinstance(expression, BinaryExpression):
-        return can_be_partitioned(expression.operand1) and can_be_partitioned(expression.operand2)
-    elif isinstance(expression, UnaryExpression) or isinstance(expression, Scaling):
-        return can_be_partitioned(expression.operand)
-    elif isinstance(expression, Operator):
-        return True
-    else:
-        return False
 
 
 class ConstantStencilGenerator:

@@ -213,13 +213,13 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     def coarse_cycle(coarse_grid, cycle):
         result = base.Cycle(cycle.approximation, cycle.rhs,
                             base.Cycle(coarse_grid, cycle.correction,
-                                       base.residual(terminals.coarse_operator, coarse_grid, cycle.correction)),
+                                       base.Residual(terminals.coarse_operator, coarse_grid, cycle.correction)),
                             predecessor=cycle.predecessor)
         result.correction.predecessor = result
         return result.correction
 
     def residual(args):
-        return base.Cycle(args[0], args[1], base.residual(terminals.operator, args[0], args[1]), predecessor=args[0].predecessor)
+        return base.Cycle(args[0], args[1], base.Residual(terminals.operator, args[0], args[1]), predecessor=args[0].predecessor)
 
     def restrict(operator, cycle):
         return base.Cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), predecessor=cycle.predecessor)

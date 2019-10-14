@@ -94,8 +94,9 @@ class PerformanceEvaluator:
                 cgs = expression.operand1
                 if cgs.expression is not None:
                     if cgs.expression.runtime is None:
-                        raise RuntimeError("Not evaluated")
-                    runtime = cgs.expression.runtime
+                        runtime = self.estimate_runtime(cgs.expression)
+                    else:
+                        runtime = cgs.expression.runtime
                 else:
                     runtime = self.runtime_coarse_grid_solver
             else:

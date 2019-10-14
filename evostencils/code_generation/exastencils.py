@@ -184,6 +184,13 @@ class ProgramGenerator:
         program = f'Function gen_mgCycle@{level} {{\n'
         program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
         program += '}\n'
+
+        def restore_valid_flag(expr: base.Expression):
+            if expr is not None:
+                expr.valid = False
+                expr.mutate(restore_valid_flag)
+        restore_valid_flag(expression)
+
         return program
 
     def run_exastencils_compiler(self):
@@ -331,7 +338,7 @@ class ProgramGenerator:
                            max_level: int, use_global_weights=False):
         program = ''
         if isinstance(expression, base.Cycle):
-            weight = expression.weight
+            weight = expression.relaxation_factor
             # Hack to change the weights after generation
 
             if use_global_weights and hasattr(expression, 'global_id'):

@@ -25,7 +25,7 @@ def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, base.Cycle):
         if not expression.weight_set:
             head, *tail = weights
-            expression._weight = head
+            expression._relaxation_factor = head
             expression.weight_set = True
             expression.global_id = len(tail)
         else:
@@ -47,7 +47,7 @@ def obtain_relaxation_factors(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, base.Cycle):
         if not expression.weight_obtained:
-            weights.append(expression.weight)
+            weights.append(expression.relaxation_factor)
             expression.weight_obtained = True
             weights.extend(obtain_relaxation_factors(expression.correction))
         return weights

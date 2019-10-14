@@ -368,28 +368,23 @@ class Optimizer:
                     individual.fitness.values = (convergence_factor, individual.fitness.values[1])
                     if time < best_time and convergence_factor < required_convergence:
                         best_individual = individual
+                        best_expression = expression
                         best_time = time
             except Exception as e:
                 self._program_generator.restore_files()
                 raise e
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
-            relaxation_factors, _ = self.optimize_relaxation_factors(best_individual, pset, es_generations, min_level, max_level, solver_program, storages)
-            best_expression = self.compile_individual(best_individual, pset)[0]
+            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function
-            # print(f"ExaSlang representation:\n{cycle_function}\n")
-            best_expression.evaluate = False
-            self.convergence_evaluator.compute_spectral_radius(best_expression)
-            self.performance_evaluator.estimate_runtime(best_expression)
+            print(f"ExaSlang representation:\n{cycle_function}\n")
 
         return solver_program, pops, logbooks
 
-    def optimize_relaxation_factors(self, best_individual, pset, generations, min_level, max_level, base_program=None, storages=None):
-        # expression = self.compile_expression(individual)
-        expression = self.compile_individual(best_individual, pset)[0]
+    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program=None, storages=None):
         initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)

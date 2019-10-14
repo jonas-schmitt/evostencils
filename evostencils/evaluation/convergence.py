@@ -68,7 +68,7 @@ class ConvergenceEvaluator:
                 approximation = correction.matching_identity()
             else:
                 approximation = self.transform(expression.approximation)
-            tmp = approximation + expression.weight * correction
+            tmp = approximation + expression.relaxation_factor * correction
             if expression.partitioning == partitioning.Single:
                 result = tmp
             elif expression.partitioning == partitioning.RedBlack:
