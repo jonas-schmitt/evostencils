@@ -26,5 +26,4 @@ An example script can be found in the examples folder. The Poisson examples from
 ## Publications
     Schmitt J., Kuckuk S., Köstler H.:
     Optimizing Geometric Multigrid Methods with Evolutionary Computation
-    Submitted for publication 
     Preprint available on arXiv: https://arxiv.org/abs/1910.02749
