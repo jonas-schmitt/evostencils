@@ -334,6 +334,28 @@ class ProgramGenerator:
         program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
 
+    def generate_operator_entry(self, expression, field, level):
+        if isinstance(expression, base.Multiplication):
+            return f'({self.generate_operator_entry(expression.operand1, field, level)} * ' \
+                   f'{self.generate_operator_entry(expression.operand2, field, level)})'
+        elif isinstance(expression, base.Addition):
+            term1 = f'{self.generate_operator_entry(expression.operand1, field, level)}'
+            term2 = f'{self.generate_operator_entry(expression.operand2, field, level)}'
+            if not isinstance(expression.operand1, base.Addition):
+                term1 = f'{term1} * {field.to_exa()}'
+            if not isinstance(expression.operand2, base.Addition):
+                term2 = f'{term2} * {field.to_exa()}'
+            return f'{term1} + {term2}'
+        elif isinstance(expression, base.Scaling):
+            return f'({expression.factor} * {self.generate_operator_entry(expression.operand, field, level)})'
+        elif isinstance(expression, base.Operator):
+            if isinstance(expression, base.Identity):
+                return '1'
+            else:
+                return f'{expression.name}@{level}'
+        else:
+            raise RuntimeError("Invalid expression")
+
     def generate_multigrid(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                            max_level: int, use_global_weights=False):
         program = ''
@@ -364,24 +386,16 @@ class ProgramGenerator:
                     operator = correction.operator
                     program += f'\t{solution_field.to_exa()} += {weight} * ({rhs_field.to_exa()}'
                     for j, entry in enumerate(operator.entries[i]):
-
                         field = self.get_solution_field(storages, j, grid.level, max_level)
-                        if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
-                            program += f' - '
-                            op = entry.operand
-                            program += f'({entry.factor}) * '
-                        elif isinstance(entry, base.Operator):
-                            op = entry
-                            if not isinstance(op, base.ZeroOperator):
-                                program += f' - '
-                        else:
-                            raise RuntimeError("Unexpected system operator entry")
-                        if isinstance(op, base.Identity):
+                        if isinstance(entry, base.Identity):
                             program += field.to_exa()
-                        elif isinstance(op, base.ZeroOperator):
+                        elif isinstance(entry, base.ZeroOperator):
                             pass
                         else:
-                            program += f'\t{op}@{level} * {field.to_exa()}'
+                            if not isinstance(entry, base.Addition):
+                                program += f' - {self.generate_operator_entry(entry, field, level)} * {field.to_exa()}'
+                            else:
+                                program += f' - ({self.generate_operator_entry(entry, field, level)})'
                     program += ')\n'
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
@@ -483,22 +497,15 @@ class ProgramGenerator:
                 program += f'\t{residual_field.to_exa()} = {rhs_field.to_exa()}'
                 for j, entry in enumerate(operator.entries[i]):
                     field = self.get_solution_field(storages, j, grid.level, max_level)
-                    if isinstance(entry, base.Scaling) and not isinstance(entry.operand, base.ZeroOperator):
-                        program += f' - '
-                        op = entry.operand
-                        program += f'({entry.factor}) * '
-                    elif isinstance(entry, base.Operator):
-                        op = entry
-                        if not isinstance(op, base.ZeroOperator):
-                            program += f' - '
-                    else:
-                        raise RuntimeError("Unexpected system operator entry")
-                    if isinstance(op, base.Identity):
+                    if isinstance(entry, base.Identity):
                         program += field.to_exa()
-                    elif isinstance(op, base.ZeroOperator):
+                    elif isinstance(entry, base.ZeroOperator):
                         pass
                     else:
-                        program += f'{op}@{level} * {field.to_exa()}'
+                        if not isinstance(entry, base.Addition):
+                            program += f' - {self.generate_operator_entry(entry, field, level)} * {field.to_exa()}'
+                        else:
+                            program += f' - ({self.generate_operator_entry(entry, field, level)})'
                 program += '\n'
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):

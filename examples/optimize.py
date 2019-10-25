@@ -87,7 +87,7 @@ def main():
     levels_per_run = 2
     required_convergence = 1.0
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=100, gp_lambda=100,
+    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=20, gp_lambda=20,
                                                                gp_generations=20,
                                                                es_generations=10,
                                                                maximum_block_size=maximum_block_size,
