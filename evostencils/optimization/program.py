@@ -353,7 +353,7 @@ class Optimizer:
             self._program_generator._counter = 0
             self._program_generator._average_generation_time = 0
             try:
-                for j in range(0, min(5, len(hof))):
+                for j in range(0, min(50, len(hof))):
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
                             abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
                         continue
@@ -362,7 +362,7 @@ class Optimizer:
 
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                      solver_program, number_of_samples=5)
+                                                                      solver_program, number_of_samples=100)
                     print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
                           f'Measured convergence factor: {convergence_factor}')
                     individual.fitness.values = (convergence_factor, individual.fitness.values[1])
@@ -370,13 +370,20 @@ class Optimizer:
                         best_individual = individual
                         best_expression = expression
                         best_time = time
-            except Exception as e:
+            except (KeyboardInterrupt, Exception) as e:
                 self._program_generator.restore_files()
                 raise e
+            if best_expression is None:
+                raise RuntimeError("Optimization failed")
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
-            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
-            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
+            try:
+                relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
+                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
+            except (KeyboardInterrupt, Exception) as e:
+                self._program_generator.restore_files()
+                raise e
+
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function

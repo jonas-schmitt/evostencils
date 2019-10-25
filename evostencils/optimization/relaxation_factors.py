@@ -94,7 +94,7 @@ class Optimizer:
                 # generator.write_program_to_file(evaluation_program)
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                _, convergence_factor = program_generator.evaluate()
+                _, convergence_factor = program_generator.evaluate(number_of_samples=10)
                 program_generator.restore_global_initializations()
                 return convergence_factor,
             else:

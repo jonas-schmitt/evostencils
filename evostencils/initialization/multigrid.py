@@ -81,27 +81,42 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
     row_of_operators = []
     indices = []
 
-    def recursive_descent(expr):
-        if expr.func == sympy.Add:
-            for arg in expr.args:
-                recursive_descent(arg)
-        elif expr.func == sympy.Mul and len(expr.args) == 2 and expr.args[-1] in fields:
-            op_symbol = expr.args[0]
-            field_symbol = expr.args[1]
-            field_index = fields.index(field_symbol)
-            if op_symbol.is_Symbol:
-                j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
-                row_of_operators.append(base.Operator(op_symbol.name, grid[field_index], ConstantStencilGenerator(operators[j].stencil)))
+    def recursive_descent(expr, field_index):
+        if expr.is_Number:
+            identity = base.Identity(grid[field_index])
+            if not expr == sympy.sympify(1):
+                return base.Scaling(float(expr.evalf()), identity)
             else:
-                entry = base.Scaling(float(op_symbol.evalf()), base.Identity(grid[field_index]))
-                row_of_operators.append(entry)
-            indices.append(field_index)
-        elif expr.is_Symbol and expr in fields:
-            field_index = fields.index(expr)
-            row_of_operators.append(base.Identity(grid[field_index]))
+                return identity
+        elif expr.is_Symbol:
+            op_symbol = expr
+            j = next(k for k, op_info in enumerate(operators) if op_symbol.name == op_info.name)
+            operator = base.Operator(op_symbol.name, grid[field_index], ConstantStencilGenerator(operators[j].stencil))
+            return operator
+        elif expr.is_Mul:
+            tmp = recursive_descent(expr.args[-1], field_index)
+            for arg in expr.args[-2::-1]:
+                if arg.is_Number:
+                    tmp = base.Scaling(float(arg.evalf()), tmp)
+                else:
+                    lhs = recursive_descent(arg, field_index)
+                    tmp = base.Multiplication(lhs, tmp)
+        elif expr.is_Add:
+            tmp = recursive_descent(expr.args[0], field_index)
+            for arg in expr.args[1:]:
+                tmp = base.Addition(recursive_descent(arg, field_index), tmp)
         else:
-            raise RuntimeError("Invalid expression")
-    recursive_descent(equation.sympy_expr)
+            raise RuntimeError("Invalid Expression")
+        return tmp
+
+    expanded_expression = sympy.expand(equation.sympy_expr)
+    for i, field in enumerate(fields):
+        if field in expanded_expression.free_symbols:
+            collected_terms = sympy.collect(expanded_expression, field, evaluate=False)
+            term = collected_terms[field]
+            entry = recursive_descent(term, i)
+            row_of_operators.append(entry)
+            indices.append(i)
     for i in range(len(grid)):
         if i not in indices:
             row_of_operators.append(base.ZeroOperator(grid[i]))
@@ -332,10 +347,11 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
-    def sample_relaxation_factor():
-        return random.gauss(1.0, 0.4)
-    for i in range(1000):
-        pset.addTerminal(sample_relaxation_factor(), TypeWrapper(float), f'omega_{i}')
+    # def sample_relaxation_factor():
+    #     return random.gauss(1.0, 0.4)
+    # for i in range(1000):
+    #     pset.addTerminal(sample_relaxation_factor(), TypeWrapper(float), f'omega_{i}')
+    pset.addTerminal(1.0, TypeWrapper(float), f'omega')
     block_sizes = []
     for i in range(len(fields)):
         block_sizes.append([])
@@ -348,15 +364,14 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
         generate_block_size((), maximum_block_size, dimension)
-    # maximum_number_of_generatable_terms = 8
+    maximum_number_of_generatable_terms = 8
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-        # Use when the number of generatable terms is restricted
-        # if number_of_terms < maximum_number_of_generatable_terms:
-        #     pset.addTerminal(block_size_permutation, types.BlockSize)
-        pset.addTerminal(block_size_permutation, types.BlockSize)
+        if number_of_terms < maximum_number_of_generatable_terms:
+            pset.addTerminal(block_size_permutation, types.BlockSize)
+        # pset.addTerminal(block_size_permutation, types.BlockSize)
 
     add_cycle(pset, terminals, types, 0, coarsest)
     for i in range(1, depth):
