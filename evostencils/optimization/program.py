@@ -387,7 +387,6 @@ class Optimizer:
             cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function
-            print(f"ExaSlang representation:\n{cycle_function}\n")
 
         return solver_program, pops, logbooks
 
@@ -399,6 +398,7 @@ class Optimizer:
         if base_program is not None and storages is not None:
             self.program_generator.generate_level_adapted_knowledge_file(max_level)
             self.program_generator.run_exastencils_compiler()
+            self.program_generator.generate_adapted_settings_file()
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)

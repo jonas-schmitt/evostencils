@@ -32,16 +32,16 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
@@ -87,13 +87,14 @@ def main():
     levels_per_run = 2
     required_convergence = 1.0
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=20, gp_lambda=20,
-                                                               gp_generations=20,
-                                                               es_generations=10,
+    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=500, gp_lambda=500,
+                                                               gp_generations=100,
+                                                               es_generations=200,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
     program_generator.generate_level_adapted_knowledge_file(max_level)
+    program_generator.generate_adapted_settings_file()
     program_generator.generate_l3_file(program)
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()

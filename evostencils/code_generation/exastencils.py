@@ -254,6 +254,7 @@ class ProgramGenerator:
             self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         else:
             self.run_exastencils_compiler()
+        self.generate_adapted_settings_file()
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, max_level)
         self.generate_l3_file(solver_program + cycle_function)
         try:
@@ -574,6 +575,25 @@ class ProgramGenerator:
                     line = input_file.readline()
                 output_file.write(program)
 
+    def generate_adapted_settings_file(self):
+        base_path = self.base_path
+        relative_input_file_path = self.settings_path
+        relative_output_file_path = f'{self.settings_path}.tmp'
+        with open(f'{base_path}/{relative_input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{relative_output_file_path}', 'w+') as output_file:
+                for line in input_file:
+                    tokens = line.split('=')
+                    lhs = tokens[0].strip(' \n\t')
+                    if not lhs == 'l2file':
+                        output_file.write(line)
+
+        subprocess.run(['cp', f'{self.base_path}/{relative_input_file_path}',
+                        f'{self.base_path}/{relative_input_file_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            ['cp', f'{self.base_path}/{relative_output_file_path}', f'{self.base_path}/{relative_input_file_path}'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def generate_level_adapted_knowledge_file(self, max_level: int):
         base_path = self.base_path
         relative_input_file_path = self.knowledge_path
@@ -599,6 +619,8 @@ class ProgramGenerator:
     def restore_files(self):
         subprocess.run(['cp', f'{self.base_path}/{self.knowledge_path}.backup', f'{self.base_path}/{self.knowledge_path}'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['cp', f'{self.base_path}/{self.settings_path}.backup', f'{self.base_path}/{self.settings_path}'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
         subprocess.run(['cp', l3_path, f'{l3_path}.generated'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -607,6 +629,10 @@ class ProgramGenerator:
         subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.tmp'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['rm', f'{self.base_path}/{self.settings_path}.tmp'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['rm', f'{self.base_path}/{self.settings_path}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['rm', f'{l3_path}.backup'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
