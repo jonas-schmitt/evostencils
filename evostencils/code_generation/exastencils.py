@@ -241,9 +241,7 @@ class ProgramGenerator:
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples
 
-    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str,
-                              infinity=1e100, number_of_samples=1):
+    def initialize_code_generation(self, max_level):
         self.generate_level_adapted_knowledge_file(max_level)
         if self._counter == 0:
             start_time = time.time()
@@ -255,6 +253,13 @@ class ProgramGenerator:
         else:
             self.run_exastencils_compiler()
         self.generate_adapted_settings_file()
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
+        subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+                              max_level: int, solver_program: str,
+                              infinity=1e100, number_of_samples=1):
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, max_level)
         self.generate_l3_file(solver_program + cycle_function)
         try:
@@ -263,13 +268,11 @@ class ProgramGenerator:
             end_time = time.time()
             elapsed_time = end_time - start_time
         except subprocess.TimeoutExpired:
-            self.restore_files()
             return infinity, infinity
         self._counter += 1
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         self.run_c_compiler()
         runtime, convergence_factor = self.evaluate(infinity, number_of_samples)
-        self.restore_files()
         return runtime, convergence_factor
 
     @staticmethod
@@ -558,9 +561,6 @@ class ProgramGenerator:
         return program
 
     def generate_l3_file(self, program: str):
-        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
-        subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         with open(f'{self.base_path}/{self._debug_l3_path}', 'r') as input_file:
             with open(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3', 'w+') as output_file:
                 line = input_file.readline()

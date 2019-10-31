@@ -66,7 +66,7 @@ def main():
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    runtime_cgs = 0.5 * 1e-3
+    runtime_cgs = 0.0
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
@@ -87,14 +87,13 @@ def main():
     levels_per_run = 2
     required_convergence = 0.1
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=500, gp_lambda=500,
-                                                               gp_generations=100,
-                                                               es_generations=100,
+    program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=20, gp_lambda=20,
+                                                               gp_generations=10,
+                                                               es_generations=20,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
-    program_generator.generate_level_adapted_knowledge_file(max_level)
-    program_generator.generate_adapted_settings_file()
+    program_generator.initialize_code_generation(max_level)
     program_generator.generate_l3_file(program)
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()

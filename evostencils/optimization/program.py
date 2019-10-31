@@ -350,8 +350,9 @@ class Optimizer:
             hof = sorted(hof, key=estimated_solving_time)
             best_time = self.infinity
             best_individual = hof[0]
-            self._program_generator._counter = 0
-            self._program_generator._average_generation_time = 0
+            self.program_generator._counter = 0
+            self.program_generator._average_generation_time = 0
+            self.program_generator.initialize_code_generation(max_level)
             try:
                 for j in range(0, min(50, len(hof))):
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
@@ -371,43 +372,42 @@ class Optimizer:
                         best_expression = expression
                         best_time = time
             except (KeyboardInterrupt, Exception) as e:
-                self._program_generator.restore_files()
+                self.program_generator.restore_files()
                 raise e
+            self.program_generator.restore_files()
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
             best_convergence_factor = best_individual.fitness.values[0]
             print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
-            try:
-                relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
-                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-            except (KeyboardInterrupt, Exception) as e:
-                self._program_generator.restore_files()
-                raise e
+            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
+            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
 
-            cycle_function = self._program_generator.generate_cycle_function(best_expression, storages, min_level,
+            cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                              max_level, self.max_level)
             solver_program += cycle_function
 
         return solver_program, pops, logbooks
 
-    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program=None, storages=None):
+    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages):
         initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        if base_program is not None and storages is not None:
-            self.program_generator.generate_level_adapted_knowledge_file(max_level)
-            self.program_generator.run_exastencils_compiler()
-            self.program_generator.generate_adapted_settings_file()
+        self.program_generator.initialize_code_generation(max_level)
+        try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
             self.program_generator.generate_l3_file(tmp + cycle_function)
-        best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
-        best_weights = list(best_individual)
-        spectral_radius, = best_individual.fitness.values
+            best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
+            best_weights = list(best_individual)
+            spectral_radius, = best_individual.fitness.values
+        except (KeyboardInterrupt, Exception) as e:
+            self.program_generator.restore_files()
+            raise e
         # print(f'Best weights: {best_weights}')
         # print(f'Best spectral radius: {spectral_radius}')
+        self.program_generator.restore_files()
         return best_weights, spectral_radius
 
     @staticmethod
