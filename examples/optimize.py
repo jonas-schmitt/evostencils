@@ -16,8 +16,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -32,8 +32,8 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
@@ -66,7 +66,7 @@ def main():
     bytes_per_word = 8
     peak_performance = 4 * 16 * 3.6 * 1e9 # 4 Cores * 16 DP FLOPS * 3.6 GHz
     peak_bandwidth = 34.1 * 1e9 # 34.1 GB/s
-    runtime_cgs = 0.04 * 1e-3
+    runtime_cgs = 0.5 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word, runtime_cgs)
     infinity = 1e100
     epsilon = 1e-10
@@ -82,14 +82,14 @@ def main():
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
+    restart_from_checkpoint = True
+    # restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 1.0
+    required_convergence = 0.1
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=500, gp_lambda=500,
                                                                gp_generations=100,
-                                                               es_generations=200,
+                                                               es_generations=100,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

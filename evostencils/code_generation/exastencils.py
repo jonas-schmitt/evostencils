@@ -335,25 +335,27 @@ class ProgramGenerator:
         program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
 
-    def generate_operator_entry(self, expression, field, level):
-        if isinstance(expression, base.Multiplication):
-            return f'({self.generate_operator_entry(expression.operand1, field, level)} * ' \
-                   f'{self.generate_operator_entry(expression.operand2, field, level)})'
-        elif isinstance(expression, base.Addition):
-            term1 = f'{self.generate_operator_entry(expression.operand1, field, level)}'
-            term2 = f'{self.generate_operator_entry(expression.operand2, field, level)}'
-            if not isinstance(expression.operand1, base.Addition):
-                term1 = f'{term1} * {field.to_exa()}'
-            if not isinstance(expression.operand2, base.Addition):
-                term2 = f'{term2} * {field.to_exa()}'
-            return f'{term1} + {term2}'
+    def generate_sympy_expression_for_operator_entry(self, expression, level):
+        if isinstance(expression, base.BinaryExpression):
+            subterm1 = self.generate_sympy_expression_for_operator_entry(expression.operand1, level)
+            subterm2 = self.generate_sympy_expression_for_operator_entry(expression.operand2, level)
+            if isinstance(expression, base.Multiplication):
+                return subterm1 * subterm2
+            elif isinstance(expression, base.Addition):
+                return subterm1 + subterm2
+            elif isinstance(expression, base.Subtraction):
+                return subterm1 - subterm2
+            else:
+                raise RuntimeError("Invalid expression")
         elif isinstance(expression, base.Scaling):
-            return f'({expression.factor} * {self.generate_operator_entry(expression.operand, field, level)})'
+            subterm = self.generate_sympy_expression_for_operator_entry(expression.operand, level)
+            return expression.factor * subterm
         elif isinstance(expression, base.Operator):
             if isinstance(expression, base.Identity):
-                return '1'
+                return sympy.sympify(1)
             else:
-                return f'{expression.name}@{level}'
+                return sympy.MatrixSymbol(f'{expression.name}@{level}', expression.shape[0], expression.shape[1])
+                # return sympy.Symbol(f'{expression.name}@{level}')
         else:
             raise RuntimeError("Invalid expression")
 
@@ -393,10 +395,9 @@ class ProgramGenerator:
                         elif isinstance(entry, base.ZeroOperator):
                             pass
                         else:
-                            if not isinstance(entry, base.Addition):
-                                program += f' - {self.generate_operator_entry(entry, field, level)} * {field.to_exa()}'
-                            else:
-                                program += f' - ({self.generate_operator_entry(entry, field, level)})'
+                            sympy_expr = self.generate_sympy_expression_for_operator_entry(entry, level)
+                            sympy_expr = sympy_expr * sympy.MatrixSymbol(field.to_exa(), entry.shape[1], entry.shape[1])
+                            program += f' - ({sympy_expr.expand()})'
                     program += ')\n'
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
@@ -503,10 +504,9 @@ class ProgramGenerator:
                     elif isinstance(entry, base.ZeroOperator):
                         pass
                     else:
-                        if not isinstance(entry, base.Addition):
-                            program += f' - {self.generate_operator_entry(entry, field, level)} * {field.to_exa()}'
-                        else:
-                            program += f' - ({self.generate_operator_entry(entry, field, level)})'
+                        sympy_expr = self.generate_sympy_expression_for_operator_entry(entry, level)
+                        sympy_expr = sympy_expr * sympy.MatrixSymbol(field.to_exa(), entry.shape[1], entry.shape[1])
+                        program += f' - ({sympy_expr.expand()})'
                 program += '\n'
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):
