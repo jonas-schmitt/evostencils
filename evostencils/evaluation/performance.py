@@ -198,7 +198,7 @@ class PerformanceEvaluator:
                 entry = entries[i][i]
                 stencil = entry.generate_stencil()
                 number_of_entries = periodic.count_number_of_entries(stencil)
-                number_of_additional_variables = reduce(lambda x, y: x*y, number_of_entries) - 1
+                number_of_additional_variables = len(number_of_entries) - 1
                 number_of_variables += number_of_additional_variables
 
             additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0

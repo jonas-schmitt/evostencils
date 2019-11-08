@@ -82,8 +82,8 @@ def main():
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    restart_from_checkpoint = True
-    # restart_from_checkpoint = False
+    # restart_from_checkpoint = True
+    restart_from_checkpoint = False
     levels_per_run = 2
     required_convergence = 0.1
     maximum_block_size = 3
