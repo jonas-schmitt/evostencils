@@ -1,7 +1,7 @@
 from evostencils.expressions import base, partitioning, system
 import evostencils.stencils.periodic as periodic
 from functools import reduce
-
+import math
 
 class PerformanceEvaluator:
     """
@@ -38,13 +38,76 @@ class PerformanceEvaluator:
     def compute_arithmetic_intensity(self, operations: float, words: float):
         return operations / (words * self.bytes_per_word)
 
-    def compute_runtime(self, operations: float, words: float, problem_size: float):
+    def compute_runtime(self, operations: float, words: float, total_number_of_operations: float):
         arithmetic_intensity = self.compute_arithmetic_intensity(operations, words)
         if arithmetic_intensity > 0.0:
-            runtime = problem_size / self.compute_performance(arithmetic_intensity)
+            runtime = total_number_of_operations / self.compute_performance(arithmetic_intensity)
         else:
             runtime = 0.0
         return runtime
+
+    def estimate_complexity(self, expression: base.Expression):
+        if expression.complexity is not None:
+            return expression.complexity
+        if isinstance(expression, base.Cycle):
+            # Partitions are currently ignored since they do not affect the arithmetic intensity
+            # Although beware that in cases where the total data size is too small the memory bandwidth can not be saturated
+            # and the maximum bandwidth will not be achieved
+            grid = expression.grid
+            correction = expression.correction
+            if isinstance(correction, base.Residual):
+                operations_per_cell, words_per_cell = 0, 0
+                operations = self.estimate_complexity(correction)
+            elif isinstance(correction, base.Multiplication):
+                operations = self.estimate_complexity(correction.operand2)
+                if isinstance(correction.operand1, system.InterGridOperator):
+                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+                else:
+                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1)
+            else:
+                raise RuntimeError("Expected multiplication")
+            operations_per_cell += len(grid) * (PerformanceEvaluator.operations_for_addition() + PerformanceEvaluator.operations_for_scaling())
+            words_per_cell += len(grid) * (PerformanceEvaluator.words_transferred_for_load() + PerformanceEvaluator.words_transferred_for_store())
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            operations += operations_per_cell * problem_size
+        elif isinstance(expression, base.Residual):
+            operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_residual(expression)
+            # Store result
+            words_per_cell += len(expression.grid) * PerformanceEvaluator.words_transferred_for_store()
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            operations = operations_per_cell * problem_size
+            if not isinstance(expression.rhs, system.RightHandSide):
+                operations_rhs = self.estimate_complexity(expression.rhs)
+            else:
+                operations_rhs = 0
+            if not isinstance(expression.approximation, system.Approximation):
+                operations_approximation = self.estimate_complexity(expression.approximation)
+            else:
+                operations_approximation = 0
+            operations += operations_rhs + operations_approximation
+        elif isinstance(expression, base.Multiplication):
+            if isinstance(expression.operand1, system.InterGridOperator):
+                operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
+                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                operations = operations_per_cell * problem_size
+            elif isinstance(expression.operand1, base.CoarseGridSolver):
+                cgs = expression.operand1
+                if cgs.expression is not None:
+                    if cgs.expression.runtime is None:
+                        operations = self.estimate_complexity(cgs.expression)
+                    else:
+                        operations = cgs.expression.operation_count
+                else:
+                    operations = 0
+            else:
+                operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
+                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                operations = operations_per_cell * problem_size
+            operations += self.estimate_complexity(expression.operand2)
+        else:
+            raise RuntimeError("Not implemented")
+        expression.complexity = operations
+        return operations
 
     def estimate_runtime(self, expression: base.Expression):
         if expression.runtime is not None:
@@ -69,13 +132,14 @@ class PerformanceEvaluator:
             operations_per_cell += len(grid) * (PerformanceEvaluator.operations_for_addition() + PerformanceEvaluator.operations_for_scaling())
             words_per_cell += len(grid) * (PerformanceEvaluator.words_transferred_for_load() + PerformanceEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            runtime += self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            tmp = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
+            runtime += tmp
         elif isinstance(expression, base.Residual):
             operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_residual(expression)
             # Store result
             words_per_cell += len(expression.grid) * PerformanceEvaluator.words_transferred_for_store()
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+            runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
             if not isinstance(expression.rhs, system.RightHandSide):
                 runtime_rhs = self.estimate_runtime(expression.rhs)
             else:
@@ -89,7 +153,7 @@ class PerformanceEvaluator:
             if isinstance(expression.operand1, system.InterGridOperator):
                 operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+                runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
             elif isinstance(expression.operand1, base.CoarseGridSolver):
                 cgs = expression.operand1
                 if cgs.expression is not None:
@@ -102,7 +166,7 @@ class PerformanceEvaluator:
             else:
                 operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.compute_runtime(operations_per_cell, words_per_cell, problem_size)
+                runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
             runtime += self.estimate_runtime(expression.operand2)
         else:
             raise RuntimeError("Not implemented")
@@ -165,9 +229,11 @@ class PerformanceEvaluator:
                 for offset, _ in constant_stencil.entries:
                     offset_sets[i].add(offset)
                 number_of_stencil_coefficients = constant_stencil.number_of_entries
-                operations_per_cell += PerformanceEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) + PerformanceEvaluator.operations_for_subtraction()
+                operations_per_cell += PerformanceEvaluator.operations_for_stencil_application(number_of_stencil_coefficients) \
+                    + PerformanceEvaluator.operations_for_subtraction()
         for s in offset_sets:
             words_per_cell += PerformanceEvaluator.words_transferred_for_stencil_application(len(s))
+        words_per_cell += len(grid) * PerformanceEvaluator.words_transferred_for_store()
         return operations_per_cell, words_per_cell
 
     @staticmethod
@@ -181,32 +247,23 @@ class PerformanceEvaluator:
             # Decoupled Relaxation
             operations_per_cell = PerformanceEvaluator.operations_for_multiplication() * number_of_variables
             words_per_cell = PerformanceEvaluator.words_transferred_for_load() * number_of_variables
-        elif isinstance(expression, system.ElementwiseDiagonal):
+        elif isinstance(expression, system.ElementwiseDiagonal) or isinstance(expression, system.Operator):
             # Collective Relaxation
             # Required operations for Gaussian Elimination
-            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
-            multiplications = additions
-            divisions = number_of_variables * (number_of_variables + 1) / 2
-            operations_per_cell = additions * PerformanceEvaluator.operations_for_addition() + \
-                                  multiplications * PerformanceEvaluator.operations_for_multiplication() + \
-                                  divisions * PerformanceEvaluator.operations_for_division()
-            words_per_cell = number_of_variables * PerformanceEvaluator.words_transferred_for_load()
-        elif isinstance(expression, system.Operator):
-            # Custom Relaxation Operator
-            entries = expression.entries
-            for i in range(len(grid)):
-                entry = entries[i][i]
-                stencil = entry.generate_stencil()
-                number_of_entries = periodic.count_number_of_entries(stencil)
-                number_of_additional_variables = len(number_of_entries) - 1
-                number_of_variables += number_of_additional_variables
+            if isinstance(expression, system.Operator):
+                entries = expression.entries
+                for i in range(len(grid)):
+                    entry = entries[i][i]
+                    stencil = entry.generate_stencil()
+                    number_of_entries = periodic.count_number_of_entries(stencil)
+                    number_of_additional_variables = len(number_of_entries) - 1
+                    number_of_variables += number_of_additional_variables
 
-            additions = (2*number_of_variables**3 + 3*number_of_variables**2 - 5*number_of_variables)/6.0
-            multiplications = additions
-            divisions = number_of_variables * (number_of_variables + 1) / 2
+            n = number_of_variables
+            multiplications = int(round(n**3 / 3 + n**2 - n / 3))
+            additions = int(round(n**3 / 3 + n**2 / 2 - 5*n / 6))
             operations_per_cell = additions * PerformanceEvaluator.operations_for_addition() + \
-                                  multiplications * PerformanceEvaluator.operations_for_multiplication() + \
-                                  divisions * PerformanceEvaluator.operations_for_division()
+                multiplications * PerformanceEvaluator.operations_for_multiplication()
             words_per_cell = number_of_variables * PerformanceEvaluator.words_transferred_for_load()
         else:
             raise NotImplementedError("Smoother currently not supported.")

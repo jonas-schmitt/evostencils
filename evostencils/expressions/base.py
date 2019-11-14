@@ -11,6 +11,7 @@ class Expression(abc.ABC):
         self.lfa_symbol = None
         self.valid = False
         self.runtime = None
+        self.complexity = None
 
     @property
     @abc.abstractmethod

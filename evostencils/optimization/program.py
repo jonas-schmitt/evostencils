@@ -83,17 +83,14 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=5, max_height=10)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=50)
         self._toolbox.register("individual", tools.initIterate, creator.Individual, self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate, pset=pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("mate", gp.cxOnePoint)
-        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.1)
-        # self._toolbox.register("mate", gp.cxOnePointLeafBiased, termpb=0.2)
-        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=5)
+        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=10)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
-        # self._toolbox.register("mutInsert", gp.mutInsert, pset=pset)
 
     @property
     def dimension(self):
@@ -179,8 +176,8 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3 # ms
-                return spectral_radius, runtime
+                complexity = self.performance_evaluator.estimate_complexity(expression)
+                return spectral_radius, complexity
             else:
                 return spectral_radius, self.infinity
 
@@ -206,7 +203,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -246,7 +243,7 @@ class Optimizer:
         # Begin the generational process
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
-            offspring = tools.selTournamentDCD(pop, 4 * (lambda_ // 4))
+            offspring = tools.selTournamentDCD(pop, int(round(4 * lambda_) // 4))
             offspring = [toolbox.clone(ind) for ind in offspring]
 
             for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
@@ -320,7 +317,6 @@ class Optimizer:
                     continue
             approximation = approximations[i]
 
-            # Not entirely clear if needed
             self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
 
             rhs = right_hand_sides[i]
@@ -341,20 +337,14 @@ class Optimizer:
 
             pops.append(pop)
 
-            def estimated_solving_time(ind):
-                rho = ind.fitness.values[0]
-                if rho < 1.0:
-                    return math.log(self.epsilon) / math.log(rho) * ind.fitness.values[1]
-                else:
-                    return rho * self.infinity
-            hof = sorted(hof, key=estimated_solving_time)
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[1])
             best_time = self.infinity
             best_individual = hof[0]
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
             try:
-                for j in range(0, min(50, len(hof))):
+                for j in range(0, min(100, len(hof))):
                     if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
                             abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
                         continue
@@ -424,7 +414,7 @@ class Optimizer:
         g.draw(f"{filename}.png", "png")
 
     @staticmethod
-    def plot_multiobjective_data(generations, convergence_data, runtime_data, label1, label2):
+    def plot_multiobjective_data(generations, convergence_data, complexity_data, label1, label2):
         from matplotlib.ticker import MaxNLocator
         import matplotlib.pyplot as plt
 
@@ -437,8 +427,8 @@ class Optimizer:
             tl.set_color("b")
 
         ax2 = ax1.twinx()
-        line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
-        ax2.set_ylabel("Runtime (ms)", color="r")
+        line2 = ax2.plot(generations, complexity_data, "r-", label=f"{label2}")
+        ax2.set_ylabel("Number of operations", color="r")
         for tl in ax2.get_yticklabels():
             tl.set_color("r")
 
@@ -452,15 +442,15 @@ class Optimizer:
     def plot_minimum_fitness(logbook):
         gen = logbook.select("gen")
         convergence_mins = logbook.chapters["convergence"].select("min")
-        runtime_mins = logbook.chapters["runtime"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Estimated Runtime per Iteration')
+        complexity_mins = logbook.chapters["complexity"].select("min")
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, complexity_mins, 'Minimum Spectral Radius', 'Minimum Estimated Number of Operations')
 
     @staticmethod
     def plot_average_fitness(logbook):
         gen = logbook.select("gen")
         convergence_avgs = logbook.chapters["convergence"].select("avg")
-        runtime_avgs = logbook.chapters["runtime"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Estimated Runtime per Iteration')
+        complexity_avgs = logbook.chapters["complexity"].select("avg")
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, complexity_avgs, 'Average Spectral Radius', 'Average Estimated Number of Operations')
 
     @staticmethod
     def plot_pareto_front(pop):
@@ -471,7 +461,7 @@ class Optimizer:
         front = numpy.array([ind.fitness.values for ind in pop])
         plt.scatter(front[:, 0], front[:, 1], c="b")
         plt.xlabel("Spectral Radius")
-        plt.ylabel("Runtime (ms)")
+        plt.ylabel("Number of Operations")
         plt.axis("tight")
         plt.show()
 
