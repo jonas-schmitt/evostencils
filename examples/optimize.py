@@ -87,7 +87,7 @@ def main():
     required_convergence = 0.1
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(levels_per_run=levels_per_run, gp_mu=500, gp_lambda=500,
-                                                               gp_generations=150,
+                                                               gp_generations=200,
                                                                es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,

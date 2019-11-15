@@ -347,11 +347,12 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
-    # def sample_relaxation_factor():
-    #     return random.gauss(1.0, 0.4)
-    # for i in range(1000):
-    #     pset.addTerminal(sample_relaxation_factor(), TypeWrapper(float), f'omega_{i}')
     pset.addTerminal(1.0, TypeWrapper(float), f'omega')
+
+    def sample_relaxation_factor():
+        return random.gauss(1.0, 0.4)
+    for i in range(1000):
+        pset.addTerminal(sample_relaxation_factor(), TypeWrapper(float), f'omega_{i}')
     block_sizes = []
     for i in range(len(fields)):
         block_sizes.append([])

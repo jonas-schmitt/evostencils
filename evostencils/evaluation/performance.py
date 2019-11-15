@@ -1,7 +1,7 @@
 from evostencils.expressions import base, partitioning, system
 import evostencils.stencils.periodic as periodic
 from functools import reduce
-import math
+
 
 class PerformanceEvaluator:
     """

@@ -9,7 +9,7 @@ from evostencils.expressions import base, transformations, system
 from evostencils.deap_extension import genGrow
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
-import math
+import math, numpy
 
 
 class suppress_output(object):
@@ -159,13 +159,11 @@ class Optimizer:
         return gp.compile(individual, pset)
 
     def evaluate(self, individual, pset):
-        import numpy, math
-        if len(individual) > 150:
-            return self.infinity, self.infinity
-        try:
-            expression1, expression2 = self.compile_individual(individual, pset)
-        except MemoryError:
-            return self.infinity, self.infinity
+        with suppress_output():
+            try:
+                expression1, expression2 = self.compile_individual(individual, pset)
+            except MemoryError:
+                return self.infinity, self.infinity
 
         expression = expression1
         with suppress_output():
@@ -441,7 +439,7 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
 
-            pop, log, hof = self.nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+            pop, log, hof = self.nsgaII(20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                         gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                         checkpoint_frequency=5, checkpoint=tmp)
 
