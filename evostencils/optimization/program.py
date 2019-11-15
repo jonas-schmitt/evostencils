@@ -1,6 +1,6 @@
 import numpy as np
 import deap.base
-from deap import gp, creator, tools
+from deap import gp, creator, tools, algorithms
 import random
 import pickle
 import os.path
@@ -183,6 +183,9 @@ class Optimizer:
 
     def nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
                min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running NSGA-II")
+        self._toolbox.unregister("select")
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
         random.seed()
         use_checkpoint = False
         if checkpoint is not None:
@@ -255,6 +258,113 @@ class Optimizer:
                     toolbox.mutate(ind2)
                 del ind1.fitness.values, ind2.fitness.values
 
+            # Evaluate the individuals with an invalid fitness
+            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            hof.update(pop)
+            if gen % checkpoint_frequency == 0:
+                if solver is not None:
+                    transformations.invalidate_expression(solver)
+                logbooks[-1] = logbook
+                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
+                try:
+                    checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
+                except (pickle.PickleError, TypeError) as e:
+                    print(e)
+                    print('Skipping checkpoint')
+            # Select the next generation population
+            pop = toolbox.select(pop + offspring, mu_)
+            record = mstats.compile(pop)
+            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            print(logbook.stream)
+
+        return pop, logbook, hof
+
+    def nsgaIII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+                min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running NSGA-III")
+        self._toolbox.unregister("select")
+        ref_points = tools.uniform_reference_points(2, 12)
+        self._toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
+        return self.multi_objective_optimization(initial_population_size, generations, mu_, lambda_, crossover_probability,
+                                                 mutation_probability, min_level, max_level, program, solver, logbooks,
+                                                 checkpoint_frequency, checkpoint)
+
+    def speaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+               min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running SPEA-II")
+        self._toolbox.unregister("select")
+        self._toolbox.register("select", tools.selSPEA2)
+        return self.multi_objective_optimization(initial_population_size, generations, mu_, lambda_, crossover_probability,
+                                                 mutation_probability, min_level, max_level, program, solver, logbooks,
+                                                 checkpoint_frequency, checkpoint)
+
+    def multi_objective_optimization(self, initial_population_size, generations, mu_, lambda_, crossover_probability,
+                                     mutation_probability, min_level, max_level, program, solver, logbooks,
+                                     checkpoint_frequency=5, checkpoint=None):
+        random.seed()
+        use_checkpoint = False
+        if checkpoint is not None:
+            if lambda_ == len(checkpoint.population):
+                use_checkpoint = True
+            else:
+                print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
+                      f'but the required size is {lambda_}.')
+        if use_checkpoint:
+            pop = checkpoint.population
+            min_generation = checkpoint.generation
+        else:
+            pop = self._toolbox.population(n=initial_population_size)
+            min_generation = 0
+        max_generation = generations
+        hof = tools.ParetoFront()
+
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        if use_checkpoint:
+            logbook = logbooks[-1]
+        else:
+            logbook = tools.Logbook()
+            logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+            logbooks.append(logbook)
+
+        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+        toolbox = self._toolbox
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+
+        hof.update(pop)
+
+        # This is just to assign the crowding distance to the individuals
+        # no actual selection is done
+        pop = toolbox.select(pop, len(pop))
+
+        record = mstats.compile(pop) if mstats is not None else {}
+        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
+        print(logbook.stream)
+
+        # Begin the generational process
+        for gen in range(min_generation + 1, max_generation + 1):
+            # Vary the population
+            offspring = algorithms.varOr(pop, toolbox, lambda_, crossover_probability, mutation_probability)
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
@@ -357,10 +467,12 @@ class Optimizer:
                     print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
                           f'Measured convergence factor: {convergence_factor}')
                     individual.fitness.values = (convergence_factor, individual.fitness.values[1])
-                    if time < best_time and convergence_factor < required_convergence:
+                    if time < best_time and ((i == 0 and convergence_factor < 0.9)
+                                             or convergence_factor < required_convergence):
                         best_individual = individual
                         best_expression = expression
                         best_time = time
+
             except (KeyboardInterrupt, Exception) as e:
                 self.program_generator.restore_files()
                 raise e
