@@ -115,6 +115,5 @@ class Optimizer:
         generator = self._gp_optimizer.program_generator
         generator.run_exastencils_compiler()
         algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
-        generator.restore_files()
         return hof[0]
 

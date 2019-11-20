@@ -259,50 +259,16 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning,
                                   predecessor=cycle.predecessor), relaxation_factor)
 
-    def two_step_smoothing(generate_smoother, cycle, partitioning, relaxation_factor):
-        tmp = smoothing(generate_smoother, cycle, partitioning, relaxation_factor)
-        cycle = residual(tmp)
-        return smoothing(generate_smoother, cycle, partitioning, relaxation_factor)
-
-    def three_step_smoothing(generate_smoother, cycle, partitioning, relaxation_factor):
-        tmp = smoothing(generate_smoother, cycle, partitioning, relaxation_factor)
-        cycle = residual(tmp)
-        tmp = smoothing(generate_smoother, cycle, partitioning, relaxation_factor)
-        cycle = residual(tmp)
-        return smoothing(generate_smoother, cycle, partitioning, relaxation_factor)
-
     def decoupled_jacobi(cycle, partitioning, relaxation_factor):
         return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor)
 
-    def decoupled_jacobi_two_steps(cycle, partitioning, relaxation_factor):
-        return two_step_smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor)
-
-    def decoupled_jacobi_three_steps(cycle, partitioning, relaxation_factor):
-        return three_step_smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor)
-
     def collective_jacobi(cycle, partitioning, relaxation_factor):
         return smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor)
-
-    def collective_jacobi_two_steps(cycle, partitioning, relaxation_factor):
-        return two_step_smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor)
-
-    def collective_jacobi_three_steps(cycle, partitioning, relaxation_factor):
-        return three_step_smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor)
 
     def collective_block_jacobi(cycle, partitioning, relaxation_factor, block_size):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_size)
         return smoothing(generate_collective_block_jacobi_fixed, cycle, partitioning, relaxation_factor)
-
-    def collective_block_jacobi_two_steps(cycle, partitioning, relaxation_factor, block_size):
-        def generate_collective_block_jacobi_fixed(operator):
-            return smoother.generate_collective_block_jacobi(operator, block_size)
-        return two_step_smoothing(generate_collective_block_jacobi_fixed, cycle, partitioning, relaxation_factor)
-
-    def collective_block_jacobi_three_steps(cycle, partitioning, relaxation_factor, block_size):
-        def generate_collective_block_jacobi_fixed(operator):
-            return smoother.generate_collective_block_jacobi(operator, block_size)
-        return three_step_smoothing(generate_collective_block_jacobi_fixed, cycle, partitioning, relaxation_factor)
 
     pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"iterate_{level}")
     pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"iterate_{level}")
@@ -313,29 +279,11 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
     pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
-    pset.addPrimitive(decoupled_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_two_steps{level}")
-    pset.addPrimitive(decoupled_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_two_steps{level}")
-
-    pset.addPrimitive(decoupled_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_three_steps_{level}")
-    pset.addPrimitive(decoupled_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_three_steps_{level}")
-
     pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
     pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
 
-    pset.addPrimitive(collective_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_two_steps_{level}")
-    pset.addPrimitive(collective_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_two_steps_{level}")
-
-    pset.addPrimitive(collective_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_three_steps_{level}")
-    pset.addPrimitive(collective_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_three_steps_{level}")
-
     pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
     pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
-
-    pset.addPrimitive(collective_block_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_two_steps_{level}")
-    pset.addPrimitive(collective_block_jacobi_two_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_two_steps_{level}")
-
-    pset.addPrimitive(collective_block_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_three_steps_{level}")
-    pset.addPrimitive(collective_block_jacobi_three_steps, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_three_steps_{level}")
 
     if not coarsest:
 
