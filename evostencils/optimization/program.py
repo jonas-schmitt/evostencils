@@ -52,7 +52,7 @@ def load_checkpoint_from_file(filename):
 class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
-                 program_generator=None, epsilon=1e-10, infinity=1e100, checkpoint_directory_path='./'):
+                 program_generator=None, epsilon=1e-10, infinity=1e300, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
@@ -221,7 +221,7 @@ class Optimizer:
 
     def gp_harm(self, initial_population_size, generations, crossover_probability, mutation_probability):
         self._toolbox.unregister('select')
-        self._toolbox.register('select', tools.selTournament, tournsize=2)
+        self._toolbox.register('select', tools.selTournament, tournsize=4)
         pop = self._toolbox.population(n=initial_population_size)
         hof = tools.HallOfFame(1)
 
@@ -247,6 +247,37 @@ class Optimizer:
         mstats.register("max", numpy.max)
         pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05,
                            beta=10, gamma=0.25, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
+        # print log
+        return pop, log, hof
+
+    def gp_simple(self, initial_population_size, generations, crossover_probability, mutation_probability):
+        self._toolbox.unregister('select')
+        self._toolbox.register('select', tools.selTournament, tournsize=4)
+        pop = self._toolbox.population(n=initial_population_size)
+        hof = tools.HallOfFame(1)
+
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if isinstance(x, tuple):
+                    x = x[0]
+                else:
+                    pass
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", numpy.std)
+        mstats.register("min", numpy.min)
+        mstats.register("max", numpy.max)
+        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations,
+                                       stats=mstats, halloffame=hof, verbose=True)
         # print log
         return pop, log, hof
 
@@ -547,8 +578,9 @@ class Optimizer:
                                                                    LevelNotFinishedType=self._NotFinishedType)
             self._init_single_objective_toolbox(pset)
 
+            # pop, log, hof = self.gp_simple(gp_mu, gp_generations, gp_crossover_probability, gp_mutation_probability)
             # pop, log, hof = self.gp_harm(gp_mu, gp_generations, gp_crossover_probability, gp_mutation_probability)
-            pop, log, hof = self.gp_mu_plus_lambda(10 * gp_mu, gp_mu, gp_lambda, gp_generations, gp_crossover_probability,
+            pop, log, hof = self.gp_mu_plus_lambda(20 * gp_mu, gp_mu, gp_lambda, gp_generations, gp_crossover_probability,
                                                    gp_mutation_probability)
             # pop, log, hof = self.gp_mu_comma_lambda(10 * gp_mu, gp_mu, gp_lambda, gp_generations, gp_crossover_probability,
             #                                         gp_mutation_probability)
@@ -556,6 +588,7 @@ class Optimizer:
             pops.append(pop)
             pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
             best_time = self.infinity
+            best_convergence_factor = self.infinity
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
@@ -575,8 +608,10 @@ class Optimizer:
                                                                       solver_program, number_of_samples=100)
                     print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
                     individual.fitness.values = (time,)
-                    if time < best_time and ((i == 0 and convergence_factor < 0.9)
-                                             or convergence_factor < required_convergence):
+                    time_difference = best_time - time
+                    if abs(time_difference) < 1 and convergence_factor < best_convergence_factor or \
+                            time_difference > 1 and ((i == 0 and convergence_factor < 0.9)
+                                                     or convergence_factor < required_convergence):
                         best_expression = expression
                         best_time = time
 
@@ -646,7 +681,7 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
 
-            pop, log, hof = self.gp_nsgaII(10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+            pop, log, hof = self.gp_nsgaII(20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                            gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                            checkpoint_frequency=5, checkpoint=tmp)
 
@@ -655,6 +690,7 @@ class Optimizer:
             hof = sorted(hof, key=lambda ind: ind.fitness.values[1])
             best_time = self.infinity
             best_individual = hof[0]
+            best_convergence_factor = self.infinity
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
@@ -672,11 +708,14 @@ class Optimizer:
                     print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
                           f'Measured convergence factor: {convergence_factor}')
                     individual.fitness.values = (convergence_factor, individual.fitness.values[1])
-                    if time < best_time and ((i == 0 and convergence_factor < 0.9)
-                                             or convergence_factor < required_convergence):
+                    time_difference = best_time - time
+                    if abs(time_difference) < 1 and convergence_factor < best_convergence_factor or \
+                            time_difference > 1 and ((i == 0 and convergence_factor < 0.9)
+                                                     or convergence_factor < required_convergence):
                         best_individual = individual
                         best_expression = expression
                         best_time = time
+                        best_convergence_factor = convergence_factor
 
             except (KeyboardInterrupt, Exception) as e:
                 self.program_generator.restore_files()

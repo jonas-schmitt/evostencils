@@ -67,7 +67,7 @@ def main():
     peak_performance = 126.89530 * 1e9 # likwid-bench -t peakflops_avx -w S0:4MB:8 -i 500000
     peak_bandwidth = 19.95779 * 1e9 # likwid-bench -t daxpy_avx_fma -w S0:8GB:8 -i 100
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
-    infinity = 1e100
+    infinity = 1e300
     epsilon = 1e-10
     problem_name = program_generator.problem_name
 
@@ -94,7 +94,7 @@ def main():
     #                                                                           restart_from_checkpoint=restart_from_checkpoint)
     program, pops, stats = optimizer.evolutionary_single_objective_optimization(levels_per_run, gp_mu=1000,
                                                                                 gp_lambda=1000,
-                                                                                gp_generations=150, es_generations=150,
+                                                                                gp_generations=100, es_generations=150,
                                                                                 gp_mutation_probability=0.5,
                                                                                 gp_crossover_probability=0.5,
                                                                                 required_convergence=required_convergence,
