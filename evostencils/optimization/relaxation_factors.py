@@ -103,6 +103,7 @@ class Optimizer:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
         lambda_ = int((4 + 3 * log(problem_size)) * 2)
+        print("Running CMA-ES")
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", numpy.mean)

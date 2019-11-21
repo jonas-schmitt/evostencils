@@ -1,6 +1,6 @@
 import numpy as np
 import deap.base
-from deap import gp, creator, tools, algorithms
+from deap import gp, creator, tools
 import random
 import pickle
 import os.path
@@ -84,27 +84,24 @@ class Optimizer:
         creator.create("SingleObjectiveFitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("SingleObjectiveIndividual", gp.PrimitiveTree, fitness=creator.SingleObjectiveFitness)
 
-    def _init_multi_objective_toolbox(self, pset):
+    def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
         self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=50)
-        self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual, self._toolbox.expression)
-        self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
-        self._toolbox.register("evaluate", self.evaluate_multiple_objectives, pset=pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("mate", gp.cxOnePoint)
         self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=10)
         self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
 
+    def _init_multi_objective_toolbox(self, pset):
+        self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
+                               self._toolbox.expression)
+        self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
+        self._toolbox.register("evaluate", self.evaluate_multiple_objectives, pset=pset)
+
     def _init_single_objective_toolbox(self, pset):
-        self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=50)
-        self._toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual, self._toolbox.expression)
+        self._toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual,
+                               self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("evaluate", self.evaluate_single_objective, pset=pset)
-        self._toolbox.register("select", tools.selBest)
-        self._toolbox.register("mate", gp.cxOnePoint)
-        self._toolbox.register("expr_mut", genGrow, pset=pset, min_height=1, max_height=10)
-        self._toolbox.register("mutate", gp.mutUniform, expr=self._toolbox.expr_mut, pset=pset)
 
     @property
     def dimension(self):
@@ -219,131 +216,9 @@ class Optimizer:
             else:
                 return spectral_radius,
 
-    def gp_harm(self, initial_population_size, generations, crossover_probability, mutation_probability):
-        self._toolbox.unregister('select')
-        self._toolbox.register('select', tools.selTournament, tournsize=4)
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(1)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if isinstance(x, tuple):
-                    x = x[0]
-                else:
-                    pass
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", numpy.std)
-        mstats.register("min", numpy.min)
-        mstats.register("max", numpy.max)
-        pop, log = gp.harm(pop, self._toolbox, crossover_probability, mutation_probability, generations, alpha=0.05,
-                           beta=10, gamma=0.25, rho=0.9, stats=mstats, halloffame=hof, verbose=True)
-        # print log
-        return pop, log, hof
-
-    def gp_simple(self, initial_population_size, generations, crossover_probability, mutation_probability):
-        self._toolbox.unregister('select')
-        self._toolbox.register('select', tools.selTournament, tournsize=4)
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(1)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if isinstance(x, tuple):
-                    x = x[0]
-                else:
-                    pass
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", numpy.std)
-        mstats.register("min", numpy.min)
-        mstats.register("max", numpy.max)
-        pop, log = algorithms.eaSimple(pop, self._toolbox, crossover_probability, mutation_probability, generations,
-                                       stats=mstats, halloffame=hof, verbose=True)
-        # print log
-        return pop, log, hof
-
-    def gp_mu_plus_lambda(self, initial_population_size, mu_, lambda_, generations, crossover_probability, mutation_probability):
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(1)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if isinstance(x, tuple):
-                    x = x[0]
-                else:
-                    pass
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", numpy.std)
-        mstats.register("min", numpy.min)
-        mstats.register("max", numpy.max)
-        pop, log = algorithms.eaMuPlusLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability,
-                                             ngen=generations, stats=mstats, halloffame=hof, verbose=True)
-        # print log
-        return pop, log, hof
-
-    def gp_mu_comma_lambda(self, initial_population_size, mu_, lambda_, generations, crossover_probability, mutation_probability):
-        pop = self._toolbox.population(n=initial_population_size)
-        hof = tools.HallOfFame(1)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if isinstance(x, tuple):
-                    x = x[0]
-                else:
-                    pass
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", numpy.std)
-        mstats.register("min", numpy.min)
-        mstats.register("max", numpy.max)
-        pop, log = algorithms.eaMuCommaLambda(pop, self._toolbox, mu_, lambda_, crossover_probability, mutation_probability,
-                                              ngen=generations, stats=mstats, halloffame=hof, verbose=True)
-        # print log
-        return pop, log, hof
-
-    def gp_nsgaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
-                  min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-II")
-        self._toolbox.unregister("select")
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+    def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
+                          crossover_probability, mutation_probability, min_level, max_level,
+                          program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof):
         random.seed()
         use_checkpoint = False
         if checkpoint is not None:
@@ -359,25 +234,7 @@ class Optimizer:
             pop = self._toolbox.population(n=initial_population_size)
             min_generation = 0
         max_generation = generations
-        hof = tools.ParetoFront()
 
-        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
         if use_checkpoint:
             logbook = logbooks[-1]
         else:
@@ -390,11 +247,8 @@ class Optimizer:
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-
-        hof.update(pop)
-
-        # This is just to assign the crowding distance to the individuals
-        # no actual selection is done
+        if hof is not None:
+            hof.update(pop)
         pop = toolbox.select(pop, len(pop))
 
         record = mstats.compile(pop) if mstats is not None else {}
@@ -404,7 +258,7 @@ class Optimizer:
         # Begin the generational process
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
-            offspring = tools.selTournamentDCD(pop, int(round(4 * lambda_) // 4))
+            offspring = toolbox.select_for_mating(pop, lambda_)
             offspring = [toolbox.clone(ind) for ind in offspring]
 
             for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
@@ -421,7 +275,8 @@ class Optimizer:
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
-            hof.update(pop)
+            if hof is not None:
+                hof.update(pop)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
                     transformations.invalidate_expression(solver)
@@ -440,44 +295,42 @@ class Optimizer:
 
         return pop, logbook, hof
 
-    def gp_nsgaIII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
-                   min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-III")
-        self._toolbox.unregister("select")
-        ref_points = tools.uniform_reference_points(2, 12)
-        self._toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
-        return self.gp_multi_objective(initial_population_size, generations, mu_, lambda_, crossover_probability,
-                                       mutation_probability, min_level, max_level, program, solver, logbooks,
-                                       checkpoint_frequency, checkpoint)
+    def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
+                            crossover_probability, mutation_probability, min_level, max_level,
+                            program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running Single-Objective Genetic Programming")
+        self._init_single_objective_toolbox(pset)
+        self._toolbox.register("select", tools.selBest)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
-    def gp_speaII(self, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
-                  min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running SPEA-II")
-        self._toolbox.unregister("select")
-        self._toolbox.register("select", tools.selSPEA2)
-        return self.gp_multi_objective(initial_population_size, generations, mu_, lambda_, crossover_probability,
-                                       mutation_probability, min_level, max_level, program, solver, logbooks,
-                                       checkpoint_frequency, checkpoint)
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
-    def gp_multi_objective(self, initial_population_size, generations, mu_, lambda_, crossover_probability,
-                           mutation_probability, min_level, max_level, program, solver, logbooks,
-                           checkpoint_frequency=5, checkpoint=None):
-        random.seed()
-        use_checkpoint = False
-        if checkpoint is not None:
-            if lambda_ == len(checkpoint.population):
-                use_checkpoint = True
-            else:
-                print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
-                      f'but the required size is {lambda_}.')
-        if use_checkpoint:
-            pop = checkpoint.population
-            min_generation = checkpoint.generation
-        else:
-            pop = self._toolbox.population(n=initial_population_size)
-            min_generation = 0
-        max_generation = generations
-        hof = tools.ParetoFront()
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        hof = tools.HallOfFame(100)
+        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
+                                      crossover_probability, mutation_probability, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
+
+    def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
+               crossover_probability, mutation_probability, min_level, max_level,
+               program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running NSGA-II Genetic Programming")
+        self._init_multi_objective_toolbox(pset)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        self._toolbox.register("select_for_mating", tools.selTournamentDCD)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -496,142 +349,76 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        if use_checkpoint:
-            logbook = logbooks[-1]
-        else:
-            logbook = tools.Logbook()
-            logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
-            logbooks.append(logbook)
+        hof = tools.ParetoFront()
 
-        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
-        toolbox = self._toolbox
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
+        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
+                                      crossover_probability, mutation_probability, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-        hof.update(pop)
+    def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+                min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running NSGA-III Genetic Programming")
+        self._init_multi_objective_toolbox(pset)
+        ref_points = tools.uniform_reference_points(2, 12)
+        self._toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
+        self._toolbox.register("select_for_mating", tools.selRandom)
 
-        # This is just to assign the crowding distance to the individuals
-        # no actual selection is done
-        pop = toolbox.select(pop, len(pop))
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
 
-        record = mstats.compile(pop) if mstats is not None else {}
-        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
-        print(logbook.stream)
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
 
-        # Begin the generational process
-        for gen in range(min_generation + 1, max_generation + 1):
-            # Vary the population
-            offspring = algorithms.varOr(pop, toolbox, lambda_, crossover_probability, mutation_probability)
-            # Evaluate the individuals with an invalid fitness
-            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-            for ind, fit in zip(invalid_ind, fitnesses):
-                ind.fitness.values = fit
-            hof.update(pop)
-            if gen % checkpoint_frequency == 0:
-                if solver is not None:
-                    transformations.invalidate_expression(solver)
-                logbooks[-1] = logbook
-                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
-                try:
-                    checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
-                except (pickle.PickleError, TypeError) as e:
-                    print(e)
-                    print('Skipping checkpoint')
-            # Select the next generation population
-            pop = toolbox.select(pop + offspring, mu_)
-            record = mstats.compile(pop)
-            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            print(logbook.stream)
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        hof = tools.ParetoFront()
 
-        return pop, logbook, hof
+        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
+                                      crossover_probability, mutation_probability, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_single_objective_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
-                                                   gp_crossover_probability=0.7, gp_mutation_probability=0.3,
-                                                   es_generations=100, required_convergence=0.1, maximum_block_size=2):
+    def SPEAII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
+               min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+        print("Running SPEA-II Genetic Programming")
+        self._init_multi_objective_toolbox(pset)
+        self._toolbox.register("select", tools.selSPEA2)
+        self._toolbox.register("select_for_mating", tools.selRandom)
 
-        levels = self.max_level - self.min_level
-        approximations = [self.approximation]
-        right_hand_sides = [self.rhs]
-        for i in range(1, levels + 1):
-            approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factors))
-            right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factors))
-        best_expression = None
-        solver_program = ""
-        pops = []
-        logbooks = []
-        storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        for i in range(levels - levels_per_run, -1, -levels_per_run):
-            min_level = self.max_level - (i + levels_per_run - 1)
-            max_level = self.max_level - i
-            approximation = approximations[i]
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
 
-            self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
 
-            rhs = right_hand_sides[i]
-            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
-                                                                   max_level, self.equations, self.operators, self.fields,
-                                                                   maximum_block_size=maximum_block_size,
-                                                                   coarse_grid_solver_expression=best_expression,
-                                                                   depth=levels_per_run, LevelFinishedType=self._FinishedType,
-                                                                   LevelNotFinishedType=self._NotFinishedType)
-            self._init_single_objective_toolbox(pset)
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        hof = tools.ParetoFront()
 
-            # pop, log, hof = self.gp_simple(gp_mu, gp_generations, gp_crossover_probability, gp_mutation_probability)
-            # pop, log, hof = self.gp_harm(gp_mu, gp_generations, gp_crossover_probability, gp_mutation_probability)
-            pop, log, hof = self.gp_mu_plus_lambda(20 * gp_mu, gp_mu, gp_lambda, gp_generations, gp_crossover_probability,
-                                                   gp_mutation_probability)
-            # pop, log, hof = self.gp_mu_comma_lambda(10 * gp_mu, gp_mu, gp_lambda, gp_generations, gp_crossover_probability,
-            #                                         gp_mutation_probability)
+        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
+                                      crossover_probability, mutation_probability, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-            pops.append(pop)
-            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
-            best_time = self.infinity
-            best_convergence_factor = self.infinity
-            self.program_generator._counter = 0
-            self.program_generator._average_generation_time = 0
-            self.program_generator.initialize_code_generation(max_level)
-            count = 0
-            try:
-                for j in range(0, len(pop)):
-                    if j < len(pop) - 1 and abs(pop[j].fitness.values[0] - pop[j + 1].fitness.values[0]) < self.epsilon:
-                        continue
-                    count += 1
-                    if count >= 100:
-                        break
-                    individual = pop[j]
-                    expression = self.compile_individual(individual, pset)[0]
-
-                    time, convergence_factor = \
-                        self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                      solver_program, number_of_samples=100)
-                    print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
-                    individual.fitness.values = (time,)
-                    time_difference = best_time - time
-                    if abs(time_difference) < 1 and convergence_factor < best_convergence_factor or \
-                            time_difference > 1 and ((i == 0 and convergence_factor < 0.9)
-                                                     or convergence_factor < required_convergence):
-                        best_expression = expression
-                        best_time = time
-
-            except (KeyboardInterrupt, Exception) as e:
-                self.program_generator.restore_files()
-                raise e
-            self.program_generator.restore_files()
-
-            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
-            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-
-            cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
-                                                                             max_level, self.max_level)
-            solver_program += cycle_function
-
-        return solver_program, pops, logbooks
-
-    def evolutionary_multi_objective_optimization(self, levels_per_run=1, gp_mu=100, gp_lambda=100, gp_generations=100, gp_crossover_probability=0.7,
-                                                  gp_mutation_probability=0.3, es_generations=100, required_convergence=0.5,
-                                                  restart_from_checkpoint=False, maximum_block_size=2):
+    def evolutionary_optimization(self, levels_per_run=1, gp_mu=100, gp_lambda=100, gp_generations=100, gp_crossover_probability=0.5,
+                                  gp_mutation_probability=0.5, es_generations=100, required_convergence=0.5,
+                                  restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
@@ -663,7 +450,7 @@ class Optimizer:
                     best_expression = checkpoint.solver
                     pass_checkpoint = True
                     logbooks = checkpoint.logbooks
-                elif min_level > checkpoint.min_level:
+                elif min_level < checkpoint.min_level:
                     continue
             approximation = approximations[i]
 
@@ -676,43 +463,40 @@ class Optimizer:
                                                                    coarse_grid_solver_expression=best_expression,
                                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                                    LevelNotFinishedType=self._NotFinishedType)
-            self._init_multi_objective_toolbox(pset)
+            self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-
-            pop, log, hof = self.gp_nsgaII(20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
-                                           gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
-                                           checkpoint_frequency=5, checkpoint=tmp)
+            if optimization_method is None:
+                pop, log, hof = self.SOGP(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                          gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
+                                          checkpoint_frequency=5, checkpoint=tmp)
+            else:
+                pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                                    gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
+                                                    checkpoint_frequency=5, checkpoint=tmp)
 
             pops.append(pop)
 
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[1])
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             best_time = self.infinity
-            best_individual = hof[0]
             best_convergence_factor = self.infinity
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
             try:
                 for j in range(0, min(100, len(hof))):
-                    if j < len(hof) - 1 and abs(hof[j].fitness.values[0] - hof[j + 1].fitness.values[0]) < self.epsilon and \
-                            abs(hof[j].fitness.values[1] - hof[j + 1].fitness.values[1] < self.epsilon):
-                        continue
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
 
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=100)
-                    print(f'Time: {time}, Estimated convergence factor: {individual.fitness.values[0]}, '
-                          f'Measured convergence factor: {convergence_factor}')
-                    individual.fitness.values = (convergence_factor, individual.fitness.values[1])
+                    print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
                     time_difference = best_time - time
-                    if abs(time_difference) < 1 and convergence_factor < best_convergence_factor or \
+                    if abs(time_difference) < 1 + self.epsilon and convergence_factor < best_convergence_factor or \
                             time_difference > 1 and ((i == 0 and convergence_factor < 0.9)
                                                      or convergence_factor < required_convergence):
-                        best_individual = individual
                         best_expression = expression
                         best_time = time
                         best_convergence_factor = convergence_factor
@@ -723,13 +507,13 @@ class Optimizer:
             self.program_generator.restore_files()
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
-            best_convergence_factor = best_individual.fitness.values[0]
-            print(f"Best individual: ({best_convergence_factor}), ({best_individual.fitness.values[1]})")
-            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level, solver_program, storages)
+            print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}")
+            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations,
+                                                                     min_level, max_level, solver_program, storages)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
 
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
-                                                                             max_level, self.max_level)
+                                                                            max_level, self.max_level)
             solver_program += cycle_function
 
         return solver_program, pops, logbooks
