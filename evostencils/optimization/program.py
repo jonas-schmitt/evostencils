@@ -1,6 +1,6 @@
 import numpy as np
 import deap.base
-from deap import gp, creator, tools
+from deap import gp, creator, tools, algorithms
 import random
 import pickle
 import os.path
@@ -228,10 +228,10 @@ class Optimizer:
                 print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
                       f'but the required size is {lambda_}.')
         if use_checkpoint:
-            pop = checkpoint.population
+            population = checkpoint.population
             min_generation = checkpoint.generation
         else:
-            pop = self._toolbox.population(n=initial_population_size)
+            population = self._toolbox.population(n=initial_population_size)
             min_generation = 0
         max_generation = generations
 
@@ -242,33 +242,34 @@ class Optimizer:
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
 
-        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+        invalid_ind = [ind for ind in population if not ind.fitness.valid]
         toolbox = self._toolbox
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
         if hof is not None:
-            hof.update(pop)
-        pop = toolbox.select(pop, len(pop))
+            hof.update(population)
+        population = toolbox.select(population, len(population))
 
-        record = mstats.compile(pop) if mstats is not None else {}
+        record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
         # Begin the generational process
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
-            offspring = toolbox.select_for_mating(pop, lambda_)
-            offspring = [toolbox.clone(ind) for ind in offspring]
-
-            for ind1, ind2 in zip(offspring[::2], offspring[1::2]):
-                rnd = random.random()
-                if rnd <= crossover_probability:
-                    toolbox.mate(ind1, ind2)
-                elif rnd <= crossover_probability + mutation_probability:
-                    toolbox.mutate(ind1)
-                    toolbox.mutate(ind2)
-                del ind1.fitness.values, ind2.fitness.values
+            offspring = []
+            for i in range(lambda_ // 2):
+                ind1, ind2 = map(toolbox.clone, toolbox.select(population, 2))
+                operator_choice = random.random()
+                if operator_choice < crossover_probability:
+                    child1, child2 = toolbox.mate(ind1, ind2)
+                elif operator_choice < crossover_probability + mutation_probability + self.epsilon:
+                    child1, = toolbox.mutate(ind1)
+                    child2, = toolbox.mutate(ind2)
+                del child1.fitness.values, child2.fitness.values
+                offspring.append(child1)
+                offspring.append(child2)
 
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -276,24 +277,25 @@ class Optimizer:
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             if hof is not None:
-                hof.update(pop)
+                hof.update(offspring)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
                     transformations.invalidate_expression(solver)
                 logbooks[-1] = logbook
-                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, pop, logbooks)
+                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, population, logbooks)
                 try:
                     checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
                 except (pickle.PickleError, TypeError) as e:
                     print(e)
                     print('Skipping checkpoint')
             # Select the next generation population
-            pop = toolbox.select(pop + offspring, mu_)
-            record = mstats.compile(pop)
+            population[:] = toolbox.select(population + offspring, mu_)
+            # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            record = mstats.compile(population)
             print(logbook.stream)
 
-        return pop, logbook, hof
+        return population, logbook, hof
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
                             crossover_probability, mutation_probability, min_level, max_level,
@@ -301,7 +303,7 @@ class Optimizer:
         print("Running Single-Objective Genetic Programming")
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", tools.selBest)
-        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
+        self._toolbox.register("select_for_mating", tools.selRandom)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -416,8 +418,8 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, levels_per_run=1, gp_mu=100, gp_lambda=100, gp_generations=100, gp_crossover_probability=0.5,
-                                  gp_mutation_probability=0.5, es_generations=100, required_convergence=0.5,
+    def evolutionary_optimization(self, levels_per_run=1, gp_mu=100, gp_lambda=100, gp_generations=100,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100, required_convergence=0.5,
                                   restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
         levels = self.max_level - self.min_level
@@ -468,11 +470,11 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.SOGP(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.SOGP(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                           gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                           checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = optimization_method(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                                     gp_mutation_probability, min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
 
