@@ -88,7 +88,7 @@ def main():
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=100, gp_lambda=100,
+                                                               gp_mu=500, gp_lambda=500,
                                                                gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
