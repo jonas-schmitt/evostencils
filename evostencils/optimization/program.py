@@ -266,6 +266,7 @@ class Optimizer:
 
         # Begin the generational process
         count = 0
+        restarts = 0
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
             offspring = []
@@ -310,13 +311,25 @@ class Optimizer:
                 else:
                     count = 0
                 if count >= 5:
+                    if restarts >= 3:
+                        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+                        print(logbook.stream)
+                        print("Population converged")
+                        return population, logbook, hof
                     # Restart
                     print("Performing restart")
                     population = toolbox.population(n=(mu_ + lambda_))
+                    invalid_ind = [ind for ind in population if not ind.fitness.valid]
+                    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+                    for ind, fit in zip(invalid_ind, fitnesses):
+                        ind.fitness.values = fit
                     population.extend(hof)
                     population[:] = toolbox.select(population, mu_)
+                    if hof is not None:
+                        hof.update(population)
                     record = mstats.compile(population)
                     count = 0
+                    restarts += 1
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             print(logbook.stream)
