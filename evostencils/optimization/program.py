@@ -6,7 +6,7 @@ import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
-from evostencils.deap_extension import genGrow, mutNodeReplacement, mutInsert
+from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
@@ -310,7 +310,7 @@ class Optimizer:
                     count += 1
                 else:
                     count = 0
-                if count >= 5:
+                if count >= 3 and hof is not None:
                     if restarts >= 3:
                         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
                         print(logbook.stream)
@@ -318,15 +318,14 @@ class Optimizer:
                         return population, logbook, hof
                     # Restart
                     print("Performing restart")
-                    population = toolbox.population(n=(mu_ + lambda_))
+                    population = toolbox.population(n=initial_population_size)
                     invalid_ind = [ind for ind in population if not ind.fitness.valid]
                     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
                     for ind, fit in zip(invalid_ind, fitnesses):
                         ind.fitness.values = fit
-                    population.extend(hof)
+                    population.append(hof[0])
                     population[:] = toolbox.select(population, mu_)
-                    if hof is not None:
-                        hof.update(population)
+                    hof.update(population)
                     record = mstats.compile(population)
                     count = 0
                     restarts += 1
@@ -528,8 +527,14 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
+            count = 0
             try:
-                for j in range(0, min(100, len(hof))):
+                for j in range(0, len(hof)):
+                    if j < len(hof)-1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon:
+                        continue
+                    count += 1
+                    if count > 100:
+                        break
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
 

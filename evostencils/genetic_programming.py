@@ -151,10 +151,12 @@ def generate_with_insertion(pset, min_height, max_height, condition, return_type
     expression = []
     height = random.randint(min_height, max_height)
     stack = [(0, return_type)]
+    subtree_inserted = False
     while len(stack) != 0:
         depth, type_ = stack.pop()
-        if type_ == return_type and len(expression) > 0:
+        if not subtree_inserted and type_ == return_type and len(expression) > 0:
             expression.extend(subtree)
+            subtree_inserted = True
             continue
         is_primitive = True
         terminals_available = len(pset.terminals[type_]) > 0

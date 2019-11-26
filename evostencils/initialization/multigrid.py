@@ -8,7 +8,7 @@ from evostencils.types import grid as grid_types
 from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
 from evostencils.types.wrapper import TypeWrapper
-from evostencils.deap_extension import PrimitiveSetTyped
+from evostencils.genetic_programming import PrimitiveSetTyped
 from deap import gp
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
