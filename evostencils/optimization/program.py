@@ -86,15 +86,13 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=30)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=1, max_height=10)
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
             operator_choice = random.random()
-            min_height = 1
-            max_height = 10
             if operator_choice < 0.9:
-                return mutInsert(individual, min_height, max_height, pset)
+                return mutInsert(individual, 1, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
 
@@ -194,7 +192,8 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                complexity = self.performance_evaluator.estimate_complexity(expression)
+                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                complexity = self.performance_evaluator.estimate_complexity(expression) / grid_points
                 return spectral_radius, complexity
             else:
                 return spectral_radius, self.infinity
@@ -215,8 +214,8 @@ class Optimizer:
             return self.infinity,
         else:
             if self._performance_evaluator is not None:
-                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                complexity = self.performance_evaluator.estimate_complexity(expression) / problem_size
+                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                complexity = self.performance_evaluator.estimate_complexity(expression) / grid_points
                 rho = spectral_radius
                 if rho < 1.0:
                     return math.log(self.epsilon) / math.log(rho) * complexity,
@@ -266,7 +265,6 @@ class Optimizer:
 
         # Begin the generational process
         count = 0
-        restarts = 0
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
             offspring = []
@@ -310,25 +308,11 @@ class Optimizer:
                     count += 1
                 else:
                     count = 0
-                if count >= 3 and hof is not None:
-                    if restarts >= 3:
-                        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-                        print(logbook.stream)
-                        print("Population converged")
-                        return population, logbook, hof
-                    # Restart
-                    print("Performing restart")
-                    population = toolbox.population(n=initial_population_size)
-                    invalid_ind = [ind for ind in population if not ind.fitness.valid]
-                    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-                    for ind, fit in zip(invalid_ind, fitnesses):
-                        ind.fitness.values = fit
-                    population.append(hof[0])
-                    population[:] = toolbox.select(population, mu_)
-                    hof.update(population)
-                    record = mstats.compile(population)
-                    count = 0
-                    restarts += 1
+                if count >= 5 and hof is not None:
+                    logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+                    print(logbook.stream)
+                    print("Population converged")
+                    return population, logbook, hof
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             print(logbook.stream)
@@ -542,10 +526,7 @@ class Optimizer:
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=100)
                     print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
-                    time_difference = best_time - time
-                    if abs(time_difference) < 1 + self.epsilon and convergence_factor < best_convergence_factor or \
-                            time_difference > 1 and ((i == 0 and convergence_factor < 0.9)
-                                                     or convergence_factor < required_convergence):
+                    if (i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence:
                         best_expression = expression
                         best_time = time
                         best_convergence_factor = convergence_factor

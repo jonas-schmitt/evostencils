@@ -12,7 +12,7 @@ def main():
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
@@ -84,9 +84,9 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 0.5
+    required_convergence = 0.1
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
+    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
                                                                gp_mu=500, gp_lambda=500,
                                                                gp_generations=100, es_generations=150,
