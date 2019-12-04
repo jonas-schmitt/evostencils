@@ -64,8 +64,8 @@ def main():
     lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
     convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
-    peak_performance = 126.89530 * 1e9 # likwid-bench -t peakflops_avx -w S0:4MB:8 -i 500000
-    peak_bandwidth = 19.95779 * 1e9 # likwid-bench -t daxpy_avx_fma -w S0:8GB:8 -i 100
+    peak_performance = 24739.37 * 1e6
+    peak_bandwidth = 23322.02 * 1e6
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
     infinity = 1e300
     epsilon = 1e-10
@@ -88,7 +88,9 @@ def main():
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=1000, gp_lambda=1000,
+                                                               gp_crossover_probability=0.5,
+                                                               gp_mutation_probability=0.5,
                                                                gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,

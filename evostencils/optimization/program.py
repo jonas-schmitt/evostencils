@@ -193,8 +193,8 @@ class Optimizer:
         else:
             if self._performance_evaluator is not None:
                 grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                complexity = self.performance_evaluator.estimate_complexity(expression) / grid_points
-                return spectral_radius, complexity
+                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
+                return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
 
@@ -215,12 +215,12 @@ class Optimizer:
         else:
             if self._performance_evaluator is not None:
                 grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                complexity = self.performance_evaluator.estimate_complexity(expression) / grid_points
+                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
                 rho = spectral_radius
                 if rho < 1.0:
-                    return math.log(self.epsilon) / math.log(rho) * complexity,
+                    return math.log(self.epsilon) / math.log(rho) * runtime,
                 else:
-                    return rho * (100 * complexity),
+                    return rho * (100 * runtime),
             else:
                 return spectral_radius,
 
@@ -359,7 +359,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -390,7 +390,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -420,7 +420,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, complexity=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -441,7 +441,7 @@ class Optimizer:
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
-                                  gp_crossover_probability=0.1, gp_mutation_probability=0.9, es_generations=100,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100,
                                   required_convergence=0.5,
                                   restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
@@ -526,7 +526,8 @@ class Optimizer:
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=100)
                     print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
-                    if (i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence:
+                    if time < best_time and \
+                            ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
                         best_time = time
                         best_convergence_factor = convergence_factor
@@ -584,7 +585,7 @@ class Optimizer:
         g.draw(f"{filename}.png", "png")
 
     @staticmethod
-    def plot_multiobjective_data(generations, convergence_data, complexity_data, label1, label2):
+    def plot_multiobjective_data(generations, convergence_data, runtime_data, label1, label2):
         from matplotlib.ticker import MaxNLocator
         import matplotlib.pyplot as plt
 
@@ -597,7 +598,7 @@ class Optimizer:
             tl.set_color("b")
 
         ax2 = ax1.twinx()
-        line2 = ax2.plot(generations, complexity_data, "r-", label=f"{label2}")
+        line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
         ax2.set_ylabel("Number of operations", color="r")
         for tl in ax2.get_yticklabels():
             tl.set_color("r")
@@ -612,15 +613,15 @@ class Optimizer:
     def plot_minimum_fitness(logbook):
         gen = logbook.select("gen")
         convergence_mins = logbook.chapters["convergence"].select("min")
-        complexity_mins = logbook.chapters["complexity"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, complexity_mins, 'Minimum Spectral Radius', 'Minimum Estimated Number of Operations')
+        runtime_mins = logbook.chapters["runtime"].select("min")
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Estimated Number of Operations')
 
     @staticmethod
     def plot_average_fitness(logbook):
         gen = logbook.select("gen")
         convergence_avgs = logbook.chapters["convergence"].select("avg")
-        complexity_avgs = logbook.chapters["complexity"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, complexity_avgs, 'Average Spectral Radius', 'Average Estimated Number of Operations')
+        runtime_avgs = logbook.chapters["runtime"].select("avg")
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Estimated Number of Operations')
 
     @staticmethod
     def plot_pareto_front(pop):
