@@ -88,9 +88,9 @@ def main():
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=1000, gp_lambda=1000,
-                                                               gp_crossover_probability=0.5,
-                                                               gp_mutation_probability=0.5,
+                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_crossover_probability=0.7,
+                                                               gp_mutation_probability=0.3,
                                                                gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
