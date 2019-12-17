@@ -348,8 +348,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
     pset.addTerminal(1.0, TypeWrapper(float), f'omega')
-    pset.addTerminal(2/3, TypeWrapper(float), f'omega_underrelax')
-    pset.addTerminal(4/3, TypeWrapper(float), f'omega_overrelax')
+    # pset.addTerminal(2/3, TypeWrapper(float), f'omega_underrelax')
+    # pset.addTerminal(4/3, TypeWrapper(float), f'omega_overrelax')
 
     block_sizes = []
     for i in range(len(fields)):

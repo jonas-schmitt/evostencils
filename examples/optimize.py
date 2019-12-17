@@ -64,8 +64,8 @@ def main():
     lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
     convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
-    peak_performance = 24739.37 * 1e6
-    peak_bandwidth = 23322.02 * 1e6
+    peak_performance = 28089.22 * 1e6
+    peak_bandwidth = 27788.12 * 1e6
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
     infinity = 1e300
     epsilon = 1e-10
@@ -84,11 +84,11 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 0.1
+    required_convergence = 0.2
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
+    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=1000, gp_lambda=1000,
                                                                gp_crossover_probability=0.7,
                                                                gp_mutation_probability=0.3,
                                                                gp_generations=100, es_generations=150,

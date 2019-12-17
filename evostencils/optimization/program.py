@@ -325,7 +325,7 @@ class Optimizer:
         print("Running Single-Objective Genetic Programming")
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", tools.selBest)
-        self._toolbox.register("select_for_mating", tools.selRandom)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -440,9 +440,9 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
-                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100,
-                                  required_convergence=0.5,
+    def evolutionary_optimization(self, levels_per_run=2, gp_mu=500, gp_lambda=500, gp_generations=100,
+                                  gp_crossover_probability=0.7, gp_mutation_probability=0.3, es_generations=150,
+                                  required_convergence=0.2,
                                   restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
         levels = self.max_level - self.min_level
@@ -514,7 +514,7 @@ class Optimizer:
             count = 0
             try:
                 for j in range(0, len(hof)):
-                    if j < len(hof)-1 and abs(hof[j].fitness.values[0] - hof[j+1].fitness.values[0]) < self.epsilon:
+                    if 0 < j < len(hof) and abs(hof[j-1].fitness.values[0] - hof[j].fitness.values[0]) < self.epsilon:
                         continue
                     count += 1
                     if count > 100:
