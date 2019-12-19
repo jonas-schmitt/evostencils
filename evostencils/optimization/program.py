@@ -525,7 +525,9 @@ class Optimizer:
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=100)
-                    print(f'Time: {time}, Measured convergence factor: {convergence_factor}')
+                    estimated_convergence, _ = self.evaluate_multiple_objectives(individual, pset)
+                    print(f'Time: {time}, Estimated convergence factor: {estimated_convergence}, '
+                          f'Measured convergence factor: {convergence_factor}')
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression

@@ -15,7 +15,7 @@ def parse_stencil_offsets(string: str):
         substituted_expr = sympy_expr
         for symbol in sympy_expr.free_symbols:
             substituted_expr = substituted_expr.subs(symbol, 0)
-        offset = int(round(substituted_expr.evalf()))
+        offset = float(substituted_expr.evalf())
         offsets.append(offset)
     return tuple(offsets)
 
