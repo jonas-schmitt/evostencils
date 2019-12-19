@@ -28,6 +28,8 @@ D = operator.from_periodic_stencil(d, grid)
 omega = 0.8
 I = operator.identity(grid)
 E = (I - omega * D.inverse() * A)
+P_stencil = gallery.ml_interpolation_stencil(grid, grid.coarse((2,2)))
+R_stencil = gallery.fw_restriction_stencil(grid, grid.coarse((2,2)))
 
 print(E.symbol().spectral_radius())
 

@@ -6,7 +6,7 @@ from evostencils.stencils import constant
 from evostencils.initialization import multigrid as initialization
 
 
-def parse_stencil_offsets(string: str):
+def parse_stencil_offsets(string: str, is_prolongation=False):
     tokens = re.split(r" ?\[ ?| ?\] ?| ?, ?", string)
     tokens = [token for token in tokens if not token == ""]
     offsets = []
@@ -15,7 +15,10 @@ def parse_stencil_offsets(string: str):
         substituted_expr = sympy_expr
         for symbol in sympy_expr.free_symbols:
             substituted_expr = substituted_expr.subs(symbol, 0)
-        offset = float(substituted_expr.evalf())
+        if is_prolongation:
+            offset = int(round(2 * substituted_expr.evalf()))
+        else:
+            offset = int(round(substituted_expr.evalf()))
         offsets.append(offset)
     return tuple(offsets)
 
@@ -35,23 +38,29 @@ def extract_l2_information(file_path: str, dimension: int):
                 level = int(tmp[1])
                 line = file.readline()
                 tokens = line.split('from')
+                is_prolongation = False
+                is_restriction = False
+                if 'gen_restrictionForSol_' in name:
+                    is_restriction = True
+                elif 'gen_prolongationForSol_' in name:
+                    is_prolongation = True
                 while True:
                     tmp = tokens[1].split('with')
                     value = float(tmp[1])
-                    offsets = parse_stencil_offsets(tmp[0])
+                    offsets = parse_stencil_offsets(tmp[0], is_prolongation)
                     stencil_entries.append((offsets, value))
                     line = file.readline()
                     tokens = line.split('from')
                     if '}' in line:
                         break
-                if 'gen_restrictionForSol_' in name:
+                if is_restriction:
                     operator_type = base.Restriction
-                elif 'gen_prolongationForSol_' in name:
+                elif is_prolongation:
                     operator_type = base.Prolongation
                 else:
                     operator_type = base.Operator
                 op_info = initialization.OperatorInfo(name, level, constant.Stencil(stencil_entries, dimension),
-                                                 operator_type)
+                                                      operator_type)
                 operators.append(op_info)
             elif tokens[0] == 'Equation':
                 tmp = tokens[1].split('@')
