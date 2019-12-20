@@ -440,8 +440,8 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, levels_per_run=2, gp_mu=500, gp_lambda=500, gp_generations=100,
-                                  gp_crossover_probability=0.7, gp_mutation_probability=0.3, es_generations=150,
+    def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=50,
+                                  gp_crossover_probability=0.7, gp_mutation_probability=0.3, es_generations=100,
                                   required_convergence=0.2,
                                   restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
