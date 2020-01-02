@@ -351,12 +351,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     # pset.addTerminal(2/3, TypeWrapper(float), f'omega_underrelax')
     # pset.addTerminal(4/3, TypeWrapper(float), f'omega_overrelax')
 
-    # def sample_relaxation_factor():
-    #     return random.gauss(1.0, 0.4)
-
-    # for i in range(1000):
-    #     pset.addTerminal(sample_relaxation_factor(), TypeWrapper(float), f'omega_{i}')
-
     block_sizes = []
     for i in range(len(fields)):
         block_sizes.append([])

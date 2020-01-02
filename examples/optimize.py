@@ -16,8 +16,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -32,8 +32,8 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
@@ -64,8 +64,8 @@ def main():
     lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
     convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
-    peak_performance = 28089.22 * 1e6
-    peak_bandwidth = 27788.12 * 1e6
+    peak_performance = 29289.62 * 1e6
+    peak_bandwidth = 20162.69 * 1e6
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
     infinity = 1e300
     epsilon = 1e-10
@@ -86,12 +86,12 @@ def main():
     levels_per_run = 2
     required_convergence = 0.2
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
+    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=100, gp_lambda=100,
-                                                               gp_crossover_probability=0.7,
-                                                               gp_mutation_probability=0.3,
-                                                               gp_generations=50, es_generations=100,
+                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_crossover_probability=0.5,
+                                                               gp_mutation_probability=0.5,
+                                                               gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

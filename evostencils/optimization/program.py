@@ -91,7 +91,7 @@ class Optimizer:
 
         def mutate(individual, pset):
             operator_choice = random.random()
-            if operator_choice < 0.9:
+            if operator_choice < 0.5:
                 return mutInsert(individual, 1, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
@@ -217,10 +217,10 @@ class Optimizer:
                 grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                 runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
                 rho = spectral_radius
-                if rho < 1.0:
+                if rho < 0.1:
                     return math.log(self.epsilon) / math.log(rho) * runtime,
                 else:
-                    return rho * (100 * runtime),
+                    return rho * math.sqrt(self.infinity),
             else:
                 return spectral_radius,
 
@@ -343,7 +343,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.HallOfFame(100)
+        hof = tools.HallOfFame(100, similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0])
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
@@ -373,7 +373,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront()
+        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -404,7 +404,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront()
+        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -434,14 +434,14 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront()
+        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=50,
-                                  gp_crossover_probability=0.7, gp_mutation_probability=0.3, es_generations=100,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100,
                                   required_convergence=0.2,
                                   restart_from_checkpoint=False, maximum_block_size=2, optimization_method=None):
 
@@ -513,12 +513,7 @@ class Optimizer:
             self.program_generator.initialize_code_generation(max_level)
             count = 0
             try:
-                for j in range(0, len(hof)):
-                    if 0 < j < len(hof) and abs(hof[j-1].fitness.values[0] - hof[j].fitness.values[0]) < self.epsilon:
-                        continue
-                    count += 1
-                    if count > 100:
-                        break
+                for j in range(0, min(100, len(hof))):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
 
