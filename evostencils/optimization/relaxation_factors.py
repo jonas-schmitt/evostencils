@@ -103,7 +103,7 @@ class Optimizer:
                 return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
         lambda_ = int((4 + 3 * log(problem_size)) * 2)
-        print("Running CMA-ES")
+        print("Running CMA-ES", flush=True)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", numpy.mean)
@@ -115,6 +115,7 @@ class Optimizer:
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
         generator.run_exastencils_compiler()
-        algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
+        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
+        print(logbook, flush=True)
         return hof[0]
 

@@ -89,7 +89,7 @@ def main():
     # Use single-objective optimization
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=200, gp_lambda=200,
+                                                               gp_mu=20, gp_lambda=20,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
                                                                gp_generations=50, es_generations=100,
@@ -101,8 +101,8 @@ def main():
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
     runtime, convergence_factor = program_generator.evaluate(infinity, 10)
-    print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n')
-    print(f'ExaSlang representation:\n{program}\n')
+    print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
+    print(f'ExaSlang representation:\n{program}\n', flush=True)
     log_dir_name = f'{problem_name}/data'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
@@ -110,10 +110,6 @@ def main():
     for log in stats:
         pickle.dump(log, open(f"{log_dir_name}/log{i}.p", "wb"))
         i += 1
-        # optimizer.plot_average_fitness(log)
-        # optimizer.plot_minimum_fitness(log)
-    # for pop in pops:
-    #    optimizer.plot_pareto_front(pop)
     program_generator.restore_files()
 
 

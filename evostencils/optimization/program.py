@@ -233,7 +233,7 @@ class Optimizer:
                 use_checkpoint = True
             else:
                 print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
-                      f'but the required size is {mu_}.')
+                      f'but the required size is {mu_}.', flush=True)
         if use_checkpoint:
             population = checkpoint.population
             min_generation = checkpoint.generation
@@ -297,8 +297,8 @@ class Optimizer:
                 try:
                     checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
                 except (pickle.PickleError, TypeError) as e:
-                    print(e)
-                    print('Skipping checkpoint')
+                    print(e, flush=True)
+                    print('Skipping checkpoint', flush=True)
             # Select the next generation population
             population[:] = toolbox.select(population + offspring, mu_)
             record = mstats.compile(population)
@@ -309,22 +309,23 @@ class Optimizer:
                     count = 0
                 if count >= 5 and hof is not None:
                     logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-                    print(logbook.stream)
-                    print("Population converged")
+                    print(logbook.stream, flush=True)
+                    print("Population converged", flush=True)
                     return population, logbook, hof
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            print(logbook.stream)
+            print(logbook.stream, flush=True)
 
         return population, logbook, hof
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
              program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running Single-Objective Genetic Programming")
+        print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", tools.selBest)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
+
         def normalize_fitness(ind):
             if math.pow(self.infinity, 1/4) < ind.fitness.values[0] < self.infinity:
                 expression, _ = self.compile_individual(ind, pset)
@@ -358,7 +359,7 @@ class Optimizer:
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-II Genetic Programming")
+        print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
@@ -388,7 +389,7 @@ class Optimizer:
 
     def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
                 min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-III Genetic Programming")
+        print("Running NSGA-III Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         ref_points = tools.uniform_reference_points(2, 12)
         self._toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
@@ -419,7 +420,7 @@ class Optimizer:
 
     def SPEAII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
                min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running SPEA-II Genetic Programming")
+        print("Running SPEA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selSPEA2)
         self._toolbox.register("select_for_mating", tools.selRandom)
@@ -529,7 +530,7 @@ class Optimizer:
                                                                       solver_program, number_of_samples=100)
                     estimated_convergence, _ = self.evaluate_multiple_objectives(individual, pset)
                     print(f'Time: {time}, Estimated convergence factor: {estimated_convergence}, '
-                          f'Measured convergence factor: {convergence_factor}')
+                          f'Measured convergence factor: {convergence_factor}', flush=True)
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
@@ -542,7 +543,7 @@ class Optimizer:
             self.program_generator.restore_files()
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
-            print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}")
+            print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
             relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations,
                                                                      min_level, max_level, solver_program, storages)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
