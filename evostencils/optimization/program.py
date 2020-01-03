@@ -214,13 +214,12 @@ class Optimizer:
             return self.infinity,
         else:
             if self._performance_evaluator is not None:
-                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
-                rho = spectral_radius
-                if rho < 0.1:
-                    return math.log(self.epsilon) / math.log(rho) * runtime,
+                if spectral_radius < 0.1:
+                    grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                    runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
+                    return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
                 else:
-                    return rho * math.sqrt(self.infinity),
+                    return spectral_radius * math.sqrt(self.infinity),
             else:
                 return spectral_radius,
 
@@ -326,8 +325,16 @@ class Optimizer:
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", tools.selBest)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
-
-        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
+        def normalize_fitness(ind):
+            if math.pow(self.infinity, 1/4) < ind.fitness.values[0] < self.infinity:
+                expression, _ = self.compile_individual(ind, pset)
+                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                spectral_radius = ind.fitness.values[0] / math.sqrt(self.infinity)
+                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
+                return math.log(self.epsilon) / math.log(spectral_radius) * runtime
+            else:
+                return ind.fitness.values[0]
+        stats_fit = tools.Statistics(normalize_fitness)
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
