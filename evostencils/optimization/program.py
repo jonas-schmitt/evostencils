@@ -6,7 +6,7 @@ import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
-from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert
+from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
@@ -323,7 +323,7 @@ class Optimizer:
              program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selBest)
+        self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
         def normalize_fitness(ind):
@@ -342,16 +342,30 @@ class Optimizer:
         def mean(xs):
             avg = 0
             for x in xs:
-                if x < self.infinity:
+                if 0 < x < self.infinity:
                     avg += x
             avg = avg / len(xs)
             return avg
 
+        def minimum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x < curr:
+                    curr = x
+            return curr
+
+        def maximum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x > curr:
+                    curr = x
+            return curr
+
         mstats.register("avg", mean)
         mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-        hof = tools.HallOfFame(100, similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0])
+        mstats.register("min", minimum)
+        mstats.register("max", maximum)
+        hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0])
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
@@ -381,7 +395,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,

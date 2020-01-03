@@ -89,10 +89,10 @@ def main():
     # Use single-objective optimization
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.SOGP,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=20, gp_lambda=20,
+                                                               gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
-                                                               gp_generations=50, es_generations=100,
+                                                               gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

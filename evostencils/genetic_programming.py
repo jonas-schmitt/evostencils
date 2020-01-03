@@ -1,6 +1,7 @@
 import random
 from inspect import isclass
 import deap.gp
+from operator import attrgetter
 
 
 def generate(pset, min_height, max_height, condition, type_=None):
@@ -186,3 +187,13 @@ def generate_with_insertion(pset, min_height, max_height, condition, return_type
                 choice = choice()
         expression.append(choice)
     return expression
+
+
+def select_unique_best(individuals, k, fit_attr="fitness"):
+    dictionary = {}
+    for i, ind in enumerate(individuals):
+        if ind.fitness not in dictionary:
+            dictionary[ind.fitness] = i
+    unique_indices = dictionary.items()
+    unique_individuals = [individuals[i] for _, i in unique_indices]
+    return sorted(unique_individuals, key=attrgetter(fit_attr), reverse=True)[:k]
