@@ -7,7 +7,7 @@ def main():
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils/Compiler/compiler.jar'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
@@ -40,7 +40,7 @@ def main():
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
     program_generator.run_c_compiler()
-    time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=100)
+    time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=10)
     print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}')
 
 
