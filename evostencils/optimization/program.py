@@ -260,7 +260,7 @@ class Optimizer:
 
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
-        print(logbook.stream)
+        print(logbook.stream, flush=True)
 
         # Begin the generational process
         count = 0

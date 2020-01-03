@@ -92,7 +92,7 @@ def main():
                                                                gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
-                                                               gp_generations=100, es_generations=150,
+                                                               gp_generations=50, es_generations=50,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
