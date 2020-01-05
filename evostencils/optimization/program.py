@@ -86,7 +86,7 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=1, max_height=10)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=20)
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
@@ -214,7 +214,7 @@ class Optimizer:
             return self.infinity,
         else:
             if self._performance_evaluator is not None:
-                if spectral_radius < 0.1:
+                if spectral_radius < 0.2:
                     grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                     runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
@@ -324,7 +324,9 @@ class Optimizer:
         print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", select_unique_best)
-        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
+        # self._toolbox.register("select", tools.selBest)
+        # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
         def normalize_fitness(ind):
             if math.pow(self.infinity, 1/4) < ind.fitness.values[0] < self.infinity:
@@ -342,7 +344,7 @@ class Optimizer:
         def mean(xs):
             avg = 0
             for x in xs:
-                if 0 < x < self.infinity:
+                if 0 < x < math.pow(self.infinity, 0.25):
                     avg += x
             avg = avg / len(xs)
             return avg
@@ -350,19 +352,32 @@ class Optimizer:
         def minimum(xs):
             curr = xs[0]
             for x in xs[1:]:
-                if 0 < x < self.infinity and x < curr:
+                if 0 < x < math.pow(self.infinity, 0.25) and x < curr:
                     curr = x
             return curr
 
         def maximum(xs):
             curr = xs[0]
             for x in xs[1:]:
-                if 0 < x < self.infinity and x > curr:
+                if 0 < x < math.pow(self.infinity, 0.25) and x > curr:
                     curr = x
             return curr
 
+        def _ss(data):
+            c = mean(data)
+            ss = sum((x-c)**2 for x in data if 0 < x < math.pow(self.infinity, 0.25))
+            return ss
+
+        def stddev(data, ddof=0):
+            n = len(data)
+            if n < 2:
+                raise ValueError('variance requires at least two data points')
+            ss = _ss(data)
+            pvar = ss/(n-ddof)
+            return pvar**0.5
+
         mstats.register("avg", mean)
-        mstats.register("std", np.std)
+        mstats.register("std", stddev)
         mstats.register("min", minimum)
         mstats.register("max", maximum)
         hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0])
@@ -462,7 +477,7 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, levels_per_run=2, gp_mu=200, gp_lambda=200, gp_generations=50,
+    def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=50,
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100,
                                   required_convergence=0.2,
                                   restart_from_checkpoint=False, maximum_block_size=3, optimization_method=None):

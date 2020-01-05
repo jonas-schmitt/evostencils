@@ -5,6 +5,7 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import pickle
 import lfa_lab
+import numpy as np
 
 
 def main():
@@ -67,7 +68,7 @@ def main():
     peak_performance = 20344.07 * 1e6
     peak_bandwidth = 19255.70 * 1e6
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
-    infinity = 1e300
+    infinity = np.finfo(np.float64).max
     epsilon = 1e-10
     problem_name = program_generator.problem_name
 
@@ -92,7 +93,7 @@ def main():
                                                                gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
-                                                               gp_generations=50, es_generations=50,
+                                                               gp_generations=50, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
