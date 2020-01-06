@@ -177,6 +177,8 @@ class Optimizer:
         return gp.compile(individual, pset)
 
     def evaluate_multiple_objectives(self, individual, pset):
+        if len(individual) > 150:
+            return self.infinity, self.infinity
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -199,6 +201,8 @@ class Optimizer:
                 return spectral_radius, self.infinity
 
     def evaluate_single_objective(self, individual, pset):
+        if len(individual) > 150:
+            return self.infinity,
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -214,7 +218,7 @@ class Optimizer:
             return self.infinity,
         else:
             if self._performance_evaluator is not None:
-                if spectral_radius < 0.2:
+                if spectral_radius < 0.1:
                     grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                     runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
@@ -254,14 +258,12 @@ class Optimizer:
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        population = toolbox.select(population, len(population))
         if hof is not None:
             hof.update(population)
-        population = toolbox.select(population, len(population))
-
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         print(logbook.stream, flush=True)
-
         # Begin the generational process
         count = 0
         for gen in range(min_generation + 1, max_generation + 1):
@@ -542,13 +544,12 @@ class Optimizer:
 
             pops.append(pop)
 
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[len(ind.fitness.values)-1])
             best_time = self.infinity
             best_convergence_factor = self.infinity
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
-            count = 0
             try:
                 for j in range(0, min(100, len(hof))):
                     individual = hof[j]
