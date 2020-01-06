@@ -557,7 +557,7 @@ class Optimizer:
 
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                      solver_program, number_of_samples=100)
+                                                                      solver_program, number_of_samples=10)
                     estimated_convergence, _ = self.evaluate_multiple_objectives(individual, pset)
                     print(f'Time: {time}, Estimated convergence factor: {estimated_convergence}, '
                           f'Measured convergence factor: {convergence_factor}', flush=True)

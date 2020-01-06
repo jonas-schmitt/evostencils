@@ -370,7 +370,10 @@ class ProgramGenerator:
             # Hack to change the weights after generation
 
             if use_global_weights and hasattr(expression, 'global_id'):
-                weight = f'omega_{expression.global_id}'
+                if expression.global_id is None:
+                    weight = '1'
+                else:
+                    weight = f'omega_{expression.global_id}'
 
             correction = expression.correction
             if isinstance(correction, base.Residual):
