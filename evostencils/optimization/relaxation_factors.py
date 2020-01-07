@@ -23,7 +23,7 @@ def reset_status(expression: base.Expression):
 
 def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, base.Cycle):
-        if not (isinstance(expression.correction, base.Multiplication) and isinstance(expression.correction.operand1, system.InterGridOperator)) and not expression.weight_set:
+        if not expression.weight_set:
             head, *tail = weights
             expression._relaxation_factor = head
             expression.weight_set = True
@@ -46,7 +46,7 @@ def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
 def obtain_relaxation_factors(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, base.Cycle):
-        if not (isinstance(expression.correction, base.Multiplication) and isinstance(expression.correction.operand1, system.InterGridOperator)) and not expression.weight_obtained:
+        if not expression.weight_obtained:
             weights.append(expression.relaxation_factor)
             expression.weight_obtained = True
         weights.extend(obtain_relaxation_factors(expression.correction))
@@ -88,19 +88,19 @@ class Optimizer:
                     storages is not None:
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                _, convergence_factor = program_generator.evaluate(number_of_samples=1)
+                runtime, convergence_factor = program_generator.evaluate(number_of_samples=1)
                 program_generator.restore_global_initializations()
-                return convergence_factor,
+                return runtime,
             else:
                 tail = set_relaxation_factors(expression, weights)
                 if len(tail) > 0:
                     raise RuntimeError("Incorrect number of weights")
                 spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(expression)
                 reset_status(expression)
-            if spectral_radius == 0.0:
-                return self._gp_optimizer.infinity,
-            else:
-                return spectral_radius,
+                if spectral_radius == 0.0:
+                    return self._gp_optimizer.infinity,
+                else:
+                    return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
         lambda_ = int((4 + 3 * log(problem_size)) * 2)
         print("Running CMA-ES", flush=True)
@@ -115,7 +115,7 @@ class Optimizer:
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
         generator.run_exastencils_compiler()
-        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
+        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         print(logbook, flush=True)
         return hof[0]
 

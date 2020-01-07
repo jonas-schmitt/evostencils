@@ -218,7 +218,7 @@ class Optimizer:
             return self.infinity,
         else:
             if self._performance_evaluator is not None:
-                if spectral_radius < 0.1:
+                if spectral_radius < 1:
                     grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
                     runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
@@ -544,7 +544,17 @@ class Optimizer:
 
             pops.append(pop)
 
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[len(ind.fitness.values)-1])
+            def estimated_time_to_solution(ind):
+                if len(ind.fitness.values) == 1:
+                    return ind.fitness.values[0]
+                else:
+                    spectral_radius = ind.fitness.values[0]
+                    runtime = ind.fitness.values[1]
+                    if spectral_radius < 1:
+                        return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                    else:
+                        return spectral_radius * math.sqrt(self.infinity),
+            hof = sorted(hof, key=estimated_time_to_solution)
             best_time = self.infinity
             best_convergence_factor = self.infinity
             self.program_generator._counter = 0
