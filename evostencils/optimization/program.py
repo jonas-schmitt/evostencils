@@ -544,7 +544,14 @@ class Optimizer:
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=10)
                     estimated_convergence, estimated_runtime = self.evaluate_multiple_objectives(individual, pset)
-                    print(f'Time: {time}, (Estimation: {math.log(self.epsilon)/math.log(estimated_convergence) * estimated_runtime}), '
+
+                    def estimate_time_to_solution(rho, t):
+                        if rho < 1:
+                            return math.log(self.epsilon) / math.log(rho) * t
+                        else:
+                            return 100 * t
+                    print(f'Time: {time}, '
+                          f'(Estimation: {estimate_time_to_solution(estimated_convergence, estimated_runtime)}, '
                           f'Convergence factor: {convergence_factor} '
                           f'(Estimation: {estimated_convergence})', flush=True)
                     if time < best_time and \
