@@ -51,7 +51,8 @@ class PerformanceEvaluator:
             return expression.runtime
         if isinstance(expression, base.Cycle):
             # Partitions are currently ignored since they do not affect the arithmetic intensity
-            # Although beware that in cases where the total data size is too small the memory bandwidth can not be saturated
+            # Although beware that in cases where the total data size is too small
+            # the memory bandwidth can not be saturated
             # and the maximum bandwidth will not be achieved
             grid = expression.grid
             correction = expression.correction
@@ -60,11 +61,14 @@ class PerformanceEvaluator:
                 runtime = self.estimate_runtime(correction)
             elif isinstance(correction, base.Multiplication):
                 if isinstance(correction.operand1, system.InterGridOperator):
+                    # Estimate runtime for right-hand side of expression
                     runtime = self.estimate_runtime(correction.operand2)
-                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
+                    operations_per_cell, words_per_cell = \
+                        PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(correction.operand1)
                 else:
                     residual = correction.operand2
-                    operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1, residual)
+                    # Estimate runtime for approximation and rhs in residual
+                    # The residual is considered within solving the local system
                     if not isinstance(residual.rhs, system.RightHandSide):
                         runtime_rhs = self.estimate_runtime(residual.rhs)
                     else:
@@ -74,19 +78,19 @@ class PerformanceEvaluator:
                     else:
                         runtime_approximation = 0
                     runtime = runtime_rhs + runtime_approximation
+                    operations_per_cell, words_per_cell = \
+                        PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(correction.operand1, residual)
             else:
                 raise RuntimeError("Expected multiplication")
-            operations_per_cell += len(grid) * (PerformanceEvaluator.operations_for_addition() + PerformanceEvaluator.operations_for_scaling())
-            words_per_cell += len(grid) * (PerformanceEvaluator.words_transferred_for_load() + PerformanceEvaluator.words_transferred_for_store())
+            operations_per_cell += len(grid) * (PerformanceEvaluator.operations_for_addition()
+                                                + PerformanceEvaluator.operations_for_scaling())
+            words_per_cell += len(grid) * (PerformanceEvaluator.words_transferred_for_load()
+                                           + PerformanceEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            tmp = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
-            runtime += tmp
+            # Compute the total runtime for solving the local system and computing a new approximation
+            runtime += self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
         elif isinstance(expression, base.Residual):
-            operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_residual(expression)
-            # Store result
-            words_per_cell += len(expression.grid) * PerformanceEvaluator.words_transferred_for_store()
-            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-            runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
+            # Estimate runtime for approximation and rhs in residual
             if not isinstance(expression.rhs, system.RightHandSide):
                 runtime_rhs = self.estimate_runtime(expression.rhs)
             else:
@@ -95,30 +99,31 @@ class PerformanceEvaluator:
                 runtime_approximation = self.estimate_runtime(expression.approximation)
             else:
                 runtime_approximation = 0
-            runtime += runtime_rhs + runtime_approximation
+            runtime = runtime_rhs + runtime_approximation
+            operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_residual(expression)
+            # Store result
+            words_per_cell += len(expression.grid) * PerformanceEvaluator.words_transferred_for_store()
+            problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+            runtime += self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
         elif isinstance(expression, base.Multiplication):
             if isinstance(expression.operand1, system.InterGridOperator):
-                operations_per_cell, words_per_cell = PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
+                runtime = self.estimate_runtime(expression.operand2)
+                operations_per_cell, words_per_cell = \
+                    PerformanceEvaluator.estimate_words_per_operation_for_intergrid_transfer(expression.operand1)
                 problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
-                runtime += self.estimate_runtime(expression.operand2)
+                runtime += self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
             elif isinstance(expression.operand1, base.CoarseGridSolver):
-                cgs = expression.operand1
-                if cgs.expression is not None:
-                    if cgs.expression.runtime is None:
-                        runtime = self.estimate_runtime(cgs.expression)
+                runtime = self.estimate_runtime(expression.operand2)
+                coarse_grid_solver = expression.operand1
+                if coarse_grid_solver.expression is not None:
+                    if coarse_grid_solver.expression.runtime is None:
+                        runtime += self.estimate_runtime(coarse_grid_solver.expression)
                     else:
-                        runtime = cgs.expression.runtime
+                        runtime += coarse_grid_solver.expression.runtime
                 else:
-                    runtime = self.runtime_coarse_grid_solver
-                runtime += self.estimate_runtime(expression.operand2)
+                    runtime += self.runtime_coarse_grid_solver
             else:
                 residual = expression.operand2
-                operations_per_cell, words_per_cell = \
-                    PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1,
-                                                                                               residual)
-                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
                 if not isinstance(residual.rhs, system.RightHandSide):
                     runtime_rhs = self.estimate_runtime(residual.rhs)
                 else:
@@ -127,7 +132,12 @@ class PerformanceEvaluator:
                     runtime_approximation = self.estimate_runtime(residual.approximation)
                 else:
                     runtime_approximation = 0
-                runtime += runtime_rhs + runtime_approximation
+                runtime = runtime_rhs + runtime_approximation
+                operations_per_cell, words_per_cell = \
+                    PerformanceEvaluator.estimate_words_per_operation_for_solving_local_system(expression.operand1,
+                                                                                               residual)
+                problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
+                runtime += self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
         else:
             raise RuntimeError("Not implemented")
         expression.runtime = runtime
