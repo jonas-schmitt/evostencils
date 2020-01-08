@@ -115,7 +115,7 @@ class Optimizer:
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
         generator.run_exastencils_compiler()
-        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
+        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
         print(logbook, flush=True)
         return hof[0]
 

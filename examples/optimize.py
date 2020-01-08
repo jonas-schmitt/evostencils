@@ -85,7 +85,7 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 0.2
+    required_convergence = 0.1
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,

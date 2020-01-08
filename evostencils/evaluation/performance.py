@@ -111,7 +111,7 @@ class PerformanceEvaluator:
                         runtime = cgs.expression.runtime
                 else:
                     runtime = self.runtime_coarse_grid_solver
-                    runtime += self.estimate_runtime(expression.operand2)
+                runtime += self.estimate_runtime(expression.operand2)
             else:
                 residual = expression.operand2
                 operations_per_cell, words_per_cell = \

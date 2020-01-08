@@ -194,8 +194,7 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             if self._performance_evaluator is not None:
-                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
+                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                 return spectral_radius, runtime
             else:
                 return spectral_radius, self.infinity
@@ -219,8 +218,7 @@ class Optimizer:
         else:
             if self._performance_evaluator is not None:
                 if spectral_radius < 1:
-                    grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                    runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
+                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
                 else:
                     return spectral_radius * math.sqrt(self.infinity),
@@ -258,9 +256,8 @@ class Optimizer:
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        hof.update(population)
         population = toolbox.select(population, len(population))
-        if hof is not None:
-            hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         print(logbook.stream, flush=True)
@@ -289,8 +286,7 @@ class Optimizer:
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
-            if hof is not None:
-                hof.update(offspring)
+            hof.update(offspring)
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
                     transformations.invalidate_expression(solver)
@@ -330,16 +326,7 @@ class Optimizer:
         # self._toolbox.register("select", tools.selBest)
         # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
-        def normalize_fitness(ind):
-            if math.pow(self.infinity, 1/4) < ind.fitness.values[0] < self.infinity:
-                expression, _ = self.compile_individual(ind, pset)
-                grid_points = sum([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
-                spectral_radius = ind.fitness.values[0] / math.sqrt(self.infinity)
-                runtime = self.performance_evaluator.estimate_runtime(expression) / grid_points * 1e6
-                return math.log(self.epsilon) / math.log(spectral_radius) * runtime
-            else:
-                return ind.fitness.values[0]
-        stats_fit = tools.Statistics(normalize_fitness)
+        stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
@@ -412,7 +399,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront(similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -532,10 +519,10 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.SOGP(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
-                                          gp_mutation_probability, min_level, max_level,
-                                          solver_program, best_expression, logbooks,
-                                          checkpoint_frequency=5, checkpoint=tmp)
+                pop, log, hof = self.NSGAII(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                                            gp_mutation_probability, min_level, max_level,
+                                            solver_program, best_expression, logbooks,
+                                            checkpoint_frequency=5, checkpoint=tmp)
             else:
                 pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
@@ -543,18 +530,6 @@ class Optimizer:
                                                     checkpoint_frequency=5, checkpoint=tmp)
 
             pops.append(pop)
-
-            def estimated_time_to_solution(ind):
-                if len(ind.fitness.values) == 1:
-                    return ind.fitness.values[0]
-                else:
-                    spectral_radius = ind.fitness.values[0]
-                    runtime = ind.fitness.values[1]
-                    if spectral_radius < 1:
-                        return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
-                    else:
-                        return spectral_radius * math.sqrt(self.infinity),
-            hof = sorted(hof, key=estimated_time_to_solution)
             best_time = self.infinity
             best_convergence_factor = self.infinity
             self.program_generator._counter = 0
@@ -568,9 +543,10 @@ class Optimizer:
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=10)
-                    estimated_convergence, _ = self.evaluate_multiple_objectives(individual, pset)
-                    print(f'Time: {time}, Estimated convergence factor: {estimated_convergence}, '
-                          f'Measured convergence factor: {convergence_factor}', flush=True)
+                    estimated_convergence, estimated_runtime = self.evaluate_multiple_objectives(individual, pset)
+                    print(f'Time: {time}, (Estimation: {math.log(self.epsilon)/math.log(estimated_convergence) * estimated_runtime}), '
+                          f'Convergence factor: {convergence_factor} '
+                          f'(Estimation: {estimated_convergence})', flush=True)
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
