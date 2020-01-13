@@ -101,16 +101,16 @@ def main():
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
     runtime, convergence_factor = program_generator.evaluate(infinity, 10)
+    program_generator.restore_files()
     print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
     print(f'ExaSlang representation:\n{program}\n', flush=True)
     log_dir_name = f'{problem_name}/data'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
-    i = 1
-    for log in stats:
-        pickle.dump(log, open(f"{log_dir_name}/log{i}.p", "wb"))
-        i += 1
-    program_generator.restore_files()
+    for i, log in enumerate(stats):
+        pickle.dump(log, open(f"{log_dir_name}/log_{i}.p", "wb"))
+    for i, pop in enumerate(pops):
+        optimizer.dump_population(pop, f"{log_dir_name}/pop_{i}.p")
 
 
 if __name__ == "__main__":
