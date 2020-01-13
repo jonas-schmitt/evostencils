@@ -85,14 +85,14 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = 2
-    required_convergence = 0.1
+    required_convergence = 0.9
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=200, gp_lambda=200,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
-                                                               gp_generations=50, es_generations=200,
+                                                               gp_generations=100, es_generations=200,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

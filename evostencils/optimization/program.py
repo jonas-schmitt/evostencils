@@ -177,8 +177,6 @@ class Optimizer:
         return gp.compile(individual, pset)
 
     def evaluate_multiple_objectives(self, individual, pset):
-        if len(individual) > 150:
-            return self.infinity, self.infinity
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -193,15 +191,17 @@ class Optimizer:
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity, self.infinity
         else:
-            if self._performance_evaluator is not None:
-                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-                return spectral_radius, runtime
+            if spectral_radius < 1:
+                iterations = math.log(self.epsilon)/math.log(spectral_radius)
+                if iterations < 20:
+                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
+                    return iterations, runtime
+                else:
+                    return iterations, self.infinity
             else:
-                return spectral_radius, self.infinity
+                return spectral_radius * 10000, self.infinity
 
     def evaluate_single_objective(self, individual, pset):
-        if len(individual) > 150:
-            return self.infinity,
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -216,14 +216,15 @@ class Optimizer:
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity,
         else:
-            if self._performance_evaluator is not None:
-                if spectral_radius < 1:
+            if spectral_radius < 1:
+                iterations = math.log(self.epsilon)/math.log(spectral_radius)
+                if iterations < 20:
                     runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
                 else:
                     return spectral_radius * math.sqrt(self.infinity),
             else:
-                return spectral_radius,
+                return spectral_radius * math.sqrt(self.infinity),
 
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
@@ -265,9 +266,10 @@ class Optimizer:
         count = 0
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
+            selected = toolbox.select_for_mating(population, lambda_)
+            parents = [toolbox.clone(ind) for ind in selected]
             offspring = []
-            for i in range(lambda_ // 2):
-                ind1, ind2 = map(toolbox.clone, toolbox.select(population, 2))
+            for ind1, ind2 in zip(parents[::2], parents[1::2]):
                 operator_choice = random.random()
                 if operator_choice < crossover_probability:
                     child1, child2 = toolbox.mate(ind1, ind2)
@@ -381,11 +383,12 @@ class Optimizer:
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
+        # self._toolbox.register("select_for_mating", tools.selRandom)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -416,7 +419,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -446,7 +449,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -466,9 +469,9 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=50,
-                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=100,
-                                  required_convergence=0.2,
+    def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
+                                  required_convergence=0.9,
                                   restart_from_checkpoint=False, maximum_block_size=3, optimization_method=None):
 
         levels = self.max_level - self.min_level
@@ -543,7 +546,8 @@ class Optimizer:
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, number_of_samples=10)
-                    estimated_convergence, estimated_runtime = self.evaluate_multiple_objectives(individual, pset)
+                    estimated_runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
+                    estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
 
                     def estimate_time_to_solution(rho, t):
                         if rho < 1:
@@ -551,9 +555,9 @@ class Optimizer:
                         else:
                             return 100 * t
                     print(f'Time: {time}, '
-                          f'(Estimation: {estimate_time_to_solution(estimated_convergence, estimated_runtime)}, '
+                          f'(Estimation: {estimate_time_to_solution(estimated_convergence_factor, estimated_runtime)}, '
                           f'Convergence factor: {convergence_factor} '
-                          f'(Estimation: {estimated_convergence})', flush=True)
+                          f'(Estimation: {estimated_convergence_factor})', flush=True)
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
@@ -594,8 +598,6 @@ class Optimizer:
         except (KeyboardInterrupt, Exception) as e:
             self.program_generator.restore_files()
             raise e
-        # print(f'Best weights: {best_weights}')
-        # print(f'Best spectral radius: {spectral_radius}')
         self.program_generator.restore_files()
         return best_weights, spectral_radius
 
@@ -621,13 +623,13 @@ class Optimizer:
         line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label1}")
         ax1.set_xlabel("Generation")
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax1.set_ylabel("Spectral Radius", color="b")
+        ax1.set_ylabel("Iterations", color="b")
         for tl in ax1.get_yticklabels():
             tl.set_color("b")
 
         ax2 = ax1.twinx()
         line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
-        ax2.set_ylabel("Number of operations", color="r")
+        ax2.set_ylabel("Runtime per Iteration", color="r")
         for tl in ax2.get_yticklabels():
             tl.set_color("r")
 
@@ -640,16 +642,18 @@ class Optimizer:
     @staticmethod
     def plot_minimum_fitness(logbook):
         gen = logbook.select("gen")
-        convergence_mins = logbook.chapters["convergence"].select("min")
+        convergence_mins = logbook.chapters["iterations"].select("min")
         runtime_mins = logbook.chapters["runtime"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius', 'Minimum Estimated Number of Operations')
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Number of Iterations',
+                                           'Minimum Runtime per Iteration')
 
     @staticmethod
     def plot_average_fitness(logbook):
         gen = logbook.select("gen")
-        convergence_avgs = logbook.chapters["convergence"].select("avg")
+        convergence_avgs = logbook.chapters["iterations"].select("avg")
         runtime_avgs = logbook.chapters["runtime"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius', 'Average Estimated Number of Operations')
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Number of Iterations',
+                                           'Average Runtime per Iteration')
 
     @staticmethod
     def plot_pareto_front(pop):
@@ -659,8 +663,8 @@ class Optimizer:
 
         front = numpy.array([ind.fitness.values for ind in pop])
         plt.scatter(front[:, 0], front[:, 1], c="b")
-        plt.xlabel("Spectral Radius")
-        plt.ylabel("Number of Operations")
+        plt.xlabel("Number of Iterations")
+        plt.ylabel("Runtime per Iteration")
         plt.axis("tight")
         plt.show()
 
