@@ -5,6 +5,7 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import lfa_lab
 import numpy as np
+from deap import tools
 
 
 def main():
@@ -81,35 +82,13 @@ def main():
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
-    levels_per_run = 2
-    required_convergence = 0.9
-    maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
-                                                               levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
-                                                               gp_crossover_probability=0.5,
-                                                               gp_mutation_probability=0.5,
-                                                               gp_generations=100, es_generations=200,
-                                                               maximum_block_size=maximum_block_size,
-                                                               required_convergence=required_convergence,
-                                                               restart_from_checkpoint=restart_from_checkpoint)
-    program_generator.initialize_code_generation(max_level)
-    program_generator.generate_l3_file(program)
-    program_generator.run_exastencils_compiler()
-    program_generator.run_c_compiler()
-    runtime, convergence_factor = program_generator.evaluate(infinity, 10)
-    program_generator.restore_files()
-    print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
-    print(f'ExaSlang representation:\n{program}\n', flush=True)
-    log_dir_name = f'{problem_name}/data'
-    if not os.path.exists(log_dir_name):
-        os.makedirs(log_dir_name)
-    for i, log in enumerate(stats):
-        optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
-    for i, pop in enumerate(pops):
-        optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
+    file_name = f'{problem_name}/data'
+
+    pop = optimizer.load_data_structure(f'{file_name}/pop_0.p')
+    log = optimizer.load_data_structure(f'{file_name}/log_0.p')
+    hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+    hof.update(pop)
+    print(hof)
 
 
 if __name__ == "__main__":

@@ -671,9 +671,11 @@ class Optimizer:
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
             print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
-            relaxation_factors, _ = self.optimize_relaxation_factors(best_expression, es_generations,
-                                                                     min_level, max_level, solver_program, storages)
-            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
+            relaxation_factors, improved_time_to_solution = \
+                self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
+                                                 solver_program, storages)
+            if best_time - improved_time_to_solution > 1:
+                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
 
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                             max_level, self.max_level)
@@ -694,12 +696,12 @@ class Optimizer:
             self.program_generator.generate_l3_file(tmp + cycle_function)
             best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
             best_weights = list(best_individual)
-            spectral_radius, = best_individual.fitness.values
+            time_to_solution, = best_individual.fitness.values
         except (KeyboardInterrupt, Exception) as e:
             self.program_generator.restore_files()
             raise e
         self.program_generator.restore_files()
-        return best_weights, spectral_radius
+        return best_weights, time_to_solution
 
     @staticmethod
     def visualize_tree(individual, filename):
@@ -769,10 +771,13 @@ class Optimizer:
         plt.show()
 
     @staticmethod
-    def dump_population(pop, file_name):
+    def dump_data_structure(data_structure, file_name):
         import pickle
         with open(file_name, 'wb') as file:
-            pickle.dump(pop, file)
+            pickle.dump(data_structure, file)
 
-
-
+    @staticmethod
+    def load_data_structure(file_name):
+        import pickle
+        with open(file_name, 'rb') as file:
+            return pickle.load(file)
