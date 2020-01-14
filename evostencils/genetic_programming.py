@@ -26,8 +26,10 @@ def generate(pset, min_height, max_height, condition, type_=None):
     expression = []
     height = random.randint(min_height, max_height)
     stack = [(0, type_)]
+    max_depth = 0
     while len(stack) != 0:
         depth, type_ = stack.pop()
+        max_depth = max(max_depth, depth)
         is_primitive = True
         terminals_available = len(pset.terminals[type_]) > 0
         primitives_available = len(pset.primitives[type_]) > 0
@@ -55,14 +57,17 @@ def generate(pset, min_height, max_height, condition, type_=None):
             if isclass(choice):
                 choice = choice()
         expression.append(choice)
-    return expression
+    return expression, max_depth
 
 
 def genGrow(pset, min_height, max_height, type_=None):
     def condition(height, depth):
         return depth >= height or \
            (depth >= min_height and random.random() < pset.terminalRatio)
-    return generate(pset, min_height, max_height, condition, type_)
+    result, max_depth = generate(pset, min_height, max_height, condition, type_)
+    while max_depth > 90:
+        result, max_depth = generate(pset, min_height, max_height, condition, type_)
+    return result
 
 
 class PrimitiveSetTyped(deap.gp.PrimitiveSetTyped):

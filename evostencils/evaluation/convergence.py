@@ -189,7 +189,7 @@ class ConvergenceEvaluator:
             p.join()
             if queue.empty():
                 return 0.0
-            return queue.get(timeout=1)
+            return queue.get(timeout=10)
         except (ArithmeticError, RuntimeError, MemoryError) as _:
             return 0.0
 

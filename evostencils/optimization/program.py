@@ -10,7 +10,6 @@ from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInse
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
-from functools import reduce
 
 
 class suppress_output(object):
@@ -86,17 +85,19 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=20)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=90)
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
             operator_choice = random.random()
             if operator_choice < 0.5:
-                return mutInsert(individual, 1, 10, pset)
+                return mutInsert(individual, 0, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
+        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=150))
+        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=150))
 
     def _init_multi_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
@@ -225,6 +226,105 @@ class Optimizer:
                     return spectral_radius * math.sqrt(self.infinity),
             else:
                 return spectral_radius * math.sqrt(self.infinity),
+
+    def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
+                                      _, __, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+
+        print("Running Multi-Objective Random Search Genetic Programming", flush=True)
+        self._init_multi_objective_toolbox(pset)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
+
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+        random.seed()
+        use_checkpoint = False
+        if checkpoint is not None:
+            if mu_ == len(checkpoint.population):
+                use_checkpoint = True
+            else:
+                print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
+                      f'but the required size is {mu_}.', flush=True)
+        if use_checkpoint:
+            population = checkpoint.population
+            min_generation = checkpoint.generation
+        else:
+            population = self._toolbox.population(n=initial_population_size)
+            min_generation = 0
+        max_generation = generations
+
+        if use_checkpoint:
+            logbook = logbooks[-1]
+        else:
+            logbook = tools.Logbook()
+            logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
+            logbooks.append(logbook)
+
+        invalid_ind = [ind for ind in population if not ind.fitness.valid]
+        toolbox = self._toolbox
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+        hof.update(population)
+        population = toolbox.select(population, len(population))
+        record = mstats.compile(population) if mstats is not None else {}
+        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
+        print(logbook.stream, flush=True)
+        # Begin the generational process
+        count = 0
+        for gen in range(min_generation + 1, max_generation + 1):
+            # Vary the population
+            offspring = self._toolbox.population(n=lambda_)
+            # Evaluate the individuals with an invalid fitness
+            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            hof.update(offspring)
+            if gen % checkpoint_frequency == 0:
+                if solver is not None:
+                    transformations.invalidate_expression(solver)
+                logbooks[-1] = logbook
+                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, population, logbooks)
+                try:
+                    checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
+                except (pickle.PickleError, TypeError) as e:
+                    print(e, flush=True)
+                    print('Skipping checkpoint', flush=True)
+            # Select the next generation population
+            population[:] = toolbox.select(population + offspring, mu_)
+            record = mstats.compile(population)
+            if len(population[0].fitness.values) == 1:
+                if record['fitness']['std'] < self.epsilon:
+                    count += 1
+                else:
+                    count = 0
+                if count >= 5 and hof is not None:
+                    logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+                    print(logbook.stream, flush=True)
+                    print("Population converged", flush=True)
+                    return population, logbook, hof
+            # Update the statistics with the new population
+            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            print(logbook.stream, flush=True)
+
+        return population, logbook, hof
 
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
@@ -463,7 +563,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
-        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -522,12 +622,12 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
