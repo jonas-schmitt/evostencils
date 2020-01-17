@@ -81,14 +81,18 @@ class Optimizer:
         self._toolbox = deap.base.Toolbox()
         self._gp_optimizer = gp_optimizer
 
-    def optimize(self, expression: base.Expression, problem_size, generations, storages=None):
+    def optimize(self, expression: base.Expression, problem_size, generations, storages, evaluation_time):
+        number_of_samples = 1
+        if evaluation_time < 1000:
+            number_of_samples = int(round(1000 / evaluation_time))
+
         def evaluate(weights):
             program_generator = self._gp_optimizer.program_generator
             if program_generator is not None and program_generator.compiler_available and \
                     storages is not None:
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                runtime, convergence_factor = program_generator.evaluate(number_of_samples=1)
+                runtime, convergence_factor = program_generator.evaluate(number_of_samples=number_of_samples)
                 program_generator.restore_global_initializations()
                 return runtime,
             else:

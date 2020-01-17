@@ -27,16 +27,16 @@ def main():
     # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
 
     # 2D Finite difference discretized Bi-Harmonic Equation
-    settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
+    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
+    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
     # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
     program_generator.run_c_compiler()

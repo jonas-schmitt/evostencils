@@ -1,6 +1,6 @@
 import random
 from inspect import isclass
-import deap.gp
+from deap import gp
 from operator import attrgetter
 
 
@@ -70,7 +70,7 @@ def genGrow(pset, min_height, max_height, type_=None):
     return result
 
 
-class PrimitiveSetTyped(deap.gp.PrimitiveSetTyped):
+class PrimitiveSetTyped(gp.PrimitiveSetTyped):
 
     def _add(self, prim):
         def addType(dict_, ret_type):
@@ -87,7 +87,7 @@ class PrimitiveSetTyped(deap.gp.PrimitiveSetTyped):
         addType(self.terminals, prim.ret)
 
         self.mapping[prim.name] = prim
-        if isinstance(prim, deap.gp.Primitive):
+        if isinstance(prim, gp.Primitive):
             for type_ in prim.args:
                 addType(self.primitives, type_)
                 addType(self.terminals, type_)

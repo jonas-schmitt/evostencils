@@ -6,7 +6,7 @@ import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
-from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
+from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best, selDoubleTournament
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
@@ -85,7 +85,7 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=10, max_height=90)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=0, max_height=90)
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
@@ -96,8 +96,8 @@ class Optimizer:
                 return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
-        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=150))
-        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=150))
+        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
+        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
 
     def _init_multi_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
@@ -481,9 +481,8 @@ class Optimizer:
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
-        # self._toolbox.register("select_for_mating", tools.selRandom)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -645,7 +644,7 @@ class Optimizer:
 
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                      solver_program, number_of_samples=10)
+                                                                      solver_program, number_of_samples=20)
                     estimated_runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
 
@@ -673,7 +672,7 @@ class Optimizer:
             print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
             relaxation_factors, improved_time_to_solution = \
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
-                                                 solver_program, storages)
+                                                 solver_program, storages, best_time)
             if best_time - improved_time_to_solution > 1:
                 relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
 
@@ -683,7 +682,7 @@ class Optimizer:
 
         return solver_program, pops, logbooks
 
-    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages):
+    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
         initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
@@ -694,7 +693,7 @@ class Optimizer:
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
             self.program_generator.generate_l3_file(tmp + cycle_function)
-            best_individual = self._weight_optimizer.optimize(expression, n, generations, storages)
+            best_individual = self._weight_optimizer.optimize(expression, n, generations, storages, evaluation_time)
             best_weights = list(best_individual)
             time_to_solution, = best_individual.fitness.values
         except (KeyboardInterrupt, Exception) as e:

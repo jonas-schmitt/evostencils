@@ -88,7 +88,10 @@ class PerformanceEvaluator:
                                            + PerformanceEvaluator.words_transferred_for_store())
             problem_size = min([reduce(lambda x, y: x * y, g.size) for g in expression.grid])
             # Compute the total runtime for solving the local system and computing a new approximation
-            runtime += self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
+            tmp = self.compute_runtime(operations_per_cell, words_per_cell, operations_per_cell * problem_size)
+            if expression.partitioning == partitioning.RedBlack:
+                tmp *= 1.4303682894270744 # Experimentally obtained factor
+            runtime += tmp
         elif isinstance(expression, base.Residual):
             # Estimate runtime for approximation and rhs in residual
             if not isinstance(expression.rhs, system.RightHandSide):
