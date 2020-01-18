@@ -82,9 +82,6 @@ class Optimizer:
         self._gp_optimizer = gp_optimizer
 
     def optimize(self, expression: base.Expression, problem_size, generations, storages, evaluation_time):
-        number_of_samples = 1
-        if evaluation_time < 1000:
-            number_of_samples = int(round(1000 / evaluation_time))
 
         def evaluate(weights):
             program_generator = self._gp_optimizer.program_generator
@@ -106,7 +103,7 @@ class Optimizer:
                 else:
                     return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        lambda_ = int((4 + 3 * log(problem_size)) * 2)
+        lambda_ = int(round((4 + 3 * log(problem_size)) * 3))
         print("Running CMA-ES", flush=True)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)

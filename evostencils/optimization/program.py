@@ -6,7 +6,7 @@ import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
 from evostencils.expressions import base, transformations, system
-from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best, selDoubleTournament
+from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
@@ -620,6 +620,9 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
+            if i == 0:
+                gp_mu = 2 * gp_mu
+                gp_lambda = 2 * gp_lambda
             if optimization_method is None:
                 pop, log, hof = self.NSGAII(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
@@ -637,8 +640,9 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[len(ind.fitness.values)-1])
             try:
-                for j in range(0, min(100, len(hof))):
+                for j in range(0, min(200, len(hof))):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
 
