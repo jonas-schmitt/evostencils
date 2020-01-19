@@ -620,9 +620,6 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            if i == 0:
-                gp_mu = 2 * gp_mu
-                gp_lambda = 2 * gp_lambda
             if optimization_method is None:
                 pop, log, hof = self.NSGAII(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,

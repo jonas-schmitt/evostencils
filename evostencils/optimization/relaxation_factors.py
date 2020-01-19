@@ -89,7 +89,7 @@ class Optimizer:
                     storages is not None:
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                runtime, convergence_factor = program_generator.evaluate(number_of_samples=number_of_samples)
+                runtime, convergence_factor = program_generator.evaluate(number_of_samples=1)
                 program_generator.restore_global_initializations()
                 return runtime,
             else:
@@ -103,7 +103,7 @@ class Optimizer:
                 else:
                     return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        lambda_ = int(round((4 + 3 * log(problem_size)) * 3))
+        lambda_ = int(round((4 + 3 * log(problem_size)) * 4))
         print("Running CMA-ES", flush=True)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -116,8 +116,8 @@ class Optimizer:
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
         generator.run_exastencils_compiler()
-        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
-        # _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
+        # _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
+        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         print(logbook, flush=True)
         return hof[0]
 
