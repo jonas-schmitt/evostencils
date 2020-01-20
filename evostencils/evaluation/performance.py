@@ -7,7 +7,8 @@ class PerformanceEvaluator:
     """
     Class for estimating the performance of matrix expressions by applying a simple roofline model
     """
-    def __init__(self, peak_performance: float, peak_bandwidth: float, bytes_per_word: int, runtime_coarse_grid_solver=0):
+    def __init__(self, peak_performance: float, peak_bandwidth: float, bytes_per_word: int,
+                 runtime_coarse_grid_solver=0):
         self._peak_performance = peak_performance
         self._peak_bandwidth = peak_bandwidth
         self._bytes_per_word = bytes_per_word

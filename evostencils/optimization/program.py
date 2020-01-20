@@ -194,7 +194,7 @@ class Optimizer:
         else:
             if spectral_radius < 1:
                 iterations = math.log(self.epsilon)/math.log(spectral_radius)
-                if iterations < 20:
+                if spectral_radius < 0.3:
                     runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     return iterations, runtime
                 else:
@@ -218,8 +218,7 @@ class Optimizer:
             return self.infinity,
         else:
             if spectral_radius < 1:
-                iterations = math.log(self.epsilon)/math.log(spectral_radius)
-                if iterations < 20:
+                if spectral_radius < 0.3:
                     runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
                 else:
@@ -645,7 +644,8 @@ class Optimizer:
 
                     time, convergence_factor = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                      solver_program, number_of_samples=20)
+                                                                      solver_program, infinity=self.infinity,
+                                                                      number_of_samples=25)
                     estimated_runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
 

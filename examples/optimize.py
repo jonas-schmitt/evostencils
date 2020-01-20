@@ -16,8 +16,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -40,8 +40,8 @@ def main():
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
@@ -66,9 +66,11 @@ def main():
     bytes_per_word = 8
     peak_performance = 20344.07 * 1e6
     peak_bandwidth = 19255.70 * 1e6
-    performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word)
+    runtime_coarse_grid_solver = 9.391977610000012
+    performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
+                                                 runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
-    epsilon = 1e-10
+    epsilon = 1e-15
     problem_name = program_generator.problem_name
 
     if not os.path.exists(problem_name):
@@ -88,7 +90,7 @@ def main():
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=1000, gp_lambda=1000,
+                                                               gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
                                                                gp_generations=100, es_generations=200,
@@ -99,7 +101,7 @@ def main():
     program_generator.generate_l3_file(program)
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
-    runtime, convergence_factor = program_generator.evaluate(infinity, 10)
+    runtime, convergence_factor = program_generator.evaluate(infinity, 100)
     program_generator.restore_files()
     print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
     print(f'ExaSlang representation:\n{program}\n', flush=True)

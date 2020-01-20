@@ -225,7 +225,7 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return result.returncode
 
-    def evaluate(self, infinity=1e100, number_of_samples=1):
+    def evaluate(self, infinity=1e300, number_of_samples=1):
         total_time = 0
         sum_of_convergence_factors = 0
         for i in range(number_of_samples):
@@ -259,7 +259,7 @@ class ProgramGenerator:
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str,
-                              infinity=1e100, number_of_samples=1):
+                              infinity=1e300, number_of_samples=1):
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, max_level)
         self.generate_l3_file(solver_program + cycle_function)
         try:
