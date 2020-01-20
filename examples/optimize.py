@@ -66,7 +66,7 @@ def main():
     bytes_per_word = 8
     peak_performance = 20344.07 * 1e6
     peak_bandwidth = 19255.70 * 1e6
-    runtime_coarse_grid_solver = 9.391977610000012
+    runtime_coarse_grid_solver = 9.391977610000012 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
