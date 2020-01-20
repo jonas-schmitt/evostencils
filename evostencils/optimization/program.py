@@ -480,7 +480,7 @@ class Optimizer:
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
@@ -620,12 +620,12 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 2 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
