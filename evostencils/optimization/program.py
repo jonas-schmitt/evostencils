@@ -232,7 +232,7 @@ class Optimizer:
 
         print("Running Multi-Objective Random Search Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        self._toolbox.register("select", tools.selNSGA2)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -480,7 +480,7 @@ class Optimizer:
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
@@ -636,7 +636,6 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[len(ind.fitness.values)-1])
             try:
                 for j in range(0, min(200, len(hof))):
                     individual = hof[j]
