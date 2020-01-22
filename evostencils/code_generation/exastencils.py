@@ -228,18 +228,19 @@ class ProgramGenerator:
     def evaluate(self, infinity=1e300, number_of_samples=1):
         total_time = 0
         sum_of_convergence_factors = 0
+        number_of_iterations = None
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.base_path}/{self.output_path}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not result.returncode == 0:
                 return infinity, infinity
             output = result.stdout.decode('utf8')
-            time_to_solution, convergence_factor = self.parse_output(output)
+            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output)
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
-        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples
+        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations
 
     def initialize_code_generation(self, max_level):
         self.generate_level_adapted_knowledge_file(max_level)
@@ -272,8 +273,8 @@ class ProgramGenerator:
         self._counter += 1
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         self.run_c_compiler()
-        runtime, convergence_factor = self.evaluate(infinity, number_of_samples)
-        return runtime, convergence_factor
+        runtime, convergence_factor, number_of_iterations = self.evaluate(infinity, number_of_samples)
+        return runtime, convergence_factor, number_of_iterations
 
     @staticmethod
     def parse_output(output: str):
@@ -288,7 +289,8 @@ class ProgramGenerator:
         convergence_factor = math.pow(convergence_factor, 1/count)
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
-        return time_to_solution, convergence_factor
+        number_of_iterations = len(lines) - 3
+        return time_to_solution, convergence_factor, number_of_iterations
 
     def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
         storage = []

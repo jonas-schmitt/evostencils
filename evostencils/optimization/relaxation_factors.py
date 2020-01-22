@@ -89,7 +89,7 @@ class Optimizer:
                     storages is not None:
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                runtime, convergence_factor = program_generator.evaluate(number_of_samples=1)
+                runtime, convergence_factor, _ = program_generator.evaluate(number_of_samples=1)
                 program_generator.restore_global_initializations()
                 return runtime,
             else:

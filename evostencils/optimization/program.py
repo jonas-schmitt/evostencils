@@ -636,27 +636,22 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
+            number_of_iterations = None
             try:
                 for j in range(0, min(200, len(hof))):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
 
-                    time, convergence_factor = \
+                    time, convergence_factor, number_of_iterations = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, infinity=self.infinity,
                                                                       number_of_samples=25)
-                    estimated_runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
 
-                    def estimate_time_to_solution(rho, t):
-                        if rho < 1:
-                            return math.log(self.epsilon) / math.log(rho) * t
-                        else:
-                            return 100 * t
                     print(f'Time: {time}, '
-                          f'(Estimation: {estimate_time_to_solution(estimated_convergence_factor, estimated_runtime)}, '
                           f'Convergence factor: {convergence_factor} '
-                          f'(Estimation: {estimated_convergence_factor})', flush=True)
+                          f'(Estimation: {estimated_convergence_factor}), '
+                          f'Number of Iterations: {number_of_iterations}', flush=True)
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
@@ -675,7 +670,14 @@ class Optimizer:
                                                  solver_program, storages, best_time)
             if best_time - improved_time_to_solution > 1:
                 relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-
+            self.program_generator.initialize_code_generation(max_level)
+            time, convergence_factor, number_of_iterations = \
+                self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
+                                                              solver_program, infinity=self.infinity,
+                                                              number_of_samples=25)
+            self.program_generator.restore_files()
+            best_expression.runtime = time / number_of_iterations * 1e-3
+            print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                             max_level, self.max_level)
             solver_program += cycle_function
