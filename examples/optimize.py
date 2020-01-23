@@ -64,8 +64,8 @@ def main():
     lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
     convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
-    peak_performance = 20344.07 * 1e6
-    peak_bandwidth = 19255.70 * 1e6
+    peak_performance = 27920.14 * 1e6
+    peak_bandwidth = 28338.93 * 1e6
     runtime_coarse_grid_solver = 9.391977610000012 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
@@ -93,7 +93,7 @@ def main():
                                                                gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
-                                                               gp_generations=100, es_generations=200,
+                                                               gp_generations=150, es_generations=200,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
