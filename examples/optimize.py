@@ -90,7 +90,7 @@ def main():
     maximum_block_size = 3
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=1000, gp_lambda=1000,
+                                                               gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
                                                                gp_mutation_probability=0.5,
                                                                gp_generations=100, es_generations=200,
@@ -101,7 +101,7 @@ def main():
     program_generator.generate_l3_file(program)
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
-    runtime, convergence_factor = program_generator.evaluate(infinity, 100)
+    runtime, convergence_factor, _ = program_generator.evaluate(infinity, 100)
     program_generator.restore_files()
     print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
     print(f'ExaSlang representation:\n{program}\n', flush=True)

@@ -192,15 +192,8 @@ class Optimizer:
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             return self.infinity, self.infinity
         else:
-            if spectral_radius < 1:
-                iterations = math.log(self.epsilon)/math.log(spectral_radius)
-                if spectral_radius < 0.3:
-                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-                    return iterations, runtime
-                else:
-                    return iterations, self.infinity
-            else:
-                return spectral_radius * 10000, self.infinity
+            runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
+            return spectral_radius, runtime
 
     def evaluate_single_objective(self, individual, pset):
         with suppress_output():
@@ -218,11 +211,8 @@ class Optimizer:
             return self.infinity,
         else:
             if spectral_radius < 1:
-                if spectral_radius < 0.3:
-                    runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-                    return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
-                else:
-                    return spectral_radius * math.sqrt(self.infinity),
+                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
+                return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
             else:
                 return spectral_radius * math.sqrt(self.infinity),
 
@@ -232,7 +222,7 @@ class Optimizer:
 
         print("Running Multi-Objective Random Search Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -422,10 +412,10 @@ class Optimizer:
              program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
-        self._toolbox.register("select", select_unique_best)
-        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
-        # self._toolbox.register("select", tools.selBest)
-        # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
+        # self._toolbox.register("select", select_unique_best)
+        # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
+        self._toolbox.register("select", tools.selBest)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -480,13 +470,14 @@ class Optimizer:
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
         print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
+        # self._toolbox.register("select_for_mating", tools.selRandom)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(spectral_radius=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -517,37 +508,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
-
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-        hof = tools.ParetoFront(similar=lambda a,b: a.fitness.values[0] == b.fitness.values[0] and a.fitness.values[1] == b.fitness.values[1])
-
-        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
-                                      crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
-
-    def SPEAII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
-               min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running SPEA-II Genetic Programming", flush=True)
-        self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selSPEA2)
-        self._toolbox.register("select_for_mating", tools.selRandom)
-
-        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
-        stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(spectral_radius=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -636,17 +597,17 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(max_level)
-            number_of_iterations = None
             try:
                 for j in range(0, min(200, len(hof))):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
-
+                    estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
+                    if not estimated_convergence_factor < 1:
+                        continue
                     time, convergence_factor, number_of_iterations = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, infinity=self.infinity,
-                                                                      number_of_samples=25)
-                    estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
+                                                                      number_of_samples=20)
 
                     print(f'Time: {time}, '
                           f'Convergence factor: {convergence_factor} '
@@ -665,18 +626,17 @@ class Optimizer:
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
             print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
-            relaxation_factors, improved_time_to_solution = \
+            relaxation_factors, improved_convergence_factor = \
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
                                                  solver_program, storages, best_time)
-            if best_time - improved_time_to_solution > 1:
-                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
+            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
             self.program_generator.initialize_code_generation(max_level)
-            time, convergence_factor, number_of_iterations = \
+            best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=25)
+                                                              number_of_samples=100)
             self.program_generator.restore_files()
-            best_expression.runtime = time / number_of_iterations * 1e-3
+            best_expression.runtime = best_time / number_of_iterations * 1e-3
             print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
                                                                             max_level, self.max_level)
@@ -726,7 +686,7 @@ class Optimizer:
         line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label1}")
         ax1.set_xlabel("Generation")
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax1.set_ylabel("Iterations", color="b")
+        ax1.set_ylabel("Spectral Radius", color="b")
         for tl in ax1.get_yticklabels():
             tl.set_color("b")
 
@@ -745,17 +705,17 @@ class Optimizer:
     @staticmethod
     def plot_minimum_fitness(logbook):
         gen = logbook.select("gen")
-        convergence_mins = logbook.chapters["iterations"].select("min")
+        convergence_mins = logbook.chapters["spectral_radius"].select("min")
         runtime_mins = logbook.chapters["runtime"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Number of Iterations',
+        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius',
                                            'Minimum Runtime per Iteration')
 
     @staticmethod
     def plot_average_fitness(logbook):
         gen = logbook.select("gen")
-        convergence_avgs = logbook.chapters["iterations"].select("avg")
+        convergence_avgs = logbook.chapters["spectral_radius"].select("avg")
         runtime_avgs = logbook.chapters["runtime"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Number of Iterations',
+        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius',
                                            'Average Runtime per Iteration')
 
     @staticmethod
@@ -766,7 +726,7 @@ class Optimizer:
 
         front = numpy.array([ind.fitness.values for ind in pop])
         plt.scatter(front[:, 0], front[:, 1], c="b")
-        plt.xlabel("Number of Iterations")
+        plt.xlabel("Spectral Radius")
         plt.ylabel("Runtime per Iteration")
         plt.axis("tight")
         plt.show()

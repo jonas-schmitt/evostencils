@@ -89,9 +89,10 @@ class Optimizer:
                     storages is not None:
                 program_generator.generate_global_weight_initializations(weights)
                 program_generator.run_c_compiler()
-                runtime, convergence_factor, _ = program_generator.evaluate(number_of_samples=1)
+                runtime, convergence_factor, _ = program_generator.evaluate(infinity=self._gp_optimizer.infinity,
+                                                                            number_of_samples=1)
                 program_generator.restore_global_initializations()
-                return runtime,
+                return convergence_factor,
             else:
                 tail = set_relaxation_factors(expression, weights)
                 if len(tail) > 0:
@@ -103,7 +104,7 @@ class Optimizer:
                 else:
                     return spectral_radius,
         self._toolbox.register("evaluate", evaluate)
-        lambda_ = int(round((4 + 3 * log(problem_size)) * 4))
+        lambda_ = int(round((4 + 3 * log(problem_size)) * 2))
         print("Running CMA-ES", flush=True)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -115,9 +116,10 @@ class Optimizer:
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
-        generator.run_exastencils_compiler()
-        # _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
-        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
+        if generator.run_exastencils_compiler() != 0:
+            raise RuntimeError("Could not initialize code generator for relaxation factor optimization")
+        _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
+        # _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         print(logbook, flush=True)
         return hof[0]
 

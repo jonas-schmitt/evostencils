@@ -2,6 +2,9 @@ from evostencils.optimization.program import Optimizer
 from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 import os
 import lfa_lab
 import numpy as np
@@ -88,7 +91,24 @@ def main():
     log = optimizer.load_data_structure(f'{file_name}/log_0.p')
     hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
     hof.update(pop)
-    print(hof)
+
+    sns.set(style="darkgrid")
+    front = np.array([ind.fitness.values for ind in hof])
+    x = front[:, 0]
+    y = front[:, 1]
+    coeffs = np.polyfit(x, y, 3)
+    x_fit = np.linspace(x[0], x[-1], num=len(x)*10)
+    y_fit = np.polyval(coeffs, x_fit)
+    columns = ['Number of Iterations', 'Runtime per Iteration (ms)']
+    df = pd.DataFrame(front, columns=columns)
+    sns.relplot(x=columns[0], y=columns[1], data=df, kind='scatter')
+    plt.plot(x_fit, y_fit)
+    plt.show()
+
+    #plt.scatter(x, y, c="b")
+    #plt.plot(x_fit, y_fit)
+    #plt.axis("tight")
+    #plt.show()
 
 
 if __name__ == "__main__":

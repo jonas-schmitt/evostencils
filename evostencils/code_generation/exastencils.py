@@ -233,11 +233,11 @@ class ProgramGenerator:
             result = subprocess.run([f'{self.base_path}/{self.output_path}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not result.returncode == 0:
-                return infinity, infinity
+                return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
             time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output)
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
-                return infinity, infinity
+                return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations
@@ -265,14 +265,18 @@ class ProgramGenerator:
         self.generate_l3_file(solver_program + cycle_function)
         try:
             start_time = time.time()
-            self.run_exastencils_compiler()
+            returncode = self.run_exastencils_compiler()
             end_time = time.time()
             elapsed_time = end_time - start_time
+            if returncode != 0:
+                return infinity, infinity, infinity
         except subprocess.TimeoutExpired:
-            return infinity, infinity
+            return infinity, infinity, infinity
         self._counter += 1
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
-        self.run_c_compiler()
+        returncode = self.run_c_compiler()
+        if returncode != 0:
+            return infinity, infinity, infinity
         runtime, convergence_factor, number_of_iterations = self.evaluate(infinity, number_of_samples)
         return runtime, convergence_factor, number_of_iterations
 
