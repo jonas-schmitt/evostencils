@@ -87,22 +87,31 @@ def main():
 
     file_name = f'{problem_name}/data'
 
-    pop = optimizer.load_data_structure(f'{file_name}/pop_0.p')
-    log = optimizer.load_data_structure(f'{file_name}/log_0.p')
-    hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
-    hof.update(pop)
+    pop0 = optimizer.load_data_structure(f'{file_name}/pop_0.p')
+    log0 = optimizer.load_data_structure(f'{file_name}/log_0.p')
+    hof0 = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+    hof0.update(pop0)
+
+    pop1 = optimizer.load_data_structure(f'{file_name}/pop_1.p')
+    log1 = optimizer.load_data_structure(f'{file_name}/log_1.p')
+    hof1 = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+    hof1.update(pop1)
 
     sns.set(style="darkgrid")
-    front = np.array([ind.fitness.values for ind in hof])
-    x = front[:, 0]
-    y = front[:, 1]
-    coeffs = np.polyfit(x, y, 3)
-    x_fit = np.linspace(x[0], x[-1], num=len(x)*10)
-    y_fit = np.polyval(coeffs, x_fit)
-    columns = ['Number of Iterations', 'Runtime per Iteration (ms)']
+    front0 = [(*ind.fitness.values, 0) for ind in hof0]
+    front1 = [(*ind.fitness.values, 1) for ind in hof1]
+    front = front0 + front1
+
+    tips = sns.load_dataset("tips")
+    # x = front[:, 0]
+    # y = front[:, 1]
+    # coeffs = np.polyfit(x, y, 3)
+    # x_fit = np.linspace(x[0], x[-1], num=len(x)*10)
+    # y_fit = np.polyval(coeffs, x_fit)
+    columns = ['Spectral Radius', 'Runtime per Iteration (ms)', 'Run']
     df = pd.DataFrame(front, columns=columns)
-    sns.relplot(x=columns[0], y=columns[1], data=df, kind='scatter')
-    plt.plot(x_fit, y_fit)
+    sns.relplot(x=columns[0], y=columns[1], hue=columns[2], data=df, kind='scatter')
+    # plt.plot(x_fit, y_fit)
     plt.show()
 
     #plt.scatter(x, y, c="b")

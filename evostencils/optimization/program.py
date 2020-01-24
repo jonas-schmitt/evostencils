@@ -173,6 +173,10 @@ class Optimizer:
     def infinity(self):
         return self._infinity
 
+    def reset_evaluation_counters(self):
+        self._failed_evaluations = 0
+        self._total_number_of_evaluations = 0
+
     def generate_individual(self):
         return self._toolbox.individual()
 
@@ -270,8 +274,9 @@ class Optimizer:
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
 
-        invalid_ind = [ind for ind in population if not ind.fitness.valid]
+        invalid_ind = [ind for ind in population]
         toolbox = self._toolbox
+        self.reset_evaluation_counters()
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
@@ -348,12 +353,14 @@ class Optimizer:
 
         invalid_ind = [ind for ind in population]
         toolbox = self._toolbox
+        self.reset_evaluation_counters()
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
         successful_evaluations = self._total_number_of_evaluations - self._failed_evaluations
         print("Number of successful evaluations in initial population:",
-              successful_evaluations)
+              successful_evaluations, flush=True)
+        self.reset_evaluation_counters()
         population = toolbox.select(population, min(2 * mu_, successful_evaluations))
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
@@ -601,8 +608,8 @@ class Optimizer:
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
 
-            print(f"Percentage of failed LFA computations: "
-                  f"{self._failed_evaluations / self._total_number_of_evaluations * 100} %")
+            print(f"Percentage of failed evaluations: "
+                  f"{self._failed_evaluations / self._total_number_of_evaluations * 100} %", flush=True)
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity

@@ -5,6 +5,7 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import lfa_lab
 import numpy as np
+import sys
 
 
 def main():
@@ -16,8 +17,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -40,8 +41,8 @@ def main():
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
 
@@ -90,7 +91,14 @@ def main():
     levels_per_run = 2
     required_convergence = 0.9
     maximum_block_size = 3
-    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimizer.NSGAII,
+    optimization_method = optimizer.NSGAII
+    if len(sys.argv) > 1:
+        if sys.argv[1].upper() == "NSGAII":
+            optimization_method = optimizer.NSGAII
+        elif sys.argv[1].upper() == "RANDOM":
+            optimization_method = optimizer.multi_objective_random_search
+
+    program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
                                                                gp_mu=500, gp_lambda=500,
                                                                gp_crossover_probability=0.5,
