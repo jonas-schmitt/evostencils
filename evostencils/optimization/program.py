@@ -75,6 +75,8 @@ class Optimizer:
         self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
         self._weight_optimizer = relaxation_factor_optimization.Optimizer(self)
+        self._total_number_of_evaluations = 0
+        self._failed_evaluations = 0
 
     @staticmethod
     def _init_creator():
@@ -178,10 +180,12 @@ class Optimizer:
         return gp.compile(individual, pset)
 
     def evaluate_multiple_objectives(self, individual, pset):
+        self._total_number_of_evaluations += 1
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
+                self._failed_evaluations += 1
                 return self.infinity, self.infinity
 
         expression = expression1
@@ -190,6 +194,7 @@ class Optimizer:
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
+            self._failed_evaluations += 1
             return self.infinity, self.infinity
         else:
             runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
@@ -341,13 +346,16 @@ class Optimizer:
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
 
-        invalid_ind = [ind for ind in population if not ind.fitness.valid]
+        invalid_ind = [ind for ind in population]
         toolbox = self._toolbox
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        successful_evaluations = self._total_number_of_evaluations - self._failed_evaluations
+        print("Number of successful evaluations in initial population:",
+              successful_evaluations)
+        population = toolbox.select(population, min(2 * mu_, successful_evaluations))
         hof.update(population)
-        population = toolbox.select(population, len(population))
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         print(logbook.stream, flush=True)
@@ -375,9 +383,11 @@ class Optimizer:
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            # print(f"Percentage of failed LFA computations: {self._failed_lfa_computations / self._lfa_computations * 100} %")
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             hof.update(offspring)
+
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
                     transformations.invalidate_expression(solver)
@@ -581,16 +591,18 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 10 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
 
+            print(f"Percentage of failed LFA computations: "
+                  f"{self._failed_evaluations / self._total_number_of_evaluations * 100} %")
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity
@@ -634,7 +646,7 @@ class Optimizer:
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=100)
+                                                              number_of_samples=20)
             self.program_generator.restore_files()
             best_expression.runtime = best_time / number_of_iterations * 1e-3
             print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
