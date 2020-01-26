@@ -1,13 +1,13 @@
 import subprocess
 problem_name = '2D_FD_LinearElasticity_fromL2'
 for i in range(0, 10):
-    print(f"Starting with run {i}")
+    print(f"Starting with run {i}", flush=True)
     optimizer = 'NSGAII'
     if i >= 5:
         optimizer = 'RANDOM'
-        print("Using Multi-Objective Random Search")
+        print("Using Multi-Objective Random Search", flush=True)
     else:
-        print("Using NSGA-II")
+        print("Using NSGA-II", flush=True)
 
     result = subprocess.run(['python', 'examples/optimize.py', optimizer],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

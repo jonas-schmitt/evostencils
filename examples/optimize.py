@@ -98,11 +98,14 @@ def main():
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
 
+    crossover_probability = 2.0/3.0
+    mutation_probability = 1.0 - crossover_probability
+
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
                                                                gp_mu=500, gp_lambda=500,
-                                                               gp_crossover_probability=0.5,
-                                                               gp_mutation_probability=0.5,
+                                                               gp_crossover_probability=crossover_probability,
+                                                               gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=200,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,

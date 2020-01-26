@@ -92,7 +92,7 @@ class Optimizer:
 
         def mutate(individual, pset):
             operator_choice = random.random()
-            if operator_choice < 0.5:
+            if operator_choice < 2.0/3.0:
                 return mutInsert(individual, 0, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
@@ -361,7 +361,7 @@ class Optimizer:
         print("Number of successful evaluations in initial population:",
               successful_evaluations, flush=True)
         self.reset_evaluation_counters()
-        population = toolbox.select(population, min(2 * mu_, successful_evaluations))
+        population = toolbox.select(population, successful_evaluations)
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
@@ -598,12 +598,12 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, 50 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 20 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, 50 * gp_mu, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
