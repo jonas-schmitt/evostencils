@@ -571,8 +571,9 @@ class Optimizer:
         pops = []
         logbooks = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        for i in range(levels - levels_per_run, -1, -levels_per_run):
-            min_level = self.max_level - (i + levels_per_run - 1)
+        # for i in range(levels - levels_per_run, -1, -levels_per_run):
+        for i in range(0, levels, levels_per_run):
+            min_level = self.max_level - (i + levels_per_run)
             max_level = self.max_level - i
             pass_checkpoint = False
             if restart_from_checkpoint:
@@ -585,37 +586,37 @@ class Optimizer:
             approximation = approximations[i]
 
             self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
+            if i > 0:
+                self.performance_evaluator.set_runtime_of_coarse_grid_solver(0.0)
 
             rhs = right_hand_sides[i]
             pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
                                                                    max_level, self.equations, self.operators, self.fields,
                                                                    maximum_block_size=maximum_block_size,
-                                                                   coarse_grid_solver_expression=best_expression,
                                                                    depth=levels_per_run, LevelFinishedType=self._FinishedType,
                                                                    LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
+            initial_population_size = max(gp_mu, 25000)
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, 50 * gp_mu, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, initial_population_size, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, 50 * gp_mu, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
 
-            print(f"Percentage of failed evaluations: "
-                  f"{self._failed_evaluations / self._total_number_of_evaluations * 100} %", flush=True)
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
-            self.program_generator.initialize_code_generation(max_level)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             try:
                 for j in range(0, min(200, len(hof))):
                     individual = hof[j]
@@ -627,11 +628,16 @@ class Optimizer:
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, infinity=self.infinity,
                                                                       number_of_samples=20)
+                    if i == 0:
+                        print(f'Time: {time}, '
+                              f'Convergence factor: {convergence_factor} '
+                              f'(Estimation: {estimated_convergence_factor}), '
+                              f'Number of Iterations: {number_of_iterations}', flush=True)
+                    else:
+                        print(f'Time: {time}, '
+                              f'Convergence factor: {convergence_factor} '
+                              f'Number of Iterations: {number_of_iterations}', flush=True)
 
-                    print(f'Time: {time}, '
-                          f'Convergence factor: {convergence_factor} '
-                          f'(Estimation: {estimated_convergence_factor}), '
-                          f'Number of Iterations: {number_of_iterations}', flush=True)
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
@@ -649,7 +655,7 @@ class Optimizer:
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
                                                  solver_program, storages, best_time)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(max_level)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
@@ -657,7 +663,7 @@ class Optimizer:
             self.program_generator.restore_files()
             best_expression.runtime = best_time / number_of_iterations * 1e-3
             print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
-            cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, min_level,
+            cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, self.min_level,
                                                                             max_level, self.max_level)
             solver_program += cycle_function
 
@@ -668,12 +674,12 @@ class Optimizer:
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        self.program_generator.initialize_code_generation(max_level)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level)
         try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
-                                                                            max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(tmp + cycle_function)
+                                                                            self.max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
             best_individual = self._weight_optimizer.optimize(expression, n, generations, storages, evaluation_time)
             best_weights = list(best_individual)
             time_to_solution, = best_individual.fitness.values

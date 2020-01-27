@@ -242,8 +242,8 @@ class ProgramGenerator:
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations
 
-    def initialize_code_generation(self, max_level):
-        self.generate_level_adapted_knowledge_file(max_level)
+    def initialize_code_generation(self, min_level: int, max_level: int):
+        self.generate_level_adapted_knowledge_file(min_level, max_level)
         if self._counter == 0:
             start_time = time.time()
             self.run_exastencils_compiler()
@@ -261,8 +261,8 @@ class ProgramGenerator:
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str,
                               infinity=1e300, number_of_samples=1):
-        cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, max_level)
-        self.generate_l3_file(solver_program + cycle_function)
+        cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
+        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
         try:
             start_time = time.time()
             returncode = self.run_exastencils_compiler()
@@ -542,22 +542,37 @@ class ProgramGenerator:
                                f'{source_field.to_exa()}\n'
             elif isinstance(expression.operand1, base.CoarseGridSolver):
                 program += self.generate_multigrid(expression.operand2, storages, min_level, max_level, use_global_weights)
+                level = max_level
                 for i, grid in enumerate(expression.operand2.grid):
                     # solution_field = self.get_solution_field(storages, i, grid.level)
                     # rhs_field = self.get_rhs_field(storages, i, grid.level)
                     source_field = self.get_rhs_field(storages, i, grid.level)
                     # program += f'\t{solution_field.to_exa()} = 0\n'
                     # tmp = rhs_field.to_exa()
-                    if grid.level == self.min_level:
+
+                    # solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                    # program += f'\t{solution_field.to_exa()} = 0\n'
+                    # program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
+                    # program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
+                    # TODO fix
+                    level = min(level, grid.level)
+                    if grid.level == min_level:
                         program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
                         program += f'\tgen_error_{self.fields[i]}@{grid.level} = 0\n'
                     else:
                         solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         program += f'\t{solution_field.to_exa()} = 0\n'
-                program += f'\tgen_mgCycle@{min_level - 1}()\n'
+                program += f'\tgen_mgCycle@{level}()\n'
                 for i, grid in enumerate(expression.grid):
                     target_field = self.get_correction_field(storages, i, grid.level)
-                    if grid.level == self.min_level:
+
+                    solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                    program += f'\t{target_field.to_exa()} = {solution_field.to_exa()}\n'
+
+                    # solution_field = self.get_solution_field(storages, i, grid.level, max_level)
+                    # program += f'\t{target_field.to_exa()} = {solution_field.to_exa()}\n'
+                    # TODO fix
+                    if grid.level == min_level:
                         pass
                         # program += f'\t{target_field.to_exa()} = gen_error_{self.fields[i]}@{grid.level}\n'
                     else:
@@ -569,13 +584,14 @@ class ProgramGenerator:
             raise RuntimeError("Not implemented")
         return program
 
-    def generate_l3_file(self, program: str):
+    def generate_l3_file(self, min_level, max_level, program: str):
         with open(f'{self.base_path}/{self._debug_l3_path}', 'r') as input_file:
             with open(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3', 'w+') as output_file:
                 line = input_file.readline()
                 while line:
                     # TODO perform this check in a more accurate way
-                    if ('Function gen_mgCycle@' in line and f'Function gen_mgCycle@{self.min_level}' not in line)\
+                    if ('Function gen_mgCycle@' in line and
+                        any([f'Function gen_mgCycle@{level}' in line for level in range(min_level+1, max_level+1)]))\
                             or 'Function InitFields' in line:
                         while line and line[0] is not '}':
                             line = input_file.readline()
@@ -603,7 +619,7 @@ class ProgramGenerator:
             ['cp', f'{self.base_path}/{relative_output_file_path}', f'{self.base_path}/{relative_input_file_path}'],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def generate_level_adapted_knowledge_file(self, max_level: int):
+    def generate_level_adapted_knowledge_file(self, min_level: int, max_level: int):
         base_path = self.base_path
         relative_input_file_path = self.knowledge_path
         relative_output_file_path = f'{self.knowledge_path}.tmp'
@@ -613,7 +629,7 @@ class ProgramGenerator:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'minLevel':
-                        output_file.write(f'{lhs}\t= {self.min_level}\n')
+                        output_file.write(f'{lhs}\t= {min_level}\n')
                     elif lhs == 'maxLevel':
                         output_file.write(f'{lhs}\t= {max_level}\n')
                     else:

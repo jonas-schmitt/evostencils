@@ -69,7 +69,8 @@ def main():
     peak_performance = 27943.55 * 1e6
     peak_bandwidth = 28338.93 * 1e6
     # Measured on the target platform
-    runtime_coarse_grid_solver = 9.391977610000012 * 1e-3
+    # runtime_coarse_grid_solver = 9.391977610000012 * 1e-3
+    runtime_coarse_grid_solver = 0
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
@@ -103,15 +104,15 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=100, gp_lambda=100,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=100, es_generations=200,
+                                                               gp_generations=50, es_generations=50,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
-    program_generator.initialize_code_generation(max_level)
-    program_generator.generate_l3_file(program)
+    program_generator.initialize_code_generation(min_level, max_level)
+    program_generator.generate_l3_file(min_level, max_level, program)
     program_generator.run_exastencils_compiler()
     program_generator.run_c_compiler()
     runtime, convergence_factor, _ = program_generator.evaluate(infinity, 100)
