@@ -571,7 +571,6 @@ class Optimizer:
         pops = []
         logbooks = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        # for i in range(levels - levels_per_run, -1, -levels_per_run):
         for i in range(0, levels, levels_per_run):
             min_level = self.max_level - (i + levels_per_run)
             max_level = self.max_level - i
@@ -622,7 +621,7 @@ class Optimizer:
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
-                    if not estimated_convergence_factor < 1:
+                    if not estimated_convergence_factor < 0.9:
                         continue
                     time, convergence_factor, number_of_iterations = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
@@ -635,7 +634,7 @@ class Optimizer:
                               f'Number of Iterations: {number_of_iterations}', flush=True)
                     else:
                         print(f'Time: {time}, '
-                              f'Convergence factor: {convergence_factor} '
+                              f'Convergence factor: {convergence_factor}, '
                               f'Number of Iterations: {number_of_iterations}', flush=True)
 
                     if time < best_time and \

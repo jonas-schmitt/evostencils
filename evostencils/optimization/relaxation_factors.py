@@ -119,7 +119,6 @@ class Optimizer:
         if generator.run_exastencils_compiler() != 0:
             raise RuntimeError("Could not initialize code generator for relaxation factor optimization")
         _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
-        # _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=True, stats=stats)
         print(logbook, flush=True)
         return hof[0]
 
