@@ -69,12 +69,11 @@ def main():
     peak_performance = 27943.55 * 1e6
     peak_bandwidth = 28338.93 * 1e6
     # Measured on the target platform
-    # runtime_coarse_grid_solver = 9.391977610000012 * 1e-3
-    runtime_coarse_grid_solver = 0
+    runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
-    epsilon = 1e-15
+    epsilon = 1e-14
     problem_name = program_generator.problem_name
 
     if not os.path.exists(problem_name):
@@ -104,7 +103,7 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=200, gp_lambda=200,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,

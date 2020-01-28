@@ -11,8 +11,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -35,13 +35,14 @@ def main():
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
     program_generator.run_c_compiler()
-    time_to_solution, convergence_factor = program_generator.evaluate(number_of_samples=100)
-    print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}')
+    time_to_solution, convergence_factor, iterations = program_generator.evaluate(number_of_samples=100)
+    print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}, '
+          f'Number of Iterations: {iterations}, Run time per Iteration: {time_to_solution / iterations} ms')
 
 
 if __name__ == "__main__":

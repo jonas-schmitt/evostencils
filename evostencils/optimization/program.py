@@ -202,7 +202,10 @@ class Optimizer:
             return self.infinity, self.infinity
         else:
             runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-            return spectral_radius, runtime
+            if spectral_radius < 1:
+                return math.log(self.epsilon) / math.log(spectral_radius), runtime
+            else:
+                return 1000 * spectral_radius, runtime
 
     def evaluate_single_objective(self, individual, pset):
         with suppress_output():
@@ -236,7 +239,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(spectral_radius=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -494,7 +497,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(spectral_radius=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -525,7 +528,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(spectral_radius=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         def mean(xs):
             avg = 0
@@ -598,7 +601,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = max(gp_mu, 25000)
+            initial_population_size = 20 * gp_mu
             if optimization_method is None:
                 pop, log, hof = self.NSGAII(pset, initial_population_size, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
@@ -617,7 +620,7 @@ class Optimizer:
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             try:
-                for j in range(0, min(200, len(hof))):
+                for j in range(0, min(int(gp_mu // 2), len(hof), 100)):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
