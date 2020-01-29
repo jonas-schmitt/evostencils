@@ -629,7 +629,7 @@ class Optimizer:
                     time, convergence_factor, number_of_iterations = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, infinity=self.infinity,
-                                                                      number_of_samples=20)
+                                                                      number_of_samples=10)
                     if i == 0:
                         print(f'Time: {time}, '
                               f'Convergence factor: {convergence_factor} '
@@ -653,15 +653,18 @@ class Optimizer:
             if best_expression is None:
                 raise RuntimeError("Optimization failed")
             print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
+            generations = es_generations
+            if i == 0:
+                generations += 50
             relaxation_factors, improved_convergence_factor = \
-                self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
+                self.optimize_relaxation_factors(best_expression, generations, min_level, max_level,
                                                  solver_program, storages, best_time)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
             self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=20)
+                                                              number_of_samples=10)
             self.program_generator.restore_files()
             best_expression.runtime = best_time / number_of_iterations * 1e-3
             print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
