@@ -91,7 +91,7 @@ def main():
     if not os.path.exists(checkpoint_directory_path):
         os.makedirs(checkpoint_directory_path)
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
-                          mpi_comm=comm, mpi_rank=mpi_rank,
+                          mpi_comm=comm, mpi_rank=mpi_rank, number_of_processes=nprocs,
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
@@ -105,6 +105,8 @@ def main():
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
+        if sys.argv[1].upper() == "SOGP":
+            optimization_method = optimizer.SOGP
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
 
@@ -113,10 +115,10 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=56, gp_lambda=56,
+                                                               gp_mu=32, gp_lambda=32,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=100, es_generations=150,
+                                                               gp_generations=60, es_generations=100,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
