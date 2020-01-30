@@ -85,27 +85,17 @@ class Optimizer:
 
         def evaluate(weights):
             program_generator = self._gp_optimizer.program_generator
-            if program_generator is not None and program_generator.compiler_available and \
-                    storages is not None:
-                program_generator.generate_global_weight_initializations(weights)
-                program_generator.run_c_compiler()
-                runtime, convergence_factor, _ = program_generator.evaluate(infinity=self._gp_optimizer.infinity,
-                                                                            number_of_samples=1)
-                program_generator.restore_global_initializations()
-                return convergence_factor,
-            else:
-                tail = set_relaxation_factors(expression, weights)
-                if len(tail) > 0:
-                    raise RuntimeError("Incorrect number of weights")
-                spectral_radius = self._gp_optimizer.convergence_evaluator.compute_spectral_radius(expression)
-                reset_status(expression)
-                if spectral_radius == 0.0:
-                    return self._gp_optimizer.infinity,
-                else:
-                    return spectral_radius,
+            output_path = program_generator._output_path_generated
+            program_generator.generate_global_weight_initializations(output_path, weights)
+            program_generator.run_c_compiler(output_path)
+            runtime, convergence_factor, _ = program_generator.evaluate(output_path, infinity=self._gp_optimizer.infinity,
+                                                                        number_of_samples=1)
+            program_generator.restore_global_initializations(output_path)
+            return convergence_factor,
         self._toolbox.register("evaluate", evaluate)
         lambda_ = int(round((4 + 3 * log(problem_size)) * 2))
-        print("Running CMA-ES", flush=True)
+        if self._gp_optimizer.is_root():
+            print("Running CMA-ES", flush=True)
         strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.3, lambda_=lambda_)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", numpy.mean)
@@ -116,9 +106,11 @@ class Optimizer:
         self._toolbox.register("update", strategy.update)
         hof = tools.HallOfFame(1)
         generator = self._gp_optimizer.program_generator
-        if generator.run_exastencils_compiler() != 0:
+        if generator.run_exastencils_compiler(knowledge_path=generator.knowledge_path_generated,
+                                              settings_path=generator.settings_path_generated) != 0:
             raise RuntimeError("Could not initialize code generator for relaxation factor optimization")
         _, logbook = algorithms.eaGenerateUpdate(self._toolbox, ngen=generations, halloffame=hof, verbose=False, stats=stats)
-        print(logbook, flush=True)
+        if self._gp_optimizer.is_root():
+            print(logbook, flush=True)
         return hof[0]
 

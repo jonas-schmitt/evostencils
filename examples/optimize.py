@@ -6,6 +6,7 @@ import os
 import lfa_lab
 import numpy as np
 import sys
+from mpi4py import MPI
 
 
 def main():
@@ -17,8 +18,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -41,10 +42,18 @@ def main():
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
-
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
+    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    comm = MPI.COMM_WORLD
+    nprocs = comm.Get_size()
+    mpi_rank = comm.Get_rank()
+    if nprocs > 1:
+        tmp = "processes"
+    else:
+        tmp = "process"
+    if mpi_rank == 0:
+        print(f"Running {nprocs} MPI {tmp}")
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank)
 
     # Evaluate baseline program
     # program_generator.run_exastencils_compiler()
@@ -78,10 +87,11 @@ def main():
 
     if not os.path.exists(problem_name):
         os.makedirs(problem_name)
-    checkpoint_directory_path = f'{problem_name}/checkpoints'
+    checkpoint_directory_path = f'{problem_name}/checkpoints_{mpi_rank}'
     if not os.path.exists(checkpoint_directory_path):
         os.makedirs(checkpoint_directory_path)
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
+                          mpi_comm=comm, mpi_rank=mpi_rank,
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
@@ -103,7 +113,7 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=1000, gp_lambda=1000,
+                                                               gp_mu=56, gp_lambda=56,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
@@ -112,13 +122,10 @@ def main():
                                                                restart_from_checkpoint=restart_from_checkpoint)
     program_generator.initialize_code_generation(min_level, max_level)
     program_generator.generate_l3_file(min_level, max_level, program)
-    program_generator.run_exastencils_compiler()
-    program_generator.run_c_compiler()
-    runtime, convergence_factor, _ = program_generator.evaluate(infinity, 100)
-    program_generator.restore_files()
-    print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
-    print(f'ExaSlang representation:\n{program}\n', flush=True)
-    log_dir_name = f'{problem_name}/data'
+    # print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
+    if mpi_rank == 0:
+        print(f'ExaSlang representation:\n{program}\n', flush=True)
+    log_dir_name = f'{problem_name}/data_{mpi_rank}'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
     for i, log in enumerate(stats):

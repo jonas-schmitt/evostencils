@@ -10,6 +10,7 @@ from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInse
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
 import math, numpy
+import itertools
 
 
 class suppress_output(object):
@@ -51,7 +52,7 @@ def load_checkpoint_from_file(filename):
 class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
-                 program_generator=None, epsilon=1e-10, infinity=1e300, checkpoint_directory_path='./'):
+                 program_generator=None, mpi_comm=None, mpi_rank=0, epsilon=1e-10, infinity=1e300, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
@@ -77,6 +78,8 @@ class Optimizer:
         self._weight_optimizer = relaxation_factor_optimization.Optimizer(self)
         self._total_number_of_evaluations = 0
         self._failed_evaluations = 0
+        self._mpi_comm = mpi_comm
+        self._mpi_rank = mpi_rank
 
     @staticmethod
     def _init_creator():
@@ -173,6 +176,17 @@ class Optimizer:
     def infinity(self):
         return self._infinity
 
+    @property
+    def mpi_rank(self):
+        return self._mpi_rank
+
+    @property
+    def mpi_comm(self):
+        return self._mpi_comm
+
+    def is_root(self):
+        return self.mpi_rank == 0
+
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
         self._total_number_of_evaluations = 0
@@ -231,8 +245,8 @@ class Optimizer:
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
                                       _, __, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-
-        print("Running Multi-Objective Random Search Genetic Programming", flush=True)
+        if self.is_root():
+            print("Running Multi-Objective Random Search Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
 
@@ -287,9 +301,10 @@ class Optimizer:
         population = toolbox.select(population, len(population))
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
-        print(logbook.stream, flush=True)
+
+        if self.is_root():
+            print(logbook.stream, flush=True)
         # Begin the generational process
-        count = 0
         for gen in range(min_generation + 1, max_generation + 1):
             # Vary the population
             offspring = self._toolbox.population(n=lambda_)
@@ -308,23 +323,14 @@ class Optimizer:
                     checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
                 except (pickle.PickleError, TypeError) as e:
                     print(e, flush=True)
-                    print('Skipping checkpoint', flush=True)
+                    print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
             population[:] = toolbox.select(population + offspring, mu_)
             record = mstats.compile(population)
-            if len(population[0].fitness.values) == 1:
-                if record['fitness']['std'] < self.epsilon:
-                    count += 1
-                else:
-                    count = 0
-                if count >= 5 and hof is not None:
-                    logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-                    print(logbook.stream, flush=True)
-                    print("Population converged", flush=True)
-                    return population, logbook, hof
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            print(logbook.stream, flush=True)
+            if self.is_root():
+                print(logbook.stream, flush=True)
 
         return population, logbook, hof
 
@@ -361,17 +367,25 @@ class Optimizer:
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
         successful_evaluations = self._total_number_of_evaluations - self._failed_evaluations
-        print("Number of successful evaluations in initial population:",
-              successful_evaluations, flush=True)
+        if self.is_root():
+            print("Number of successful evaluations in initial population:",
+                  successful_evaluations, flush=True)
         self.reset_evaluation_counters()
-        population = toolbox.select(population, successful_evaluations - successful_evaluations % 4)
+        population = toolbox.select(population, max(lambda_, successful_evaluations - successful_evaluations % 4))
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
-        print(logbook.stream, flush=True)
+        if self.is_root():
+            print(logbook.stream, flush=True)
         # Begin the generational process
-        count = 0
+        immigration_interval = 20
         for gen in range(min_generation + 1, max_generation + 1):
+            if gen % immigration_interval == 0:
+                if self.is_root():
+                    print("Exchanging colonies", flush=True)
+                colonies = self.mpi_comm.allgather(population)
+                merged_colonies = list(itertools.chain.from_iterable(colonies))
+                population = toolbox.select(merged_colonies, mu_)
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
             parents = [toolbox.clone(ind) for ind in selected]
@@ -393,7 +407,6 @@ class Optimizer:
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-            # print(f"Percentage of failed LFA computations: {self._failed_lfa_computations / self._lfa_computations * 100} %")
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             hof.update(offspring)
@@ -407,30 +420,28 @@ class Optimizer:
                     checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
                 except (pickle.PickleError, TypeError) as e:
                     print(e, flush=True)
-                    print('Skipping checkpoint', flush=True)
+                    print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
             population[:] = toolbox.select(population + offspring, mu_)
             record = mstats.compile(population)
-            if len(population[0].fitness.values) == 1:
-                if record['fitness']['std'] < self.epsilon:
-                    count += 1
-                else:
-                    count = 0
-                if count >= 5 and hof is not None:
-                    logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-                    print(logbook.stream, flush=True)
-                    print("Population converged", flush=True)
-                    return population, logbook, hof
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            print(logbook.stream, flush=True)
+            if self.is_root():
+                print(logbook.stream, flush=True)
+            if self.is_root():
+                print("Exchanging colonies")
+            colonies = self.mpi_comm.allgather(population)
+            merged_colonies = list(itertools.chain.from_iterable(colonies))
+            population = toolbox.select(merged_colonies, mu_)
+            hof.update(population)
 
         return population, logbook, hof
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
              program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running Single-Objective Genetic Programming", flush=True)
+        if self.is_root():
+            print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         # self._toolbox.register("select", select_unique_best)
         # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
@@ -488,7 +499,8 @@ class Optimizer:
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
                program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-II Genetic Programming", flush=True)
+        if self.is_root():
+            print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='log')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
@@ -519,7 +531,8 @@ class Optimizer:
 
     def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_, crossover_probability, mutation_probability,
                 min_level, max_level, program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
-        print("Running NSGA-III Genetic Programming", flush=True)
+        if self.is_root():
+            print("Running NSGA-III Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         ref_points = tools.uniform_reference_points(2, 12)
         self._toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
@@ -601,7 +614,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 20 * gp_mu
+            initial_population_size = 6 * gp_mu
             mu_ = gp_mu
             lambda_ = gp_lambda
             if i > 0:
@@ -625,7 +638,8 @@ class Optimizer:
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             try:
-                for j in range(0, min(int(gp_mu // 2), len(hof), 100)):
+                # for j in range(0, min(int(gp_mu // 2), len(hof), 100)):
+                for j in range(0, min(2, len(hof))):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
@@ -634,16 +648,17 @@ class Optimizer:
                     time, convergence_factor, number_of_iterations = \
                         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                       solver_program, infinity=self.infinity,
-                                                                      number_of_samples=10)
-                    if i == 0:
-                        print(f'Time: {time}, '
-                              f'Convergence factor: {convergence_factor} '
-                              f'(Estimation: {estimated_convergence_factor}), '
-                              f'Number of Iterations: {number_of_iterations}', flush=True)
-                    else:
-                        print(f'Time: {time}, '
-                              f'Convergence factor: {convergence_factor}, '
-                              f'Number of Iterations: {number_of_iterations}', flush=True)
+                                                                      number_of_samples=20)
+                    if self.is_root():
+                        if i == 0:
+                            print(f'Time: {time}, '
+                                  f'Convergence factor: {convergence_factor} '
+                                  f'(Estimation: {estimated_convergence_factor}), '
+                                  f'Number of Iterations: {number_of_iterations}', flush=True)
+                        else:
+                            print(f'Time: {time}, '
+                                  f'Convergence factor: {convergence_factor}, '
+                                  f'Number of Iterations: {number_of_iterations}', flush=True)
 
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
@@ -652,12 +667,10 @@ class Optimizer:
                         best_convergence_factor = convergence_factor
 
             except (KeyboardInterrupt, Exception) as e:
-                self.program_generator.restore_files()
                 raise e
-            self.program_generator.restore_files()
-            if best_expression is None:
-                raise RuntimeError("Optimization failed")
-            print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
+            self.mpi_comm.barrier()
+            print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
+
             generations = es_generations
             if i > 0:
                 generations = int(round(2 * es_generations / 3))
@@ -669,14 +682,15 @@ class Optimizer:
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=10)
-            self.program_generator.restore_files()
+                                                              number_of_samples=20)
             best_expression.runtime = best_time / number_of_iterations * 1e-3
-            print(f"Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
+            self.mpi_comm.barrier()
+            print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, self.min_level,
                                                                             max_level, self.max_level)
             solver_program += cycle_function
 
+        self.mpi_comm.barrier()
         return solver_program, pops, logbooks
 
     def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
