@@ -602,13 +602,18 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             initial_population_size = 20 * gp_mu
+            mu_ = gp_mu
+            lambda_ = gp_lambda
+            if i > 0:
+                mu_ = int(gp_mu // 2)
+                lambda_ = int(gp_lambda // 2)
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, initial_population_size, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
+                pop, log, hof = self.NSGAII(pset, initial_population_size, gp_generations, mu_, lambda_, gp_crossover_probability,
                                             gp_mutation_probability, min_level, max_level,
                                             solver_program, best_expression, logbooks,
                                             checkpoint_frequency=5, checkpoint=tmp)
             else:
-                pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
+                pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, mu_, lambda_,
                                                     gp_crossover_probability, gp_mutation_probability,
                                                     min_level, max_level, solver_program, best_expression, logbooks,
                                                     checkpoint_frequency=5, checkpoint=tmp)
@@ -654,8 +659,8 @@ class Optimizer:
                 raise RuntimeError("Optimization failed")
             print(f"Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
             generations = es_generations
-            if i == 0:
-                generations += 50
+            if i > 0:
+                generations = int(round(2 * es_generations / 3))
             relaxation_factors, improved_convergence_factor = \
                 self.optimize_relaxation_factors(best_expression, generations, min_level, max_level,
                                                  solver_program, storages, best_time)

@@ -103,10 +103,10 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=500, gp_lambda=500,
+                                                               gp_mu=1000, gp_lambda=1000,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=100, es_generations=100,
+                                                               gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
