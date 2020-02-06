@@ -5,7 +5,7 @@ import random
 import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
-from evostencils.expressions import base, transformations, system
+from evostencils.expressions import base, transformations, system, reference_cycles
 from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
 import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
@@ -103,20 +103,18 @@ class Optimizer:
                 return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
-        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
-        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
+        self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
+        self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
 
     def _init_multi_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
                                self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
-        self._toolbox.register("evaluate", self.evaluate_spectral_radius_multi_objective, pset=pset)
 
     def _init_single_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual,
                                self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
-        self._toolbox.register("evaluate", self.evaluate_spectral_radius, pset=pset)
 
     @property
     def dimension(self):
@@ -433,19 +431,12 @@ class Optimizer:
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
-        immigration_interval = 20
+        immigration_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
-            if gen == 10:
-                toolbox.unregister('evaluate')
-                toolbox.register('evaluate', toolbox.evaluate_with_generator)
-                population = toolbox.select(population, len(population))
-                fitnesses = toolbox.map(toolbox.evaluate, population)
-                for ind, fit in zip(population, fitnesses):
-                    ind.fitness.values = fit
             if gen % immigration_interval == 0:
-                if self.is_root():
-                    print("Exchanging colonies")
-                number_of_immigrants = max(int(len(population) // 2), 10)
+                # if self.is_root():
+                #     print("Exchanging colonies")
+                number_of_immigrants = len(population)
                 colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
                 merged_colonies = list(itertools.chain.from_iterable(colonies))
                 population = toolbox.select(merged_colonies, mu_)
@@ -491,8 +482,8 @@ class Optimizer:
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             if self.is_root():
                 print(logbook.stream, flush=True)
-        if self.is_root():
-            print("Exchanging colonies")
+        # if self.is_root():
+        #     print("Exchanging colonies")
         colonies = self.mpi_comm.allgather(population)
         merged_colonies = list(itertools.chain.from_iterable(colonies))
         population = toolbox.select(merged_colonies, mu_)
@@ -510,9 +501,10 @@ class Optimizer:
         # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
         self._toolbox.register("select", tools.selBest)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
-        self._toolbox.register('evaluate_with_generator', self.evaluate_time_to_solution, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program)
+        self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset)
+        # self._toolbox.register('evaluate', self.evaluate_time_to_solution, pset=pset,
+        #                        storages=storages, min_level=min_level, max_level=max_level,
+        #                        solver_program=program)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -568,11 +560,13 @@ class Optimizer:
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
-        self._toolbox.register('evaluate_with_generator', self.evaluate_convergence_factor_and_runtime, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program)
+        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset)
+        # self._toolbox.register('evaluate', self.evaluate_convergence_factor_and_runtime, pset=pset,
+        #                        storages=storages, min_level=min_level, max_level=max_level,
+        #                        solver_program=program)
+
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -641,39 +635,40 @@ class Optimizer:
                 self.performance_evaluator.set_runtime_of_coarse_grid_solver(0.0)
 
             rhs = right_hand_sides[i]
-            pset = multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension, self.coarsening_factors,
-                                                                   max_level, self.equations, self.operators, self.fields,
-                                                                   maximum_block_size=maximum_block_size,
-                                                                   depth=levels_per_run, LevelFinishedType=self._FinishedType,
-                                                                   LevelNotFinishedType=self._NotFinishedType)
+            pset, terminal_list = \
+                multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
+                                                                self.coarsening_factors, max_level, self.equations,
+                                                                self.operators, self.fields,
+                                                                maximum_block_size=maximum_block_size,
+                                                                depth=levels_per_run,
+                                                                LevelFinishedType=self._FinishedType,
+                                                                LevelNotFinishedType=self._NotFinishedType)
+
             self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 20 * gp_mu
+            initial_population_size = 2 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10)
             if optimization_method is None:
-                pop, log, hof = self.NSGAII(pset, initial_population_size, gp_generations, gp_mu, gp_lambda, gp_crossover_probability,
-                                            gp_mutation_probability, min_level, max_level,
-                                            solver_program, storages, best_expression, logbooks,
-                                            checkpoint_frequency=5, checkpoint=tmp)
-            else:
-                pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
-                                                    gp_crossover_probability, gp_mutation_probability,
-                                                    min_level, max_level, solver_program, storages, best_expression, logbooks,
-                                                    checkpoint_frequency=5, checkpoint=tmp)
+                optimization_method = self.NSGAII
+            pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
+                                                gp_crossover_probability, gp_mutation_probability,
+                                                min_level, max_level, solver_program, storages, best_expression, logbooks,
+                                                checkpoint_frequency=5, checkpoint=tmp)
 
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             try:
-                for j in range(0, min(int(gp_mu // 2), len(hof), 100)):
+                for j in range(0, min(len(hof), 100)):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
                     estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
@@ -709,7 +704,7 @@ class Optimizer:
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
                                                  solver_program, storages, best_time)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
@@ -729,7 +724,7 @@ class Optimizer:
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10)
         try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
@@ -739,9 +734,7 @@ class Optimizer:
             best_weights = list(best_individual)
             time_to_solution, = best_individual.fitness.values
         except (KeyboardInterrupt, Exception) as e:
-            self.program_generator.restore_files()
             raise e
-        self.program_generator.restore_files()
         return best_weights, time_to_solution
 
     @staticmethod

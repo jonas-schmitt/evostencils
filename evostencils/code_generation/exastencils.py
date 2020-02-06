@@ -32,6 +32,10 @@ class ProgramGenerator:
                  mpi_rank=0, platform='linux'):
         self._average_generation_time = 0
         self._counter = 0
+        self.timeout_copy_file = 60
+        self.timeout_evaluate = 600
+        self.timeout_exastencils_compiler = 300
+        self.timeout_c_compiler = 180
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
         self._knowledge_path = knowledge_path
@@ -44,6 +48,7 @@ class ProgramGenerator:
         self._platform = platform
         self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.knowledge'
         self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.settings'
+        self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         self._output_path_generated = None
         self.run_exastencils_compiler()
         self._equations, self._operators, self._fields = \
@@ -151,7 +156,7 @@ class ProgramGenerator:
         weights = reversed(weights)
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
         subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
         with open(path_to_file, 'r') as file:
             lines = file.readlines()
             last_line = lines[-1]
@@ -170,7 +175,7 @@ class ProgramGenerator:
         # Hack to change the weights after generation
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
         subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
 
     @staticmethod
     def get_solution_field(storages: List[CycleStorage], index: int, level: int, max_level: int):
@@ -217,30 +222,30 @@ class ProgramGenerator:
         current_path = os.getcwd()
         os.chdir(self.base_path)
         if self._counter == 0:
-            timeout = None
+            timeout = self.timeout_exastencils_compiler
         else:
             timeout = 10 * self._average_generation_time
             if self._counter < 5:
                 timeout = 1.5 * timeout - self._counter * self._average_generation_time
         try:
+            timeout = min(self.timeout_exastencils_compiler, timeout)
             result = subprocess.run(['java', '-cp',
                                      self.absolute_compiler_path, 'Main',
                                      f'{self.base_path}/{settings_path}',
                                      f'{self.base_path}/{knowledge_path}',
                                      f'{self.base_path}/lib/{self.platform}.platform'],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     timeout=timeout)
         except subprocess.TimeoutExpired as e:
             raise e
         os.chdir(current_path)
         if result.returncode != 0:
-            print(result.stderr.decode('utf8'))
             raise RuntimeError("Compiler not working. Aborting.")
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
         result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.base_path}/{makefile_path}'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
     def evaluate(self, executable_path, infinity=1e300, number_of_samples=1):
@@ -249,7 +254,7 @@ class ProgramGenerator:
         number_of_iterations = None
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
             if not result.returncode == 0:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
@@ -260,17 +265,19 @@ class ProgramGenerator:
             sum_of_convergence_factors += convergence_factor
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations
 
-    def initialize_code_generation(self, min_level: int, max_level: int):
+    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=100):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
+        self.generate_adapted_layer_files(iteration_limit)
+        settings_path = self.generate_adapted_settings_file(l2file_required=True)
         if self._counter == 0:
             start_time = time.time()
-            self.run_exastencils_compiler(knowledge_path=knowledge_path)
+            self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
             end_time = time.time()
             elapsed_time = end_time - start_time
             self._counter += 1
             self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         else:
-            self.run_exastencils_compiler()
+            self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
         settings_path = self.generate_adapted_settings_file()
         _, __, ___, output_path_generated = \
             parser.extract_settings_information(self.base_path, settings_path)
@@ -611,10 +618,11 @@ class ProgramGenerator:
         return program
 
     def generate_l3_file(self, min_level, max_level, program: str):
-
+        # TODO fix hacky solution
+        input_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
-        with open(f'{self.base_path}/{self._debug_l3_path}', 'r') as input_file:
+        with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{self.base_path}/{output_file_path}', 'w') as output_file:
                 line = input_file.readline()
                 while line:
@@ -629,11 +637,7 @@ class ProgramGenerator:
                     line = input_file.readline()
                 output_file.write(program)
 
-        subprocess.run(['cp', f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa4',
-                        f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    def generate_adapted_settings_file(self):
+    def generate_adapted_settings_file(self, l2file_required=False):
         base_path = self.base_path
         input_file_path = self.settings_path
         output_file_path = self.settings_path_generated
@@ -643,7 +647,9 @@ class ProgramGenerator:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'configName':
-                        output_file.write(f'{lhs}\t = "{self.problem_name}_{self.mpi_rank}"\n')
+                        output_file.write(f'  {lhs}\t = "{self.problem_name}_{self.mpi_rank}"\n')
+                    elif l2file_required:
+                        output_file.write(line)
                     elif not lhs == 'l2file':
                         output_file.write(line)
         return output_file_path
@@ -667,39 +673,32 @@ class ProgramGenerator:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'minLevel':
-                        output_file.write(f'{lhs}\t= {min_level}\n')
+                        output_file.write(f'  {lhs}\t= {min_level}\n')
                     elif lhs == 'maxLevel':
-                        output_file.write(f'{lhs}\t= {max_level}\n')
+                        output_file.write(f'  {lhs}\t= {max_level}\n')
                     else:
                         output_file.write(line)
         return output_file_path
 
-        # subprocess.run(['cp', f'{self.base_path}/{relative_input_file_path}', f'{self.base_path}/{relative_input_file_path}.backup'],
-        #                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def generate_adapted_layer_files(self, iteration_limit):
+        base_path = self.base_path
+        input_file_path = f'{self._base_path_prefix}/{self.problem_name}.exa3'
+        output_file_path = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
+        tmp = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}'
+        subprocess.run(['cp', f'{tmp}.exa1', f'{tmp}_{self.mpi_rank}.exa1'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        subprocess.run(['cp', f'{tmp}.exa2', f'{tmp}_{self.mpi_rank}.exa2'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        subprocess.run(['cp', f'{tmp}.exa4', f'{tmp}_{self.mpi_rank}.exa4'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
 
-        # subprocess.run(['cp', f'{self.base_path}/{relative_output_file_path}', f'{self.base_path}/{relative_input_file_path}'],
-        #                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    def restore_files(self):
-        """
-        subprocess.run(['cp', f'{self.base_path}/{self.knowledge_path}.backup', f'{self.base_path}/{self.knowledge_path}'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['cp', f'{self.base_path}/{self.settings_path}.backup', f'{self.base_path}/{self.settings_path}'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
-        subprocess.run(['cp', l3_path, f'{l3_path}.generated'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['cp', f'{l3_path}.backup', l3_path],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.tmp'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['rm', f'{self.base_path}/{self.knowledge_path}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['rm', f'{self.base_path}/{self.settings_path}.tmp'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['rm', f'{self.base_path}/{self.settings_path}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['rm', f'{l3_path}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        """
-
+        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
+                for line in input_file:
+                    tokens = line.split('=')
+                    lhs = tokens[0].strip(' \n\t')
+                    if lhs == 'solver_maxNumIts':
+                        output_file.write(f'\t{lhs}\t= {iteration_limit}\n')
+                    else:
+                        output_file.write(line)
+        return output_file_path

@@ -78,7 +78,8 @@ def main():
     peak_performance = 27943.55 * 1e6
     peak_bandwidth = 28338.93 * 1e6
     # Measured on the target platform
-    runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
+    # runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
+    runtime_coarse_grid_solver = 4.218824230769231 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
@@ -115,16 +116,14 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=32, gp_lambda=32,
+                                                               gp_mu=20, gp_lambda=20,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=60, es_generations=100,
+                                                               gp_generations=20, es_generations=5,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
-    program_generator.initialize_code_generation(min_level, max_level)
-    program_generator.generate_l3_file(min_level, max_level, program)
-    # print(f'Runtime: {runtime}, Convergence factor: {convergence_factor}\n', flush=True)
+    
     if mpi_rank == 0:
         print(f'ExaSlang representation:\n{program}\n', flush=True)
     log_dir_name = f'{problem_name}/data_{mpi_rank}'

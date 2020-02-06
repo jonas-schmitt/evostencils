@@ -15,7 +15,6 @@ from sympy.parsing.sympy_parser import parse_expr
 import itertools
 import typing
 from functools import reduce
-import random
 
 
 class OperatorInfo:
@@ -347,8 +346,11 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
+    # Relaxation Factors
+    step_size = 0.05
     pset.addTerminal(1.0, TypeWrapper(float))
-
+    for i in range(10, 31):
+        pset.addTerminal(i * step_size, TypeWrapper(float))
     block_sizes = []
     for i in range(len(fields)):
         block_sizes.append([])
@@ -368,8 +370,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
             number_of_terms += reduce(lambda x, y: x * y, block_size)
         if number_of_terms <= maximum_number_of_generatable_terms:
             pset.addTerminal(block_size_permutation, types.BlockSize)
-
     add_cycle(pset, terminals, types, 0, coarsest)
+
+    terminal_list = [terminals]
     for i in range(1, depth):
         approximation = system.ZeroApproximation(terminals.coarse_grid)
         operator = coarse_operator
@@ -394,5 +397,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                               prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
         add_cycle(pset, terminals, types, i, coarsest)
+        terminal_list.append(terminals)
 
-    return pset
+    return pset, terminal_list

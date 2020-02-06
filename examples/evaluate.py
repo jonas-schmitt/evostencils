@@ -40,7 +40,7 @@ def main():
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path)
     program_generator.run_c_compiler()
-    time_to_solution, convergence_factor, iterations = program_generator.evaluate(number_of_samples=100)
+    time_to_solution, convergence_factor, iterations = program_generator.evaluate(number_of_samples=10)
     print(f'Time to solution: {time_to_solution} ms, Convergence Factor: {convergence_factor}, '
           f'Number of Iterations: {iterations}, Run time per Iteration: {time_to_solution / iterations} ms')
 

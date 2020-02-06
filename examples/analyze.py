@@ -9,6 +9,8 @@ import os
 import lfa_lab
 import numpy as np
 from deap import tools
+from math import log
+from matplotlib import rc
 
 
 def main():
@@ -84,40 +86,37 @@ def main():
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
+    base_path = ''
+    hofs = []
+    front = []
+    for i in range(0, 3):
+        file_name = f'{base_path}_NSGAII_{i}/data'
+        pop = optimizer.load_data_structure(f'{file_name}/pop_0.p')
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+        hof.update(pop)
+        hofs.append(hof)
+        front += [(*ind.fitness.values, 'NSGA-II', i+1) for ind in hof]
 
-    file_name = f'{problem_name}/data'
+    for i in range(0, 3):
+        file_name = f'{base_path}_RANDOM_{i}/data'
+        pop = optimizer.load_data_structure(f'{file_name}/pop_0.p')
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+        hof.update(pop)
+        hofs.append(hof)
+        front += [(*ind.fitness.values, 'Random', i+1) for ind in hof]
 
-    pop0 = optimizer.load_data_structure(f'{file_name}/pop_0.p')
-    log0 = optimizer.load_data_structure(f'{file_name}/log_0.p')
-    hof0 = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
-    hof0.update(pop0)
-
-    pop1 = optimizer.load_data_structure(f'{file_name}/pop_1.p')
-    log1 = optimizer.load_data_structure(f'{file_name}/log_1.p')
-    hof1 = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
-    hof1.update(pop1)
-
-    sns.set(style="darkgrid")
-    front0 = [(*ind.fitness.values, 0) for ind in hof0]
-    front1 = [(*ind.fitness.values, 1) for ind in hof1]
-    front = front0 + front1
-
-    tips = sns.load_dataset("tips")
-    # x = front[:, 0]
-    # y = front[:, 1]
-    # coeffs = np.polyfit(x, y, 3)
-    # x_fit = np.linspace(x[0], x[-1], num=len(x)*10)
-    # y_fit = np.polyval(coeffs, x_fit)
-    columns = ['Spectral Radius', 'Runtime per Iteration (ms)', 'Run']
+    columns = ['Estimated Number of Iterations', 'Estimated Runtime per Iteration (ms)', 'Method', 'Experiment']
     df = pd.DataFrame(front, columns=columns)
-    sns.relplot(x=columns[0], y=columns[1], hue=columns[2], data=df, kind='scatter')
-    # plt.plot(x_fit, y_fit)
-    plt.show()
-
-    #plt.scatter(x, y, c="b")
-    #plt.plot(x_fit, y_fit)
-    #plt.axis("tight")
-    #plt.show()
+    rc('text', usetex=True)
+    sns.set(style="white")
+    sns.set_context("paper")
+    sns.despine()
+    palette = sns.color_palette("colorblind", n_colors=3)
+    sns.relplot(x=columns[0], y=columns[1], hue=columns[3], style=columns[2],
+                data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
+    plt.xlim(0, 35)
+    plt.tight_layout()
+    plt.savefig("pareto-front.pdf", quality=100, dpi=300)
 
 
 if __name__ == "__main__":
