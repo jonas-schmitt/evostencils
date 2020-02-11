@@ -40,7 +40,7 @@ class CheckPoint:
         self.logbooks = logbooks
 
     def dump_to_file(self, filename):
-        with open(filename, 'wb') as file:
+        with open(filename, 'wb+') as file:
             pickle.dump(self, file)
 
 
@@ -92,7 +92,7 @@ class Optimizer:
 
     def _init_toolbox(self, pset):
         self._toolbox = deap.base.Toolbox()
-        self._toolbox.register("expression", genGrow, pset=pset, min_height=0, max_height=90)
+        self._toolbox.register("expression", genGrow, pset=pset, min_height=0, max_height=50)
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
@@ -103,8 +103,8 @@ class Optimizer:
                 return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
-        self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
-        self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
+        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
+        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
 
     def _init_multi_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
@@ -501,10 +501,10 @@ class Optimizer:
         # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
         self._toolbox.register("select", tools.selBest)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
-        self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset)
-        # self._toolbox.register('evaluate', self.evaluate_time_to_solution, pset=pset,
-        #                        storages=storages, min_level=min_level, max_level=max_level,
-        #                        solver_program=program)
+        # self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_time_to_solution, pset=pset,
+                               storages=storages, min_level=min_level, max_level=max_level,
+                               solver_program=program)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -562,11 +562,10 @@ class Optimizer:
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
-        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset)
-        # self._toolbox.register('evaluate', self.evaluate_convergence_factor_and_runtime, pset=pset,
-        #                        storages=storages, min_level=min_level, max_level=max_level,
-        #                        solver_program=program)
-
+        # self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_convergence_factor_and_runtime, pset=pset,
+                               storages=storages, min_level=min_level, max_level=max_level,
+                               solver_program=program)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])

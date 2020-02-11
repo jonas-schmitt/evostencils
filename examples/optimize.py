@@ -75,11 +75,10 @@ def main():
     convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
     # Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz
-    peak_performance = 27943.55 * 1e6
-    peak_bandwidth = 28338.93 * 1e6
+    peak_performance = 26633.33 * 1e6
+    peak_bandwidth = 26570.26 * 1e6
     # Measured on the target platform
-    # runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
-    runtime_coarse_grid_solver = 4.218824230769231 * 1e-3
+    runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = np.finfo(np.float64).max
@@ -99,7 +98,7 @@ def main():
 
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    levels_per_run = 2
+    levels_per_run = 4
     required_convergence = 0.9
     maximum_block_size = 3
     optimization_method = optimizer.NSGAII
@@ -116,10 +115,10 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=20, gp_lambda=20,
+                                                               gp_mu=128, gp_lambda=128,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=20, es_generations=5,
+                                                               gp_generations=50, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)

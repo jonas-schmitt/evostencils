@@ -65,7 +65,7 @@ def genGrow(pset, min_height, max_height, type_=None):
         return depth >= height or \
            (depth >= min_height and random.random() < pset.terminalRatio)
     result, max_depth = generate(pset, min_height, max_height, condition, type_)
-    while max_depth > 90:
+    while max_depth > 90 or len(result) > 100: # Include size limit for individual as well
         result, max_depth = generate(pset, min_height, max_height, condition, type_)
     return result
 

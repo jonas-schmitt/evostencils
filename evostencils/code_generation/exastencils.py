@@ -479,6 +479,9 @@ class ProgramGenerator:
                     equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
                                                                                              self.equations, self.fields)
                     dependent_equations, independent_equations = transformations.find_independent_equation_sets(equation_dict)
+                    if isinstance(correction.operand1.operand, system.ElementwiseDiagonal):
+                        dependent_equations.extend(independent_equations)
+                        independent_equations.clear()
                     for key, value in independent_equations:
                         coloring = False
                         indentation = ''
