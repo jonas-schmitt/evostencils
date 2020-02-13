@@ -81,15 +81,13 @@ def main():
     runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
-    infinity = np.finfo(np.float64).max
+    infinity = 1e300
     epsilon = 1e-14
     problem_name = program_generator.problem_name
 
-    if not os.path.exists(problem_name):
-        os.makedirs(problem_name)
-    checkpoint_directory_path = f'{problem_name}/checkpoints_{mpi_rank}'
-    if not os.path.exists(checkpoint_directory_path):
-        os.makedirs(checkpoint_directory_path)
+    if not os.path.exists(f'{cwd}/{problem_name}'):
+        os.makedirs(f'{cwd}/{problem_name}')
+    checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           mpi_comm=comm, mpi_rank=mpi_rank, number_of_processes=nprocs,
                           convergence_evaluator=convergence_evaluator,

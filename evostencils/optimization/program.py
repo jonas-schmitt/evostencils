@@ -40,7 +40,7 @@ class CheckPoint:
         self.logbooks = logbooks
 
     def dump_to_file(self, filename):
-        with open(filename, 'wb+') as file:
+        with open(filename, 'wb') as file:
             pickle.dump(self, file)
 
 
@@ -82,7 +82,10 @@ class Optimizer:
         self._mpi_comm = mpi_comm
         self._mpi_rank = mpi_rank
         self._number_of_processes = number_of_processes
-
+        self._individual_cache = {}
+        self._individual_cache_size = 100000
+        self._individual_cache_hits = 0
+        self._individual_cache_misses = 0
     @staticmethod
     def _init_creator():
         creator.create("MultiObjectiveFitness", deap.base.Fitness, weights=(-1.0, -1.0))
@@ -115,6 +118,28 @@ class Optimizer:
         self._toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual,
                                self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
+
+    @property
+    def individual_cache(self):
+        return self._individual_cache
+
+    def clear_individual_cache(self):
+        self.individual_cache.clear()
+
+    def add_individual_to_cache(self, individual, values):
+        if len(self.individual_cache) < self._individual_cache_size:
+            self.individual_cache[str(individual)] = values
+
+    def individual_in_cache(self, individual):
+        tmp = str(individual) in self.individual_cache
+        if tmp:
+            self._individual_cache_hits += 1
+        else:
+            self._individual_cache_misses += 1
+        return tmp
+
+    def get_cached_fitness(self, individual):
+        return self.individual_cache[str(individual)]
 
     @property
     def dimension(self):
@@ -201,14 +226,19 @@ class Optimizer:
     def compile_individual(self, individual, pset):
         return gp.compile(individual, pset)
 
-    def evaluate_multiple_objectives(self, individual, pset):
+    def estimate_multiple_objectives(self, individual, pset):
+        if self.individual_in_cache(individual):
+            return self.infinity, self.infinity
+            # return self.get_cached_fitness(individual)
         self._total_number_of_evaluations += 1
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
                 self._failed_evaluations += 1
-                return self.infinity, self.infinity
+                values = self.infinity, self.infinity
+                self.add_individual_to_cache(individual, values)
+                return values
 
         expression = expression1
         with suppress_output():
@@ -217,39 +247,24 @@ class Optimizer:
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
             self._failed_evaluations += 1
-            return self.infinity, self.infinity
+            values = self.infinity, self.infinity
+            self.add_individual_to_cache(individual, values)
+            return values
         else:
             runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
             if spectral_radius < 1:
-                return math.log(self.epsilon) / math.log(spectral_radius), runtime
+                values = math.log(self.epsilon) / math.log(spectral_radius), runtime
+                self.add_individual_to_cache(individual, values)
+                return values
             else:
-                return 1000 * spectral_radius, runtime
+                values = 1000 * spectral_radius, runtime
+                self.add_individual_to_cache(individual, values)
+                return values
 
-    def evaluate_spectral_radius(self, individual, pset):
-        self._total_number_of_evaluations += 1
-        with suppress_output():
-            try:
-                expression1, expression2 = self.compile_individual(individual, pset)
-            except MemoryError:
-                self._failed_evaluations += 1
-                return self.infinity,
-
-        expression = expression1
-        with suppress_output():
-            spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-
-        if spectral_radius == 0.0 or math.isnan(spectral_radius) \
-                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
-            self._failed_evaluations += 1
+    def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program):
+        if self.individual_in_cache(individual):
             return self.infinity,
-        else:
-            return spectral_radius,
-
-    def evaluate_spectral_radius_multi_objective(self, individual, pset):
-        spectral_radius, = self.evaluate_spectral_radius(individual, pset)
-        return spectral_radius, self.infinity
-
-    def evaluate_time_to_solution(self, individual, pset, storages, min_level, max_level, solver_program):
+            # return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -259,9 +274,13 @@ class Optimizer:
             time, _, __ = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                         solver_program, infinity=self.infinity,
                                                                         number_of_samples=3)
+            self.add_individual_to_cache(individual, (time,))
             return time,
 
-    def evaluate_convergence_factor_and_runtime(self, individual, pset, storages, min_level, max_level, solver_program):
+    def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program):
+        if self.individual_in_cache(individual):
+            return self.infinity, self.infinity
+            # return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -272,14 +291,21 @@ class Optimizer:
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
                                                               number_of_samples=3)
-            return convergence_factor, time / iterations
+            values = convergence_factor, time / iterations
+            self.add_individual_to_cache(individual, values)
+            return values
 
-    def evaluate_single_objective(self, individual, pset):
+    def estimate_single_objective(self, individual, pset):
+        if self.individual_in_cache(individual):
+            return self.infinity,
+            # return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
-                return self.infinity,
+                values = self.infinity,
+                self.add_individual_to_cache(individual, values)
+                return values
 
         expression = expression1
         with suppress_output():
@@ -287,13 +313,19 @@ class Optimizer:
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
                 or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
-            return self.infinity,
+            values = self.infinity,
+            self.add_individual_to_cache(individual, values)
+            return values
         else:
             if spectral_radius < 1:
                 runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-                return math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                values = math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                self.add_individual_to_cache(individual, values)
+                return values
             else:
-                return spectral_radius * math.sqrt(self.infinity),
+                values = spectral_radius * math.sqrt(self.infinity),
+                self.add_individual_to_cache(individual, values)
+                return values
 
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
                                       _, __, min_level, max_level,
@@ -440,6 +472,8 @@ class Optimizer:
                 colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
                 merged_colonies = list(itertools.chain.from_iterable(colonies))
                 population = toolbox.select(merged_colonies, mu_)
+                print(f"Individual cache hits: "
+                      f"{self._individual_cache_hits / (self._individual_cache_hits + self._individual_cache_misses)} %")
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
             parents = [toolbox.clone(ind) for ind in selected]
@@ -471,8 +505,10 @@ class Optimizer:
                 logbooks[-1] = logbook
                 checkpoint = CheckPoint(min_level, max_level, gen, program, solver, population, logbooks)
                 try:
+                    if not os.path.exists(self._checkpoint_directory_path):
+                        os.makedirs(self._checkpoint_directory_path)
                     checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
-                except (pickle.PickleError, TypeError) as e:
+                except (pickle.PickleError, TypeError, FileNotFoundError) as e:
                     print(e, flush=True)
                     print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
@@ -501,8 +537,8 @@ class Optimizer:
         # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
         self._toolbox.register("select", tools.selBest)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
-        # self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset)
-        self._toolbox.register('evaluate', self.evaluate_time_to_solution, pset=pset,
+        # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
                                storages=storages, min_level=min_level, max_level=max_level,
                                solver_program=program)
 
@@ -562,8 +598,8 @@ class Optimizer:
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2)
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
-        # self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset)
-        self._toolbox.register('evaluate', self.evaluate_convergence_factor_and_runtime, pset=pset,
+        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
                                storages=storages, min_level=min_level, max_level=max_level,
                                solver_program=program)
 
@@ -657,6 +693,7 @@ class Optimizer:
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10)
             if optimization_method is None:
                 optimization_method = self.NSGAII
+            self.clear_individual_cache()
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,
                                                 min_level, max_level, solver_program, storages, best_expression, logbooks,
