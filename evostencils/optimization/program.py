@@ -228,8 +228,7 @@ class Optimizer:
 
     def estimate_multiple_objectives(self, individual, pset):
         if self.individual_in_cache(individual):
-            return self.infinity, self.infinity
-            # return self.get_cached_fitness(individual)
+            return self.get_cached_fitness(individual)
         self._total_number_of_evaluations += 1
         with suppress_output():
             try:
@@ -263,8 +262,7 @@ class Optimizer:
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program):
         if self.individual_in_cache(individual):
-            return self.infinity,
-            # return self.get_cached_fitness(individual)
+            return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -279,8 +277,7 @@ class Optimizer:
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program):
         if self.individual_in_cache(individual):
-            return self.infinity, self.infinity
-            # return self.get_cached_fitness(individual)
+            return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -297,8 +294,7 @@ class Optimizer:
 
     def estimate_single_objective(self, individual, pset):
         if self.individual_in_cache(individual):
-            return self.infinity,
-            # return self.get_cached_fitness(individual)
+            return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
@@ -529,7 +525,7 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+             program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
         if self.is_root():
             print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
@@ -592,7 +588,7 @@ class Optimizer:
 
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+               program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
@@ -697,7 +693,7 @@ class Optimizer:
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,
                                                 min_level, max_level, solver_program, storages, best_expression, logbooks,
-                                                checkpoint_frequency=5, checkpoint=tmp)
+                                                checkpoint_frequency=2, checkpoint=tmp)
 
             pops.append(pop)
             best_time = self.infinity
