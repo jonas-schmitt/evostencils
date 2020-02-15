@@ -622,6 +622,45 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
 
+    def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_,
+                crossover_probability, mutation_probability, min_level, max_level,
+                program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
+        if self.is_root():
+            print("Running NSGA-III Genetic Programming", flush=True)
+        self._init_multi_objective_toolbox(pset)
+        H = mu_
+        reference_points = tools.uniform_reference_points(2, H)
+        mu_ = H + (4 - H % 4)
+        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points))
+        self._toolbox.register("select_for_mating", tools.selRandom)
+        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
+                               storages=storages, min_level=min_level, max_level=max_level,
+                               solver_program=program)
+
+        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
+        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
+        stats_size = tools.Statistics(len)
+        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
+
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        mstats.register("avg", mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
+        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+
+        return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
+                                      crossover_probability, mutation_probability, min_level, max_level,
+                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
+
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
                                   required_convergence=0.9,
@@ -679,7 +718,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 2 * gp_mu
+            initial_population_size = 4 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4

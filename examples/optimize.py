@@ -18,8 +18,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -42,8 +42,8 @@ def main():
     # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
     mpi_rank = comm.Get_rank()
@@ -99,11 +99,13 @@ def main():
     levels_per_run = 4
     required_convergence = 0.9
     maximum_block_size = 3
-    optimization_method = optimizer.NSGAII
+    optimization_method = optimizer.NSGAIII
     if len(sys.argv) > 1:
-        if sys.argv[1].upper() == "NSGAII":
+        if sys.argv[1].upper() == "NSGAIII":
             optimization_method = optimizer.NSGAII
-        if sys.argv[1].upper() == "SOGP":
+        elif sys.argv[1].upper() == "NSGAII":
+            optimization_method = optimizer.NSGAII
+        elif sys.argv[1].upper() == "SOGP":
             optimization_method = optimizer.SOGP
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
@@ -116,7 +118,7 @@ def main():
                                                                gp_mu=128, gp_lambda=128,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=50, es_generations=150,
+                                                               gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint)
