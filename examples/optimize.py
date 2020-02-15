@@ -102,7 +102,7 @@ def main():
     optimization_method = optimizer.NSGAIII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAIII":
-            optimization_method = optimizer.NSGAII
+            optimization_method = optimizer.NSGAIII
         elif sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
         elif sys.argv[1].upper() == "SOGP":

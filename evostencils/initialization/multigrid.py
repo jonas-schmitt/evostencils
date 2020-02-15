@@ -348,7 +348,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
     # Relaxation Factors
     step_size = 0.05
-    pset.addTerminal(1.0, TypeWrapper(float))
     for i in range(10, 31):
         pset.addTerminal(i * step_size, TypeWrapper(float))
     block_sizes = []
