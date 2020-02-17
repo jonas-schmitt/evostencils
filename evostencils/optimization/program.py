@@ -271,7 +271,7 @@ class Optimizer:
             expression = expression1
             time, _, __ = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                         solver_program, infinity=self.infinity,
-                                                                        number_of_samples=3)
+                                                                        number_of_samples=10)
             self.add_individual_to_cache(individual, (time,))
             return time,
 
@@ -287,7 +287,7 @@ class Optimizer:
             time, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
-                                                              number_of_samples=3)
+                                                              number_of_samples=5)
             values = convergence_factor, time / iterations
             self.add_individual_to_cache(individual, values)
             return values
@@ -529,9 +529,7 @@ class Optimizer:
         if self.is_root():
             print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
-        # self._toolbox.register("select", select_unique_best)
-        # self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
-        self._toolbox.register("select", tools.selBest)
+        self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
         # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
         self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
@@ -581,7 +579,7 @@ class Optimizer:
         mstats.register("std", stddev)
         mstats.register("min", minimum)
         mstats.register("max", maximum)
-        hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness.values[0] == b.fitness.values[0])
+        hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness == b.fitness)
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
@@ -725,9 +723,9 @@ class Optimizer:
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             if optimization_method is None:
-                optimization_method = self.NSGAII
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,
