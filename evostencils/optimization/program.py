@@ -1,4 +1,3 @@
-import numpy as np
 import deap.base
 from deap import gp, creator, tools
 import random
@@ -106,8 +105,6 @@ class Optimizer:
                 return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
-        # self._toolbox.decorate("mate", gp.staticLimit(key=len, max_value=100))
-        # self._toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=100))
 
     def _init_multi_objective_toolbox(self, pset):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
@@ -226,6 +223,39 @@ class Optimizer:
     def compile_individual(self, individual, pset):
         return gp.compile(individual, pset)
 
+    def estimate_single_objective(self, individual, pset):
+        self._total_number_of_evaluations += 1
+        if self.individual_in_cache(individual):
+            return self.get_cached_fitness(individual)
+        with suppress_output():
+            try:
+                expression1, expression2 = self.compile_individual(individual, pset)
+            except MemoryError:
+                self._failed_evaluations += 1
+                values = self.infinity,
+                self.add_individual_to_cache(individual, values)
+                return values
+
+        expression = expression1
+        with suppress_output():
+            spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
+
+        if spectral_radius == 0.0 or math.isnan(spectral_radius) \
+                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
+            values = self.infinity,
+            self.add_individual_to_cache(individual, values)
+            return values
+        else:
+            if spectral_radius < 1:
+                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
+                values = math.log(self.epsilon) / math.log(spectral_radius) * runtime,
+                self.add_individual_to_cache(individual, values)
+                return values
+            else:
+                values = spectral_radius * math.sqrt(self.infinity),
+                self.add_individual_to_cache(individual, values)
+                return values
+
     def estimate_multiple_objectives(self, individual, pset):
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
@@ -251,23 +281,22 @@ class Optimizer:
             return values
         else:
             runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-            if spectral_radius < 1:
-                values = math.log(self.epsilon) / math.log(spectral_radius), runtime
-                self.add_individual_to_cache(individual, values)
-                return values
-            else:
-                values = 1000 * spectral_radius, runtime
-                self.add_individual_to_cache(individual, values)
-                return values
+            values = spectral_radius, runtime
+            self.add_individual_to_cache(individual, values)
+            return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program):
+        self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
-                return self.infinity,
+                self._failed_evaluations += 1
+                values = self.infinity,
+                self.add_individual_to_cache(individual, values)
+                return values
             expression = expression1
             time, _, __ = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                                         solver_program, infinity=self.infinity,
@@ -276,13 +305,17 @@ class Optimizer:
             return time,
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program):
+        self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
-                return self.infinity,
+                self._failed_evaluations += 1
+                values = self.infinity, self.infinity
+                self.add_individual_to_cache(individual, values)
+                return values
             expression = expression1
             time, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
@@ -292,44 +325,17 @@ class Optimizer:
             self.add_individual_to_cache(individual, values)
             return values
 
-    def estimate_single_objective(self, individual, pset):
-        if self.individual_in_cache(individual):
-            return self.get_cached_fitness(individual)
-        with suppress_output():
-            try:
-                expression1, expression2 = self.compile_individual(individual, pset)
-            except MemoryError:
-                values = self.infinity,
-                self.add_individual_to_cache(individual, values)
-                return values
-
-        expression = expression1
-        with suppress_output():
-            spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
-
-        if spectral_radius == 0.0 or math.isnan(spectral_radius) \
-                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
-            values = self.infinity,
-            self.add_individual_to_cache(individual, values)
-            return values
-        else:
-            if spectral_radius < 1:
-                runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
-                values = math.log(self.epsilon) / math.log(spectral_radius) * runtime,
-                self.add_individual_to_cache(individual, values)
-                return values
-            else:
-                values = spectral_radius * math.sqrt(self.infinity),
-                self.add_individual_to_cache(individual, values)
-                return values
-
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
                                       _, __, min_level, max_level,
                                       program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+
         if self.is_root():
             print("Running Multi-Objective Random Search Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='log')
+        H = mu_
+        reference_points = tools.uniform_reference_points(2, H)
+        mu_ = H + (4 - H % 4)
+        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -339,15 +345,42 @@ class Optimizer:
         def mean(xs):
             avg = 0
             for x in xs:
-                if x < self.infinity:
+                if 0 < x < self.infinity:
                     avg += x
             avg = avg / len(xs)
             return avg
 
+        def minimum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x < curr:
+                    curr = x
+            return curr
+
+        def maximum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x > curr:
+                    curr = x
+            return curr
+
+        def _ss(data):
+            c = mean(data)
+            ss = sum((x-c)**2 for x in data if 0 < x < self.infinity)
+            return ss
+
+        def stddev(data, ddof=0):
+            n = len(data)
+            if n < 2:
+                raise ValueError('variance requires at least two data points')
+            ss = _ss(data)
+            pvar = ss/(n-ddof)
+            return pvar**0.5
+
         mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
+        mstats.register("std", stddev)
+        mstats.register("min", minimum)
+        mstats.register("max", maximum)
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
         random.seed()
         use_checkpoint = False
@@ -418,6 +451,46 @@ class Optimizer:
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
                           program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof):
+        def mean(xs):
+            avg = 0
+            for x in xs:
+                if 0 < x < self.infinity:
+                    avg += x
+            avg = avg / len(xs)
+            return avg
+
+        def minimum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x < curr:
+                    curr = x
+            return curr
+
+        def maximum(xs):
+            curr = xs[0]
+            for x in xs[1:]:
+                if 0 < x < self.infinity and x > curr:
+                    curr = x
+            return curr
+
+        def _ss(data):
+            c = mean(data)
+            ss = sum((x-c)**2 for x in data if 0 < x < self.infinity)
+            return ss
+
+        def stddev(data, ddof=0):
+            n = len(data)
+            if n < 2:
+                raise ValueError('variance requires at least two data points')
+            ss = _ss(data)
+            pvar = ss/(n-ddof)
+            return pvar**0.5
+
+        mstats.register("avg", mean)
+        mstats.register("std", stddev)
+        mstats.register("min", minimum)
+        mstats.register("max", maximum)
+
         random.seed()
         use_checkpoint = False
         if checkpoint is not None:
@@ -461,15 +534,20 @@ class Optimizer:
         # Begin the generational process
         immigration_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
-            if gen % immigration_interval == 0:
-                # if self.is_root():
-                #     print("Exchanging colonies")
-                number_of_immigrants = len(population)
+            if gen % immigration_interval == 0 and self.number_of_processes > 1:
+                if self.is_root():
+                    print("Exchanging colonies")
+                caches = self.mpi_comm.allgather(self.individual_cache)
+                merged_cache = {}
+                for cache in caches:
+                    merged_cache.update(cache)
+                self._individual_cache = merged_cache
+                number_of_immigrants = min(4 * int(len(population) / self.number_of_processes), len(population))
                 colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
                 merged_colonies = list(itertools.chain.from_iterable(colonies))
                 population = toolbox.select(merged_colonies, mu_)
-                print(f"Individual cache hits: "
-                      f"{self._individual_cache_hits / (self._individual_cache_hits + self._individual_cache_misses)} %")
+                # print(f"Individual cache hits: "
+                #       f"{self._individual_cache_hits / (self._individual_cache_hits + self._individual_cache_misses)} %")
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
             parents = [toolbox.clone(ind) for ind in selected]
@@ -530,7 +608,7 @@ class Optimizer:
             print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", select_unique_best)
-        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
         # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
         self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
                                storages=storages, min_level=min_level, max_level=max_level,
@@ -540,45 +618,6 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if 0 < x < math.pow(self.infinity, 0.25):
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        def minimum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < math.pow(self.infinity, 0.25) and x < curr:
-                    curr = x
-            return curr
-
-        def maximum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < math.pow(self.infinity, 0.25) and x > curr:
-                    curr = x
-            return curr
-
-        def _ss(data):
-            c = mean(data)
-            ss = sum((x-c)**2 for x in data if 0 < x < math.pow(self.infinity, 0.25))
-            return ss
-
-        def stddev(data, ddof=0):
-            n = len(data)
-            if n < 2:
-                raise ValueError('variance requires at least two data points')
-            ss = _ss(data)
-            pvar = ss/(n-ddof)
-            return pvar**0.5
-
-        mstats.register("avg", mean)
-        mstats.register("std", stddev)
-        mstats.register("min", minimum)
-        mstats.register("max", maximum)
         hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness == b.fitness)
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -590,7 +629,7 @@ class Optimizer:
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2)
+        self._toolbox.register("select", tools.selNSGA2, nd='standard')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
         self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
@@ -602,18 +641,6 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
 
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
@@ -641,18 +668,6 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
 
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        mstats.register("avg", mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
