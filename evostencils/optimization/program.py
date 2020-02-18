@@ -629,7 +629,7 @@ class Optimizer:
         H = mu_
         reference_points = tools.uniform_reference_points(2, H)
         mu_ = H + (4 - H % 4)
-        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points))
+        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
         self._toolbox.register("select_for_mating", tools.selRandom)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
         self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
