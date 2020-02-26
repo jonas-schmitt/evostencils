@@ -10,6 +10,7 @@ import evostencils.optimization.relaxation_factors as relaxation_factor_optimiza
 from evostencils.types import level_control
 import math, numpy
 import itertools
+import numpy as np
 
 
 class suppress_output(object):
@@ -51,7 +52,7 @@ def load_checkpoint_from_file(filename):
 class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
-                 program_generator=None, mpi_comm=None, mpi_rank=0, number_of_processes=1,
+                 program_generator=None, mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
                  epsilon=1e-10, infinity=1e300, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._dimension = dimension
@@ -80,11 +81,12 @@ class Optimizer:
         self._failed_evaluations = 0
         self._mpi_comm = mpi_comm
         self._mpi_rank = mpi_rank
-        self._number_of_processes = number_of_processes
+        self._number_of_mpi_processes = number_of_mpi_processes
         self._individual_cache = {}
         self._individual_cache_size = 100000
         self._individual_cache_hits = 0
         self._individual_cache_misses = 0
+
     @staticmethod
     def _init_creator():
         creator.create("MultiObjectiveFitness", deap.base.Fitness, weights=(-1.0, -1.0))
@@ -207,11 +209,26 @@ class Optimizer:
         return self._mpi_comm
 
     @property
-    def number_of_processes(self):
-        return self._number_of_processes
+    def number_of_mpi_processes(self):
+        return self._number_of_mpi_processes
 
     def is_root(self):
         return self.mpi_rank == 0
+
+    def mpi_exchange_neighbors(self, data):
+        if self.mpi_rank > 0:
+            left_neighbor = self.mpi_rank - 1
+        else:
+            left_neighbor = self.number_of_mpi_processes - 1
+        if self.mpi_rank < self.number_of_mpi_processes - 1:
+            right_neighbor = self.mpi_rank + 1
+        else:
+            right_neighbor = 0
+        self.mpi_comm.isend(data, left_neighbor, tag=self.mpi_rank)
+        self.mpi_comm.isend(data, right_neighbor, tag=self.mpi_rank)
+        left_data = self.mpi_comm.recv(source=left_neighbor, tag=left_neighbor)
+        right_data = self.mpi_comm.recv(source=right_neighbor, tag=right_neighbor)
+        return left_data, right_data
 
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
@@ -342,45 +359,10 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
 
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if 0 < x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
-
-        def minimum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < self.infinity and x < curr:
-                    curr = x
-            return curr
-
-        def maximum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < self.infinity and x > curr:
-                    curr = x
-            return curr
-
-        def _ss(data):
-            c = mean(data)
-            ss = sum((x-c)**2 for x in data if 0 < x < self.infinity)
-            return ss
-
-        def stddev(data, ddof=0):
-            n = len(data)
-            if n < 2:
-                raise ValueError('variance requires at least two data points')
-            ss = _ss(data)
-            pvar = ss/(n-ddof)
-            return pvar**0.5
-
-        mstats.register("avg", mean)
-        mstats.register("std", stddev)
-        mstats.register("min", minimum)
-        mstats.register("max", maximum)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
         random.seed()
         use_checkpoint = False
@@ -451,45 +433,11 @@ class Optimizer:
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
                           program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof):
-        def mean(xs):
-            avg = 0
-            for x in xs:
-                if 0 < x < self.infinity:
-                    avg += x
-            avg = avg / len(xs)
-            return avg
 
-        def minimum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < self.infinity and x < curr:
-                    curr = x
-            return curr
-
-        def maximum(xs):
-            curr = xs[0]
-            for x in xs[1:]:
-                if 0 < x < self.infinity and x > curr:
-                    curr = x
-            return curr
-
-        def _ss(data):
-            c = mean(data)
-            ss = sum((x-c)**2 for x in data if 0 < x < self.infinity)
-            return ss
-
-        def stddev(data, ddof=0):
-            n = len(data)
-            if n < 2:
-                raise ValueError('variance requires at least two data points')
-            ss = _ss(data)
-            pvar = ss/(n-ddof)
-            return pvar**0.5
-
-        mstats.register("avg", mean)
-        mstats.register("std", stddev)
-        mstats.register("min", minimum)
-        mstats.register("max", maximum)
+        mstats.register("avg", np.mean)
+        mstats.register("std", np.std)
+        mstats.register("min", np.min)
+        mstats.register("max", np.max)
 
         random.seed()
         use_checkpoint = False
@@ -532,22 +480,15 @@ class Optimizer:
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
-        immigration_interval = 10
+        immigration_interval = 5
         for gen in range(min_generation + 1, max_generation + 1):
-            if gen % immigration_interval == 0 and self.number_of_processes > 1:
+            if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
                 if self.is_root():
-                    print("Exchanging colonies")
-                caches = self.mpi_comm.allgather(self.individual_cache)
-                merged_cache = {}
-                for cache in caches:
-                    merged_cache.update(cache)
-                self._individual_cache = merged_cache
-                number_of_immigrants = min(4 * int(len(population) / self.number_of_processes), len(population))
-                colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
-                merged_colonies = list(itertools.chain.from_iterable(colonies))
-                population = toolbox.select(merged_colonies, mu_)
-                # print(f"Individual cache hits: "
-                #       f"{self._individual_cache_hits / (self._individual_cache_hits + self._individual_cache_misses)} %")
+                    print("Exchanging colonies", flush=True)
+                left_colony, right_colony = self.mpi_exchange_neighbors(population)
+                population.extend(left_colony)
+                population.extend(right_colony)
+                population = toolbox.select(population, mu_)
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
             parents = [toolbox.clone(ind) for ind in selected]
@@ -592,11 +533,14 @@ class Optimizer:
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             if self.is_root():
                 print(logbook.stream, flush=True)
-        # if self.is_root():
-        #     print("Exchanging colonies")
-        colonies = self.mpi_comm.allgather(population)
-        merged_colonies = list(itertools.chain.from_iterable(colonies))
-        population = toolbox.select(merged_colonies, mu_)
+        if self.is_root():
+            print("Exchanging colonies", flush=True)
+        for i in range(0, self.number_of_mpi_processes // 2 + 1):
+            left_colony, right_colony = self.mpi_exchange_neighbors(population)
+            population.extend(left_colony)
+            population.extend(right_colony)
+            population = toolbox.select(population, mu_)
+
         hof.update(population)
 
         return population, logbook, hof
@@ -740,7 +684,7 @@ class Optimizer:
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             if optimization_method is None:
-                optimization_method = self.NSGAIII
+                optimization_method = self.SOGP
             self.clear_individual_cache()
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,

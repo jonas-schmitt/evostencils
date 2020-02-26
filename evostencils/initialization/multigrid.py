@@ -13,7 +13,6 @@ from deap import gp
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
 import itertools
-import typing
 from functools import reduce
 
 
@@ -210,7 +209,8 @@ class Types:
         types = [grid_types.generate_correction_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseCorrection = multiple.generate_type_list(*types)
         self.Partitioning = partitioning.generate_any_partitioning_type()
-        self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
+        # self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
+        self.BlockSize = TypeWrapper(tuple)
         self.Finished = FinishedType
         self.NotFinished = NotFinishedType
 

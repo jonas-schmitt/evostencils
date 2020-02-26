@@ -38,8 +38,8 @@ def main():
     # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
 
     # 2D Finite volume discretized Stokes
-    # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
-    # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
+    # settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
+    # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
@@ -89,14 +89,14 @@ def main():
         os.makedirs(f'{cwd}/{problem_name}')
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
-                          mpi_comm=comm, mpi_rank=mpi_rank, number_of_processes=nprocs,
+                          mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=nprocs,
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    levels_per_run = 4
+    levels_per_run = 2
     required_convergence = 0.9
     maximum_block_size = 3
     optimization_method = optimizer.NSGAIII
@@ -115,7 +115,7 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=128, gp_lambda=128,
+                                                               gp_mu=32, gp_lambda=32,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
