@@ -244,17 +244,20 @@ class Optimizer:
     def mpi_wait_for_request(self, request):
         counter = 0
         cancel_request = False
-        while not request.test():
-            time.sleep(1e-3)
-            if counter == self._timeout_counter_limit:
-                cancel_request = True
-                break
-            counter += 1
-        if cancel_request:
-            request.Cancel()
+        try:
+            while not request.test():
+                time.sleep(1e-3)
+                if counter == self._timeout_counter_limit:
+                    cancel_request = True
+                    break
+                counter += 1
+            if cancel_request:
+                request.Cancel()
+                return None
+            else:
+                return request.wait()
+        except pickle.UnpicklingError as _:
             return None
-        else:
-            return request.wait()
 
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
