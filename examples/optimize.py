@@ -96,7 +96,7 @@ def main():
 
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    levels_per_run = 2
+    levels_per_run = 4
     required_convergence = 0.9
     maximum_block_size = 3
     optimization_method = optimizer.NSGAIII
