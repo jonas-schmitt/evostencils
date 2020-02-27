@@ -86,7 +86,7 @@ class Optimizer:
         self._individual_cache_size = 100000
         self._individual_cache_hits = 0
         self._individual_cache_misses = 0
-        self._timeout_counter_limit = 60000
+        self._timeout_counter_limit = 10000
 
     @staticmethod
     def _init_creator():
@@ -245,7 +245,7 @@ class Optimizer:
         counter = 0
         cancel_request = False
         try:
-            while not request.test():
+            while not request.Test():
                 time.sleep(1e-3)
                 if counter == self._timeout_counter_limit:
                     cancel_request = True
@@ -253,10 +253,14 @@ class Optimizer:
                 counter += 1
             if cancel_request:
                 request.Cancel()
+                print("Communication timeout reached")
+                print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
                 return None
             else:
                 return request.wait()
-        except pickle.UnpicklingError as _:
+        except Exception as e:
+            print(e)
+            print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
             return None
 
     def reset_evaluation_counters(self):
