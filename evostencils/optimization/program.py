@@ -10,6 +10,7 @@ import evostencils.optimization.relaxation_factors as relaxation_factor_optimiza
 from evostencils.types import level_control
 import math, numpy
 import numpy as np
+import time
 
 
 class suppress_output(object):
@@ -85,6 +86,7 @@ class Optimizer:
         self._individual_cache_size = 100000
         self._individual_cache_hits = 0
         self._individual_cache_misses = 0
+        self._timeout_counter_limit = 60000
 
     @staticmethod
     def _init_creator():
@@ -236,8 +238,23 @@ class Optimizer:
     def mpi_send_to_neighbors(self, data):
         right_neighbor = self.mpi_get_right_neighbor()
         left_neighbor = self.mpi_get_left_neighbor()
-        self.mpi_comm.send(data, left_neighbor, tag=self.mpi_rank)
-        self.mpi_comm.send(data, right_neighbor, tag=self.mpi_rank)
+        self.mpi_comm.isend(data, left_neighbor, tag=self.mpi_rank)
+        self.mpi_comm.isend(data, right_neighbor, tag=self.mpi_rank)
+
+    def mpi_wait_for_request(self, request):
+        counter = 0
+        cancel_request = False
+        while not request.test():
+            time.sleep(1e-3)
+            if counter == self._timeout_counter_limit:
+                cancel_request = True
+                break
+            counter += 1
+        if cancel_request:
+            request.Cancel()
+            return None
+        else:
+            return request.wait()
 
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
@@ -490,15 +507,19 @@ class Optimizer:
             print(logbook.stream, flush=True)
         # Begin the generational process
         immigration_interval = 5
-        request_left_neighbor_data, request_right_neighbor_data = self.mpi_receive_from_neighbors()
+        request_left_neighbor, request_right_neighbor = self.mpi_receive_from_neighbors()
         for gen in range(min_generation + 1, max_generation + 1):
             if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
                 if self.is_root():
                     print("Exchanging colonies", flush=True)
                 self.mpi_send_to_neighbors(population[len(population)//2:])
-                population.extend(request_left_neighbor_data.wait())
-                population.extend(request_right_neighbor_data.wait())
-                request_left_neighbor_data, request_right_neighbor_data = self.mpi_receive_from_neighbors()
+                left_neighbor_population = self.mpi_wait_for_request(request_left_neighbor)
+                if left_neighbor_population is not None:
+                    population.extend(left_neighbor_population)
+                right_neighbor_population = self.mpi_wait_for_request(request_right_neighbor)
+                if right_neighbor_population is not None:
+                    population.extend(right_neighbor_population)
+                request_left_neighbor, request_right_neighbor = self.mpi_receive_from_neighbors()
                 population = toolbox.select(population, mu_)
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
@@ -549,10 +570,10 @@ class Optimizer:
             print("Exchanging colonies", flush=True)
 
         for i in range(0, self.number_of_mpi_processes // 2):
-            request_left_neighbor_data, request_right_neighbor_data = self.mpi_receive_from_neighbors()
+            request_left_neighbor, request_right_neighbor = self.mpi_receive_from_neighbors()
             self.mpi_send_to_neighbors(population[len(population)//2:])
-            population.extend(request_left_neighbor_data.wait())
-            population.extend(request_right_neighbor_data.wait())
+            population.extend(request_left_neighbor.wait())
+            population.extend(request_right_neighbor.wait())
             population = toolbox.select(population, mu_)
 
         hof.update(population)
