@@ -246,19 +246,21 @@ class Optimizer:
         counter = 0
         cancel_request = False
         try:
-            while not request.Test():
-                time.sleep(1e-3)
+            finished, result = request.test()
+            while not finished:
                 if counter == self._timeout_counter_limit:
+                    request.Cancel()
                     cancel_request = True
                     break
                 counter += 1
+                time.sleep(1e-2)
+                finished, result = request.test()
             if cancel_request:
-                request.Cancel()
                 print("Communication timeout reached")
                 print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
                 return None
             else:
-                return request.wait()
+                return result
         except Exception as e:
             request.Cancel()
             print(e)
@@ -269,22 +271,26 @@ class Optimizer:
         counter = 0
         cancel_request = False
         try:
-            while not request.Test():
-                time.sleep(1e-3)
+            finished, _ = request.test()
+            while not finished:
                 if counter == self._timeout_counter_limit:
+                    request.Cancel()
                     cancel_request = True
+                    print("Communication timeout reached")
+                    print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
                     break
                 counter += 1
-            if cancel_request:
-                request.Cancel()
-                print("Communication timeout reached")
-                print(f"Emigration of individuals failed on process with rank {self.mpi_rank}")
-            else:
-                request.wait()
+                time.sleep(1e-2)
+                finished, _ = request.test()
+                if cancel_request:
+                    return False
+                else:
+                    return True
         except Exception as e:
             request.Cancel()
             print(e)
             print(f"Emigration of individuals failed on process with rank {self.mpi_rank}")
+            return False
 
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
@@ -542,18 +548,29 @@ class Optimizer:
             if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
                 if self.is_root():
                     print("Exchanging colonies", flush=True)
+
                 send_request_left_neighbor, send_request_right_neighbor = \
-                    self.mpi_send_to_neighbors(population[len(population)//2:])
-                self.mpi_wait_for_send_request(send_request_left_neighbor)
-                self.mpi_wait_for_send_request(send_request_right_neighbor)
-                left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
-                if left_neighbor_population is not None:
-                    population.extend(left_neighbor_population)
-                right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
-                if right_neighbor_population is not None:
-                    population.extend(right_neighbor_population)
+                        self.mpi_send_to_neighbors(population[:len(population)//2])
+
+                send_succesfull = self.mpi_wait_for_send_request(send_request_left_neighbor)
+                if send_succesfull:
+                    left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
+                    if left_neighbor_population is not None:
+                        population.extend(left_neighbor_population)
+                else:
+                    receive_request_left_neighbor.Cancel()
+
+                send_succesfull = self.mpi_wait_for_send_request(send_request_right_neighbor)
+                if send_succesfull:
+                    right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
+                    if right_neighbor_population is not None:
+                        population.extend(right_neighbor_population)
+                else:
+                    receive_request_right_neighbor.Cancel()
+
                 receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
                 population = toolbox.select(population, mu_)
+                self.mpi_comm.barrier()
             # Vary the population
             selected = toolbox.select_for_mating(population, lambda_)
             parents = [toolbox.clone(ind) for ind in selected]
@@ -600,10 +617,27 @@ class Optimizer:
                 print(logbook.stream, flush=True)
         if self.is_root():
             print("Exchanging colonies", flush=True)
+
         send_request_left_neighbor, send_request_right_neighbor = \
             self.mpi_send_to_neighbors(population[len(population) // 2:])
-        self.mpi_wait_for_send_request(send_request_left_neighbor)
-        self.mpi_wait_for_send_request(send_request_right_neighbor)
+
+        send_succesfull = self.mpi_wait_for_send_request(send_request_left_neighbor)
+        if send_succesfull:
+            left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
+            if left_neighbor_population is not None:
+                population.extend(left_neighbor_population)
+        else:
+            receive_request_left_neighbor.Cancel()
+
+        send_succesfull = self.mpi_wait_for_send_request(send_request_right_neighbor)
+        if send_succesfull:
+            right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
+            if right_neighbor_population is not None:
+                population.extend(right_neighbor_population)
+        else:
+            receive_request_right_neighbor.Cancel()
+
+        self.mpi_comm.barrier()
 
         hof.update(population)
         if self.is_root():
