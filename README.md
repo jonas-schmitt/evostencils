@@ -1,7 +1,7 @@
 # EvoStencils
 Generating optimal iterative solvers through evolutionary computation
 ## Requirements
-Python >= 3.6, sbt (for ExaStencils)
+Python >= 3.6, sbt (for ExaStencils), MPI
 ## Setup
 1. Clone and build the ExaStencils framework
 ```
