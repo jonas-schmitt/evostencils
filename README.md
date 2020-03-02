@@ -14,7 +14,7 @@ sbt assembly
   Follow these instructions: https://hrittich.github.io/lfa-lab/install.html  
 3. Install required Python packages
 ```
-pip install deap sympy
+pip install deap sympy mpi4py dill
 ```
 3. Set up the environment  
 ```
