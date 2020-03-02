@@ -11,6 +11,7 @@ from evostencils.types import level_control
 import math, numpy
 import numpy as np
 import time
+import itertools
 
 
 class suppress_output(object):
@@ -246,7 +247,7 @@ class Optimizer:
         counter = 0
         cancel_request = False
         try:
-            finished, result = request.test()
+            finished = request.Test()
             while not finished:
                 if counter == self._timeout_counter_limit:
                     request.Cancel()
@@ -254,13 +255,13 @@ class Optimizer:
                     break
                 counter += 1
                 time.sleep(1e-2)
-                finished, result = request.test()
+                finished = request.Test()
             if cancel_request:
                 print("Communication timeout reached")
                 print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
                 return None
             else:
-                return result
+                return request.wait()
         except Exception as e:
             request.Cancel()
             print(e)
@@ -271,7 +272,7 @@ class Optimizer:
         counter = 0
         cancel_request = False
         try:
-            finished, _ = request.test()
+            finished = request.Test()
             while not finished:
                 if counter == self._timeout_counter_limit:
                     request.Cancel()
@@ -281,11 +282,11 @@ class Optimizer:
                     break
                 counter += 1
                 time.sleep(1e-2)
-                finished, _ = request.test()
-                if cancel_request:
-                    return False
-                else:
-                    return True
+                finished = request.Test()
+            if cancel_request:
+                return False
+            else:
+                return True
         except Exception as e:
             request.Cancel()
             print(e)
@@ -543,30 +544,27 @@ class Optimizer:
             print(logbook.stream, flush=True)
         # Begin the generational process
         immigration_interval = 5
-        receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
+        receive_request_left_neighbor = None
+        receive_request_right_neighbor = None
+        if self.number_of_mpi_processes > 1:
+            receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
         for gen in range(min_generation + 1, max_generation + 1):
             if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
                 if self.is_root():
                     print("Exchanging colonies", flush=True)
 
                 send_request_left_neighbor, send_request_right_neighbor = \
-                        self.mpi_send_to_neighbors(population[:len(population)//2])
+                    self.mpi_send_to_neighbors(population[:len(population)//2])
 
-                send_succesfull = self.mpi_wait_for_send_request(send_request_left_neighbor)
-                if send_succesfull:
-                    left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
-                    if left_neighbor_population is not None:
-                        population.extend(left_neighbor_population)
-                else:
-                    receive_request_left_neighbor.Cancel()
+                self.mpi_wait_for_send_request(send_request_left_neighbor)
+                left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
+                if left_neighbor_population is not None:
+                    population.extend(left_neighbor_population)
 
-                send_succesfull = self.mpi_wait_for_send_request(send_request_right_neighbor)
-                if send_succesfull:
-                    right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
-                    if right_neighbor_population is not None:
-                        population.extend(right_neighbor_population)
-                else:
-                    receive_request_right_neighbor.Cancel()
+                self.mpi_wait_for_send_request(send_request_right_neighbor)
+                right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
+                if right_neighbor_population is not None:
+                    population.extend(right_neighbor_population)
 
                 receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
                 population = toolbox.select(population, mu_)
@@ -618,26 +616,25 @@ class Optimizer:
         if self.is_root():
             print("Exchanging colonies", flush=True)
 
-        send_request_left_neighbor, send_request_right_neighbor = \
-            self.mpi_send_to_neighbors(population[len(population) // 2:])
+        if self.number_of_mpi_processes > 1:
+            send_request_left_neighbor, send_request_right_neighbor = \
+                self.mpi_send_to_neighbors(population[:len(population) // 2])
 
-        send_succesfull = self.mpi_wait_for_send_request(send_request_left_neighbor)
-        if send_succesfull:
+            self.mpi_wait_for_send_request(send_request_left_neighbor)
             left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
             if left_neighbor_population is not None:
                 population.extend(left_neighbor_population)
-        else:
-            receive_request_left_neighbor.Cancel()
 
-        send_succesfull = self.mpi_wait_for_send_request(send_request_right_neighbor)
-        if send_succesfull:
+            self.mpi_wait_for_send_request(send_request_right_neighbor)
             right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
             if right_neighbor_population is not None:
                 population.extend(right_neighbor_population)
-        else:
-            receive_request_right_neighbor.Cancel()
 
-        self.mpi_comm.barrier()
+            self.mpi_comm.barrier()
+            number_of_immigrants = max(10, 2 * len(population) // self.number_of_mpi_processes)
+            colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
+            immigrants = list(itertools.chain.from_iterable(colonies))
+            population.extend(immigrants)
 
         hof.update(population)
         if self.is_root():
@@ -821,6 +818,8 @@ class Optimizer:
                         best_expression = expression
                         best_time = time
                         best_convergence_factor = convergence_factor
+                    if len(individual.fitness.values) == 1:
+                        break
 
             except (KeyboardInterrupt, Exception) as e:
                 raise e
@@ -851,7 +850,7 @@ class Optimizer:
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=30)
         try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,

@@ -4,9 +4,10 @@ from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import lfa_lab
-import numpy as np
 import sys
+import dill
 from mpi4py import MPI
+MPI.pickle.__init__(dill.dumps, dill.loads)
 
 
 def main():
