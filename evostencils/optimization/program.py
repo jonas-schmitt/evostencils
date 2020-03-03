@@ -407,26 +407,30 @@ class Optimizer:
 
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
                                       _, __, min_level, max_level,
-                                      program, solver, logbooks, checkpoint_frequency=5, checkpoint=None):
+                                      program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
 
         if self.is_root():
             print("Running Multi-Objective Random Search Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        H = mu_
-        reference_points = tools.uniform_reference_points(2, H)
-        mu_ = H + (4 - H % 4)
-        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
+        self._toolbox.register("select", tools.selNSGA2, nd='standard')
+        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
+                               storages=storages, min_level=min_level, max_level=max_level,
+                               solver_program=program)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(iterations=stats_fit1, runtime=stats_fit2, size=stats_size)
+
+        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
 
         mstats.register("avg", np.mean)
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
+
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+
         random.seed()
         use_checkpoint = False
         if checkpoint is not None:
@@ -780,7 +784,7 @@ class Optimizer:
             self.program_generator._average_generation_time = 0
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             if optimization_method is None:
-                optimization_method = self.SOGP
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,
@@ -818,8 +822,6 @@ class Optimizer:
                         best_expression = expression
                         best_time = time
                         best_convergence_factor = convergence_factor
-                    if len(individual.fitness.values) == 1:
-                        break
 
             except (KeyboardInterrupt, Exception) as e:
                 raise e
