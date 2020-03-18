@@ -683,7 +683,7 @@ class ProgramGenerator:
                         output_file.write(line)
         return output_file_path
 
-    def generate_adapted_layer_files(self, iteration_limit):
+    def generate_adapted_layer_files(self, iteration_limit, coarse_grid_solver_type=None, number_of_cgs_iterations=None):
         base_path = self.base_path
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}.exa3'
         output_file_path = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
@@ -701,7 +701,45 @@ class ProgramGenerator:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'solver_maxNumIts':
-                        output_file.write(f'\t{lhs}\t= {iteration_limit}\n')
+                        output_file.write(f'  {lhs}\t= {iteration_limit}\n')
+                    elif coarse_grid_solver_type is not None and lhs == 'solver_cgs':
+                        output_file.write(f'  {lhs}\t= "{coarse_grid_solver_type}"\n')
+                    elif number_of_cgs_iterations is not None and lhs == 'solver_cgs_maxNumIts':
+                        output_file.write(f'  {lhs}\t= {number_of_cgs_iterations}\n')
                     else:
                         output_file.write(line)
         return output_file_path
+
+    def extract_krylov_iteration_from_layer3_file(self, layer3_file_path, level):
+        krylov_solver_function = ''
+        with open(f'{self.base_path}/{layer3_file_path}', 'r') as input_file:
+            line = input_file.readline()
+            while line:
+                if f'Function gen_mgCycle@{level}' in line:
+                    block_count = 1
+                    while line and block_count > 0:
+                        if 'print' not in line:
+                            krylov_solver_function += line
+                        line = input_file.readline()
+                        if '{' in line:
+                            block_count += 1
+                        elif '}' in line:
+                            block_count -= 1
+                    krylov_solver_function += line
+                line = input_file.readline()
+        return krylov_solver_function
+
+    def generate_krylov_subspace_iteration(self, level: int, max_level: int, solver_type: str,
+                                           number_of_solver_iterations: int):
+        min_level = level
+        iteration_limit = 1
+        knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
+        self.generate_adapted_layer_files(iteration_limit, solver_type, number_of_solver_iterations)
+        settings_path = self.generate_adapted_settings_file(l2file_required=True)
+        self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
+        layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
+        krylov_solver_function = self.extract_krylov_iteration_from_layer3_file(layer3_file_path, level)
+        krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', solver_type)
+        return krylov_solver_function
+
+
