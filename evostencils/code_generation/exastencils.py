@@ -65,6 +65,7 @@ class ProgramGenerator:
             self._compiler_available = True
         else:
             raise RuntimeError("Compiler not found. Aborting.")
+        self._solver_cache = {}
 
     @property
     def absolute_compiler_path(self):
@@ -710,7 +711,7 @@ class ProgramGenerator:
                         output_file.write(line)
         return output_file_path
 
-    def extract_krylov_iteration_from_layer3_file(self, layer3_file_path, level):
+    def extract_krylov_subspace_method_from_layer3_file(self, layer3_file_path, level):
         krylov_solver_function = ''
         with open(f'{self.base_path}/{layer3_file_path}', 'r') as input_file:
             line = input_file.readline()
@@ -729,8 +730,24 @@ class ProgramGenerator:
                 line = input_file.readline()
         return krylov_solver_function
 
-    def generate_krylov_subspace_iteration(self, level: int, max_level: int, solver_type: str,
-                                           number_of_solver_iterations: int):
+    def add_solver_to_cache(self, solver_type: str, number_of_solver_iterations: int, program: str):
+        key = solver_type, number_of_solver_iterations
+        self._solver_cache[key] = program, True
+
+    def solver_in_cache(self, solver_type: str, number_of_solver_iterations: int):
+        key = solver_type, number_of_solver_iterations
+        return key in self._solver_cache
+
+    def set_solver_valid(self, solver_type: str, number_of_solver_iterations: int):
+        key = solver_type, number_of_solver_iterations
+        value = self._solver_cache[key]
+        self._solver_cache[key] = value[0], True
+
+    def invalidate_solver_cache(self):
+        return {key: (value[0], False) for key, value in self._solver_cache.items()}
+
+    def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
+                                        number_of_solver_iterations: int):
         min_level = level
         iteration_limit = 1
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
@@ -738,8 +755,9 @@ class ProgramGenerator:
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
-        krylov_solver_function = self.extract_krylov_iteration_from_layer3_file(layer3_file_path, level)
+        krylov_solver_function = self.extract_krylov_subspace_method_from_layer3_file(layer3_file_path, level)
         krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', solver_type)
+        self.add_solver_to_cache(solver_type, number_of_solver_iterations, krylov_solver_function)
         return krylov_solver_function
 
 
