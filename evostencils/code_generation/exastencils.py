@@ -1,4 +1,5 @@
 from evostencils.expressions import base, partitioning as part, system, transformations
+from evostencils.expressions import krylov_subspace
 from evostencils.initialization import multigrid, parser
 import os
 import subprocess
@@ -66,6 +67,7 @@ class ProgramGenerator:
         else:
             raise RuntimeError("Compiler not found. Aborting.")
         self._solver_cache = {}
+        self._field_declaration_cache = set()
 
     @property
     def absolute_compiler_path(self):
@@ -205,7 +207,13 @@ class ProgramGenerator:
                                 max_level: int, use_global_weights=False):
         program = f'Function gen_mgCycle@{level} {{\n'
         program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
-        program += '}\n'
+        program += '}\n\n'
+        for key, value in self._solver_cache.items():
+            solver_function = value[0]
+            valid = value[1]
+            if valid:
+                program += solver_function + '\n'
+        self.invalidate_solver_cache()
 
         def restore_valid_flag(expr: base.Expression):
             if expr is not None:
@@ -462,7 +470,7 @@ class ProgramGenerator:
                         source_field = self.obtain_correct_source_field(correction.operand2, storages, i, op_level, max_level)
                         program += f'\t{solution_field.to_exa()} += {weight} * ({entry.name}@{op_level} * ' \
                                    f'{source_field.to_exa()})\n'
-                elif isinstance(correction.operand1, base.Inverse):
+                elif isinstance(correction.operand1, base.Inverse) or isinstance(correction.operand1, krylov_subspace.KrylovSubspaceMethod):
                     residual = correction.operand2
                     if not isinstance(residual.rhs, system.RightHandSide) and not residual.rhs.valid:
                         program += self.generate_multigrid(residual.rhs, storages, min_level, max_level,
@@ -475,57 +483,74 @@ class ProgramGenerator:
                         for i, grid in enumerate(expression.grid):
                             solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                             program += f'\t{solution_field.to_exa()} = 0\n'
-                    smoothing_operator = correction.operand1.operand
-                    system_operator = correction.operand2.operator
-                    equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
-                                                                                             self.equations, self.fields)
-                    dependent_equations, independent_equations = transformations.find_independent_equation_sets(equation_dict)
-                    if isinstance(correction.operand1.operand, system.ElementwiseDiagonal):
-                        dependent_equations.extend(independent_equations)
-                        independent_equations.clear()
-                    for key, value in independent_equations:
+
+                    if isinstance(correction.operand1, krylov_subspace.KrylovSubspaceMethod):
+                        level = expression.grid[0].level
+                        krylov_subspace_operator = correction.operand1
+                        program += f'\t{krylov_subspace_operator.name}@{level}()\n'
+                        solver_name = krylov_subspace_operator.name
+                        number_of_solver_iterations = krylov_subspace_operator.number_of_iterations
+                        if not self.solver_in_cache(level, solver_name, number_of_solver_iterations):
+                            krylov_solver_function, _ = \
+                                self.generate_krylov_subspace_method(level, max_level, solver_name,
+                                                                     number_of_solver_iterations)
+                            self.add_solver_to_cache(level, solver_name, number_of_solver_iterations,
+                                                     krylov_solver_function, valid=True)
+                        else:
+                            self.set_solver_valid(level, krylov_subspace_operator.name,
+                                                  krylov_subspace_operator.number_of_iterations)
+                    elif isinstance(correction.operand1, base.Inverse):
+                        smoothing_operator = correction.operand1.operand
+                        system_operator = correction.operand2.operator
+                        equation_dict = transformations.obtain_sympy_expression_for_local_system(smoothing_operator, system_operator,
+                                                                                                 self.equations, self.fields)
+                        dependent_equations, independent_equations = transformations.find_independent_equation_sets(equation_dict)
+                        if isinstance(correction.operand1.operand, system.ElementwiseDiagonal):
+                            dependent_equations.extend(independent_equations)
+                            independent_equations.clear()
+                        for key, value in independent_equations:
+                            coloring = False
+                            indentation = ''
+                            if expression.partitioning == part.RedBlack:
+                                coloring = True
+                                program += '\tcolor with {\n\t\t(('
+                                for i in range(self.dimension):
+                                    program += f'i{i}'
+                                    if i < self.dimension - 1:
+                                        program += ' + '
+                                program += ') % 2),\n'
+                                indentation += '\t'
+                            if key[1] < max_level:
+                                program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
+                            else:
+                                program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
+                            program += self.generate_solve_locally(key, value, indentation, max_level)
+                            program += f'\t{indentation}}}\n'
+                            if coloring:
+                                program += '\t}\n'
+
                         coloring = False
                         indentation = ''
-                        if expression.partitioning == part.RedBlack:
-                            coloring = True
-                            program += '\tcolor with {\n\t\t(('
-                            for i in range(self.dimension):
-                                program += f'i{i}'
-                                if i < self.dimension - 1:
-                                    program += ' + '
-                            program += ') % 2),\n'
-                            indentation += '\t'
-                        if key[1] < max_level:
-                            program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
-                        else:
-                            program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
-                        program += self.generate_solve_locally(key, value, indentation, max_level)
-                        program += f'\t{indentation}}}\n'
-                        if coloring:
-                            program += '\t}\n'
-
-                    coloring = False
-                    indentation = ''
-                    if len(dependent_equations) > 0:
-                        if expression.partitioning == part.RedBlack:
-                            coloring = True
-                            program += '\tcolor with {\n\t\t(('
-                            for i in range(self.dimension):
-                                program += f'i{i}'
-                                if i < self.dimension - 1:
-                                    program += ' + '
-                            program += ') % 2),\n'
-                            indentation += '\t'
-                        level = dependent_equations[0][0][1]
-                        if level < max_level:
-                            program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
-                        else:
-                            program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
-                        for key, value in dependent_equations:
-                            program += self.generate_solve_locally(key, value, indentation, max_level)
-                        program += f'\t{indentation}}}\n'
-                        if coloring:
-                            program += '\t}\n'
+                        if len(dependent_equations) > 0:
+                            if expression.partitioning == part.RedBlack:
+                                coloring = True
+                                program += '\tcolor with {\n\t\t(('
+                                for i in range(self.dimension):
+                                    program += f'i{i}'
+                                    if i < self.dimension - 1:
+                                        program += ' + '
+                                program += ') % 2),\n'
+                                indentation += '\t'
+                            level = dependent_equations[0][0][1]
+                            if level < max_level:
+                                program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                            else:
+                                program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                            for key, value in dependent_equations:
+                                program += self.generate_solve_locally(key, value, indentation, max_level)
+                            program += f'\t{indentation}}}\n'
+                            if coloring:
+                                program += '\t}\n'
                 else:
                     raise RuntimeError("Unsupported operator")
             else:
@@ -628,6 +653,8 @@ class ProgramGenerator:
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{self.base_path}/{output_file_path}', 'w') as output_file:
+                for field_declaration in self._field_declaration_cache:
+                    output_file.write(field_declaration)
                 line = input_file.readline()
                 while line:
                     # TODO perform this check in a more accurate way
@@ -637,7 +664,8 @@ class ProgramGenerator:
                         while line and line[0] is not '}':
                             line = input_file.readline()
                         line = input_file.readline()
-                    output_file.write(line)
+                    if 'Field' not in line or line not in self._field_declaration_cache:
+                        output_file.write(line)
                     line = input_file.readline()
                 output_file.write(program)
 
@@ -713,6 +741,7 @@ class ProgramGenerator:
 
     def extract_krylov_subspace_method_from_layer3_file(self, layer3_file_path, level):
         krylov_solver_function = ''
+        residual_norm_function = ''
         with open(f'{self.base_path}/{layer3_file_path}', 'r') as input_file:
             line = input_file.readline()
             while line:
@@ -727,19 +756,32 @@ class ProgramGenerator:
                         elif '}' in line:
                             block_count -= 1
                     krylov_solver_function += line
+                elif f'Function gen_resNorm@{level}' in line:
+                    block_count = 1
+                    while line and block_count > 0:
+                        if 'print' not in line:
+                            residual_norm_function += line
+                        line = input_file.readline()
+                        if '{' in line:
+                            block_count += 1
+                        elif '}' in line:
+                            block_count -= 1
+                    residual_norm_function += line
+                elif 'Field' in line and 'gen_' in line:
+                    self._field_declaration_cache.add(line)
                 line = input_file.readline()
-        return krylov_solver_function
+        return krylov_solver_function, residual_norm_function
 
-    def add_solver_to_cache(self, solver_type: str, number_of_solver_iterations: int, program: str):
-        key = solver_type, number_of_solver_iterations
-        self._solver_cache[key] = program, True
+    def add_solver_to_cache(self, level, solver_type: str, number_of_solver_iterations: int, program: str, valid=False):
+        key = level, solver_type, number_of_solver_iterations
+        self._solver_cache[key] = program, valid
 
-    def solver_in_cache(self, solver_type: str, number_of_solver_iterations: int):
-        key = solver_type, number_of_solver_iterations
+    def solver_in_cache(self, level, solver_type: str, number_of_solver_iterations: int):
+        key = level, solver_type, number_of_solver_iterations
         return key in self._solver_cache
 
-    def set_solver_valid(self, solver_type: str, number_of_solver_iterations: int):
-        key = solver_type, number_of_solver_iterations
+    def set_solver_valid(self, level, solver_type: str, number_of_solver_iterations: int):
+        key = level, solver_type, number_of_solver_iterations
         value = self._solver_cache[key]
         self._solver_cache[key] = value[0], True
 
@@ -750,14 +792,30 @@ class ProgramGenerator:
                                         number_of_solver_iterations: int):
         min_level = level
         iteration_limit = 1
-        knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
+        knowledge_path = self.generate_level_adapted_knowledge_file(min_level, min(min_level + 1, max_level))
         self.generate_adapted_layer_files(iteration_limit, solver_type, number_of_solver_iterations)
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
-        krylov_solver_function = self.extract_krylov_subspace_method_from_layer3_file(layer3_file_path, level)
+        krylov_solver_function, residual_norm_function = \
+            self.extract_krylov_subspace_method_from_layer3_file(layer3_file_path, level)
         krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', solver_type)
-        self.add_solver_to_cache(solver_type, number_of_solver_iterations, krylov_solver_function)
-        return krylov_solver_function
+        return krylov_solver_function, residual_norm_function
+
+    def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, maximum_number_of_solver_iterations):
+        self._field_declaration_cache.clear()
+        residual_norm_functions = []
+        for level in range(min_level, max_level + 1):
+            for i, solver_type in enumerate(solver_list):
+                for number_of_solver_iterations in range(1, maximum_number_of_solver_iterations+1):
+                    krylov_solver_function, residual_norm_function = \
+                        self.generate_krylov_subspace_method(level, max_level, solver_type, number_of_solver_iterations)
+                    self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
+                    if i == 0:
+                        residual_norm_functions.append(residual_norm_function)
+        return residual_norm_functions
+
+
+
 
 

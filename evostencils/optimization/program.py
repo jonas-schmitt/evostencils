@@ -782,6 +782,15 @@ class Optimizer:
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
+            solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
+            maximum_number_of_solver_iterations = 1
+            residual_norm_functions = \
+                self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level, self.max_level,
+                                                                               solver_list,
+                                                                               maximum_number_of_solver_iterations)
+            for residual_norm_function in residual_norm_functions[:len(residual_norm_functions)-1]:
+                solver_program += residual_norm_function
+                solver_program += '\n'
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
             if optimization_method is None:
                 optimization_method = self.NSGAIII

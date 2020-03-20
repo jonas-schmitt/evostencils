@@ -29,21 +29,17 @@ class KrylovSubspaceMethod(Entity):
         return f'KrylovSubspaceMethod({repr(self.name)}, {repr(self.operator)}, {repr(self.number_of_iterations)})'
 
 
-class ConjugateGradient(KrylovSubspaceMethod):
-    def __init__(self, operator, number_of_iterations):
-        super().__init__('ConjugateGradient', operator, number_of_iterations)
+def generate_conjugate_gradient(operator, number_of_iterations):
+    return KrylovSubspaceMethod('ConjugateGradient', operator, number_of_iterations)
 
 
-class BiCGStab(KrylovSubspaceMethod):
-    def __init__(self, operator, number_of_iterations):
-        super().__init__('BiCGStab', operator, number_of_iterations)
+def generate_bicgstab(operator, number_of_iterations):
+    return KrylovSubspaceMethod('BiCGStab', operator, number_of_iterations)
 
 
-class MinRes(KrylovSubspaceMethod):
-    def __init__(self, operator, number_of_iterations):
-        super().__init__('MinRes', operator, number_of_iterations)
+def generate_minres(operator, number_of_iterations):
+    return KrylovSubspaceMethod('MinRes', operator, number_of_iterations)
 
 
-class ConjugateResidual(KrylovSubspaceMethod):
-    def __init__(self, operator, number_of_iterations):
-        super().__init__('ConjugateResidual', operator, number_of_iterations)
+def generate_conjugate_residual(operator, number_of_iterations):
+    return KrylovSubspaceMethod('ConjugateResidual', operator, number_of_iterations)
