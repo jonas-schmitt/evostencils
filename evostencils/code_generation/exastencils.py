@@ -291,10 +291,10 @@ class ProgramGenerator:
         _, __, ___, output_path_generated = \
             parser.extract_settings_information(self.base_path, settings_path)
         self._output_path_generated = output_path_generated
+        debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+        subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return output_path_generated
-        # l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa3'
-        # subprocess.run(['cp', l3_path, f'{l3_path}.backup'],
-        #                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str,
@@ -488,17 +488,8 @@ class ProgramGenerator:
                         level = expression.grid[0].level
                         krylov_subspace_operator = correction.operand1
                         program += f'\t{krylov_subspace_operator.name}@{level}()\n'
-                        solver_name = krylov_subspace_operator.name
-                        number_of_solver_iterations = krylov_subspace_operator.number_of_iterations
-                        if not self.solver_in_cache(level, solver_name, number_of_solver_iterations):
-                            krylov_solver_function, _ = \
-                                self.generate_krylov_subspace_method(level, max_level, solver_name,
-                                                                     number_of_solver_iterations)
-                            self.add_solver_to_cache(level, solver_name, number_of_solver_iterations,
-                                                     krylov_solver_function, valid=True)
-                        else:
-                            self.set_solver_valid(level, krylov_subspace_operator.name,
-                                                  krylov_subspace_operator.number_of_iterations)
+                        self.set_solver_valid(level, krylov_subspace_operator.name,
+                                              krylov_subspace_operator.number_of_iterations)
                     elif isinstance(correction.operand1, base.Inverse):
                         smoothing_operator = correction.operand1.operand
                         system_operator = correction.operand2.operator
@@ -648,7 +639,7 @@ class ProgramGenerator:
 
     def generate_l3_file(self, min_level, max_level, program: str):
         # TODO fix hacky solution
-        input_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
+        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
@@ -667,6 +658,9 @@ class ProgramGenerator:
                     if 'Field' not in line or line not in self._field_declaration_cache:
                         output_file.write(line)
                     line = input_file.readline()
+                    while line == '\n':
+                        line = input_file.readline()
+
                 output_file.write(program)
 
     def generate_adapted_settings_file(self, l2file_required=False):
@@ -786,7 +780,7 @@ class ProgramGenerator:
         self._solver_cache[key] = value[0], True
 
     def invalidate_solver_cache(self):
-        return {key: (value[0], False) for key, value in self._solver_cache.items()}
+        self._solver_cache = {key: (value[0], False) for key, value in self._solver_cache.items()}
 
     def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
                                         number_of_solver_iterations: int):
@@ -811,7 +805,7 @@ class ProgramGenerator:
                     krylov_solver_function, residual_norm_function = \
                         self.generate_krylov_subspace_method(level, max_level, solver_type, number_of_solver_iterations)
                     self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
-                    if i == 0:
+                    if i == 0 and min_level < level < max_level:
                         residual_norm_functions.append(residual_norm_function)
         return residual_norm_functions
 

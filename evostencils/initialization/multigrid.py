@@ -310,7 +310,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_gradient_{level}")
     pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
                       multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_gradient_{level}")
-
     pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
                       multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"bicgstab_{level}")
     pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
@@ -325,7 +324,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                       multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_residual_{level}")
     pset.addPrimitive(conjugate_residual, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
                       multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_residual_{level}")
-
     if not coarsest:
 
         pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
