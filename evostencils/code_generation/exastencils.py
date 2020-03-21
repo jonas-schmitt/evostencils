@@ -805,7 +805,7 @@ class ProgramGenerator:
                     krylov_solver_function, residual_norm_function = \
                         self.generate_krylov_subspace_method(level, max_level, solver_type, number_of_solver_iterations)
                     self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
-                    if i == 0 and min_level < level < max_level:
+                    if i == 0:
                         residual_norm_functions.append(residual_norm_function)
         return residual_norm_functions
 
