@@ -486,6 +486,11 @@ class ProgramGenerator:
 
                     if isinstance(correction.operand1, krylov_subspace.KrylovSubspaceMethod):
                         level = expression.grid[0].level
+                        for i, grid in enumerate(expression.grid):
+                            source_field = self.get_rhs_field(storages, i, grid.level)
+                            level = min(level, grid.level)
+                            if grid.level < max_level:
+                                program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
                         krylov_subspace_operator = correction.operand1
                         program += f'\t{krylov_subspace_operator.name}@{level}()\n'
                         self.set_solver_valid(level, krylov_subspace_operator.name,
