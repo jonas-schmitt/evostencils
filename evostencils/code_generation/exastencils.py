@@ -237,7 +237,8 @@ class ProgramGenerator:
             if self._counter < 5:
                 timeout = 1.5 * timeout - self._counter * self._average_generation_time
         try:
-            timeout = min(self.timeout_exastencils_compiler, timeout)
+            # timeout = min(self.timeout_exastencils_compiler, timeout)
+            timeout = self.timeout_exastencils_compiler
             result = subprocess.run(['java', '-cp',
                                      self.absolute_compiler_path, 'Main',
                                      f'{self.base_path}/{settings_path}',
@@ -267,7 +268,7 @@ class ProgramGenerator:
             if not result.returncode == 0:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
-            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output)
+            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity, infinity
             total_time += time_to_solution
@@ -323,16 +324,21 @@ class ProgramGenerator:
         return runtime, convergence_factor, number_of_iterations
 
     @staticmethod
-    def parse_output(output: str):
+    def parse_output(output: str, infinity: float):
         lines = output.splitlines()
         convergence_factor = 1
         count = 0
         for line in lines:
             if 'convergence factor' in line:
                 tmp = line.split('convergence factor is ')
-                convergence_factor *= float(tmp[-1])
-                count += 1
-        convergence_factor = math.pow(convergence_factor, 1/count)
+                rho = float(tmp[-1])
+                if not math.isinf(rho) and not math.isnan(rho):
+                    convergence_factor *= rho
+                    count += 1
+        if count > 0:
+            convergence_factor = math.pow(convergence_factor, 1/count)
+        else:
+            convergence_factor = infinity
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
         number_of_iterations = len(lines) - 3
@@ -772,6 +778,7 @@ class ProgramGenerator:
         return krylov_solver_function, residual_norm_function
 
     def add_solver_to_cache(self, level, solver_type: str, number_of_solver_iterations: int, program: str, valid=False):
+    # def add_solver_to_cache(self, level, solver_type: str, number_of_solver_iterations: int, program: str, valid=True):
         key = level, solver_type, number_of_solver_iterations
         self._solver_cache[key] = program, valid
 
@@ -786,6 +793,7 @@ class ProgramGenerator:
 
     def invalidate_solver_cache(self):
         self._solver_cache = {key: (value[0], False) for key, value in self._solver_cache.items()}
+        # self._solver_cache = {key: (value[0], True) for key, value in self._solver_cache.items()}
 
     def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
                                         number_of_solver_iterations: int):
@@ -801,17 +809,16 @@ class ProgramGenerator:
         krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', solver_type)
         return krylov_solver_function, residual_norm_function
 
-    def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, maximum_number_of_solver_iterations):
+    def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, number_of_solver_iterations):
         self._field_declaration_cache.clear()
         residual_norm_functions = []
         for level in range(min_level, max_level + 1):
             for i, solver_type in enumerate(solver_list):
-                for number_of_solver_iterations in range(1, maximum_number_of_solver_iterations+1):
-                    krylov_solver_function, residual_norm_function = \
+                krylov_solver_function, residual_norm_function = \
                         self.generate_krylov_subspace_method(level, max_level, solver_type, number_of_solver_iterations)
-                    self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
-                    if i == 0:
-                        residual_norm_functions.append(residual_norm_function)
+                self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
+                if i == 0:
+                    residual_norm_functions.append(residual_norm_function)
         return residual_norm_functions
 
 

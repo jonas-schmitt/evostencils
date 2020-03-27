@@ -378,11 +378,14 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
-            time, _, __ = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                                        solver_program, infinity=self.infinity,
-                                                                        number_of_samples=10)
-            self.add_individual_to_cache(individual, (time,))
-            return time,
+            time, convergence_factor, number_of_iterations = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
+                    solver_program, infinity=self.infinity,
+                    number_of_samples=5)
+            fitness = time,
+            if number_of_iterations == 100 or convergence_factor > 1:
+                fitness = convergence_factor * math.sqrt(self.infinity) * time / number_of_iterations,
+            self.add_individual_to_cache(individual, fitness)
+            return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program):
         self._total_number_of_evaluations += 1
@@ -400,7 +403,7 @@ class Optimizer:
             time, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
-                                                              number_of_samples=5)
+                                                              number_of_samples=3)
             values = convergence_factor, time / iterations
             self.add_individual_to_cache(individual, values)
             return values
@@ -746,7 +749,7 @@ class Optimizer:
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
         # solver_list = ['ConjugateGradient']
-        maximum_number_of_solver_iterations = 1
+        maximum_number_of_solver_iterations = 256
         residual_norm_functions = \
             self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level+1, self.max_level,
                                                                            solver_list,
@@ -863,7 +866,7 @@ class Optimizer:
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=30)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=50)
         try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,

@@ -396,7 +396,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
 
     # number of Krylov subspace method iterations
-    pset.addTerminal(1, TypeWrapper(int))
+    pset.addTerminal(256, TypeWrapper(int))
     # pset.addTerminal(2, TypeWrapper(int))
     # pset.addTerminal(3, TypeWrapper(int))
 
