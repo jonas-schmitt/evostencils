@@ -383,7 +383,7 @@ class Optimizer:
                     number_of_samples=5)
             fitness = time,
             if number_of_iterations == 100 or convergence_factor > 1:
-                fitness = convergence_factor * math.sqrt(self.infinity) * time / number_of_iterations,
+                fitness = convergence_factor * math.sqrt(self.infinity),
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -749,10 +749,12 @@ class Optimizer:
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
         # solver_list = ['ConjugateGradient']
-        maximum_number_of_solver_iterations = 256
+        minimum_number_of_solver_iterations = 256
+        maximum_number_of_solver_iterations = 2048
         residual_norm_functions = \
             self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level+1, self.max_level,
                                                                            solver_list,
+                                                                           minimum_number_of_solver_iterations,
                                                                            maximum_number_of_solver_iterations)
         for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
             solver_program += residual_norm_function

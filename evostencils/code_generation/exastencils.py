@@ -237,8 +237,7 @@ class ProgramGenerator:
             if self._counter < 5:
                 timeout = 1.5 * timeout - self._counter * self._average_generation_time
         try:
-            # timeout = min(self.timeout_exastencils_compiler, timeout)
-            timeout = self.timeout_exastencils_compiler
+            timeout = min(self.timeout_exastencils_compiler, timeout)
             result = subprocess.run(['java', '-cp',
                                      self.absolute_compiler_path, 'Main',
                                      f'{self.base_path}/{settings_path}',
@@ -319,9 +318,11 @@ class ProgramGenerator:
         returncode = self.run_c_compiler(self._output_path_generated)
         if returncode != 0:
             return infinity, infinity, infinity
-        runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated,
-                                                                          infinity, number_of_samples)
-        return runtime, convergence_factor, number_of_iterations
+        try:
+            runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated, infinity, number_of_samples)
+            return runtime, convergence_factor, number_of_iterations
+        except subprocess.TimeoutExpired:
+            return infinity, infinity, infinity
 
     @staticmethod
     def parse_output(output: str, infinity: float):
@@ -498,7 +499,7 @@ class ProgramGenerator:
                             if grid.level < max_level:
                                 program += f'\tgen_rhs_{self.fields[i]}@{grid.level} = {source_field.to_exa()}\n'
                         krylov_subspace_operator = correction.operand1
-                        program += f'\t{krylov_subspace_operator.name}@{level}()\n'
+                        program += f'\t{krylov_subspace_operator.name}_{krylov_subspace_operator.number_of_iterations}@{level}()\n'
                         self.set_solver_valid(level, krylov_subspace_operator.name,
                                               krylov_subspace_operator.number_of_iterations)
                     elif isinstance(correction.operand1, base.Inverse):
@@ -806,19 +807,22 @@ class ProgramGenerator:
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
         krylov_solver_function, residual_norm_function = \
             self.extract_krylov_subspace_method_from_layer3_file(layer3_file_path, level)
-        krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', solver_type)
+        krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', f'{solver_type}_{number_of_solver_iterations}')
         return krylov_solver_function, residual_norm_function
 
-    def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, number_of_solver_iterations):
+    def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, minimum_number_of_solver_iterations=64, maximum_number_of_solver_iterations=1024):
         self._field_declaration_cache.clear()
         residual_norm_functions = []
         for level in range(min_level, max_level + 1):
             for i, solver_type in enumerate(solver_list):
-                krylov_solver_function, residual_norm_function = \
-                        self.generate_krylov_subspace_method(level, max_level, solver_type, number_of_solver_iterations)
-                self.add_solver_to_cache(level, solver_type, number_of_solver_iterations, krylov_solver_function)
-                if i == 0:
-                    residual_norm_functions.append(residual_norm_function)
+                j = minimum_number_of_solver_iterations
+                while j <= maximum_number_of_solver_iterations:
+                    krylov_solver_function, residual_norm_function = \
+                            self.generate_krylov_subspace_method(level, max_level, solver_type, j)
+                    self.add_solver_to_cache(level, solver_type, j, krylov_solver_function)
+                    if i == 0:
+                        residual_norm_functions.append(residual_norm_function)
+                    j *= 2
         return residual_norm_functions
 
 
