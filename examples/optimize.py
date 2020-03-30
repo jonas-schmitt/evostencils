@@ -46,7 +46,6 @@ def main():
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
-
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
@@ -104,7 +103,7 @@ def main():
     restart_from_checkpoint = False
     levels_per_run = max_level - min_level
     required_convergence = 0.9
-    maximum_block_size = 4
+    maximum_block_size = 8
     optimization_method = optimizer.NSGAIII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAIII":
@@ -121,7 +120,7 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=128, gp_lambda=128,
+                                                               gp_mu=64, gp_lambda=64,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,

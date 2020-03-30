@@ -390,16 +390,24 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(1.0, TypeWrapper(float))
     omega_min = 0.0
     omega_max = 2.0
-    number_of_values = 64
-    step_size = (omega_max - omega_min) / number_of_values
-    for i in range(1, number_of_values + 1):
+    number_of_steps = 64
+    step_size = (omega_max - omega_min) / number_of_steps
+    for i in range(1, number_of_steps + 1):
         pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
 
     # number of Krylov subspace method iterations
+
+    """
+    pset.addTerminal(8, TypeWrapper(int))
+    pset.addTerminal(16, TypeWrapper(int))
+    pset.addTerminal(32, TypeWrapper(int))
+    """
+    pset.addTerminal(32, TypeWrapper(int))
+    pset.addTerminal(64, TypeWrapper(int))
+    pset.addTerminal(128, TypeWrapper(int))
     pset.addTerminal(256, TypeWrapper(int))
     pset.addTerminal(512, TypeWrapper(int))
     pset.addTerminal(1024, TypeWrapper(int))
-    pset.addTerminal(2048, TypeWrapper(int))
 
     # Block sizes
     block_sizes = []
@@ -419,9 +427,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-        pset.addTerminal(block_size_permutation, types.BlockSize)
-        # if number_of_terms <= maximum_number_of_generatable_terms:
-        #     pset.addTerminal(block_size_permutation, types.BlockSize)
+        if number_of_terms <= maximum_number_of_generatable_terms:
+            pset.addTerminal(block_size_permutation, types.BlockSize)
     add_cycle(pset, terminals, types, 0, coarsest)
 
     terminal_list = [terminals]

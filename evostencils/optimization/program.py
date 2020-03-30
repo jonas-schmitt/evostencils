@@ -54,7 +54,7 @@ class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  convergence_evaluator, performance_evaluator=None,
                  program_generator=None, mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
-                 epsilon=1e-10, infinity=1e300, checkpoint_directory_path='./'):
+                 epsilon=1e-12, infinity=1e300, checkpoint_directory_path='./'):
         assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
@@ -380,9 +380,9 @@ class Optimizer:
             expression = expression1
             time, convergence_factor, number_of_iterations = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                     solver_program, infinity=self.infinity,
-                    number_of_samples=5)
+                    number_of_samples=1)
             fitness = time,
-            if number_of_iterations == 100 or convergence_factor > 1:
+            if number_of_iterations >= 100 or convergence_factor > 1:
                 fitness = convergence_factor * math.sqrt(self.infinity),
             self.add_individual_to_cache(individual, fitness)
             return fitness
@@ -749,8 +749,8 @@ class Optimizer:
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
         # solver_list = ['ConjugateGradient']
-        minimum_number_of_solver_iterations = 256
-        maximum_number_of_solver_iterations = 2048
+        minimum_number_of_solver_iterations = 32
+        maximum_number_of_solver_iterations = 1024
         residual_norm_functions = \
             self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level+1, self.max_level,
                                                                            solver_list,

@@ -34,7 +34,7 @@ class ProgramGenerator:
         self._average_generation_time = 0
         self._counter = 0
         self.timeout_copy_file = 60
-        self.timeout_evaluate = 600
+        self.timeout_evaluate = 300
         self.timeout_exastencils_compiler = 300
         self.timeout_c_compiler = 180
         self._absolute_compiler_path = absolute_compiler_path
@@ -327,22 +327,25 @@ class ProgramGenerator:
     @staticmethod
     def parse_output(output: str, infinity: float):
         lines = output.splitlines()
-        convergence_factor = 1
+        convergence_factors = []
         count = 0
         for line in lines:
             if 'convergence factor' in line:
                 tmp = line.split('convergence factor is ')
                 rho = float(tmp[-1])
                 if not math.isinf(rho) and not math.isnan(rho):
-                    convergence_factor *= rho
-                    count += 1
-        if count > 0:
-            convergence_factor = math.pow(convergence_factor, 1/count)
+                    convergence_factors.append(rho)
+        convergence_factor = 1
+        if len(convergence_factors) > 0:
+            exponent = 1.0/len(convergence_factors)
+            for rho in convergence_factors:
+                convergence_factor *= math.pow(rho, exponent)
         else:
             convergence_factor = infinity
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
         number_of_iterations = len(lines) - 3
+        print(convergence_factor, flush=True)
         return time_to_solution, convergence_factor, number_of_iterations
 
     def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
@@ -820,7 +823,7 @@ class ProgramGenerator:
                     krylov_solver_function, residual_norm_function = \
                             self.generate_krylov_subspace_method(level, max_level, solver_type, j)
                     self.add_solver_to_cache(level, solver_type, j, krylov_solver_function)
-                    if i == 0:
+                    if i == 0 and j == minimum_number_of_solver_iterations:
                         residual_norm_functions.append(residual_norm_function)
                     j *= 2
         return residual_norm_functions
