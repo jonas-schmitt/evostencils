@@ -380,7 +380,7 @@ class Optimizer:
             expression = expression1
             time, convergence_factor, number_of_iterations = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                     solver_program, infinity=self.infinity,
-                    number_of_samples=1)
+                    number_of_samples=5)
             fitness = time,
             if number_of_iterations >= 100 or convergence_factor > 1:
                 fitness = convergence_factor * math.sqrt(self.infinity),
@@ -403,7 +403,8 @@ class Optimizer:
             time, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
-                                                              number_of_samples=3)
+                                                              number_of_samples=5)
+
             values = convergence_factor, time / iterations
             self.add_individual_to_cache(individual, values)
             return values

@@ -345,7 +345,6 @@ class ProgramGenerator:
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
         number_of_iterations = len(lines) - 3
-        print(convergence_factor, flush=True)
         return time_to_solution, convergence_factor, number_of_iterations
 
     def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
