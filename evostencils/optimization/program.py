@@ -52,10 +52,10 @@ def load_checkpoint_from_file(filename):
 
 class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
-                 convergence_evaluator, performance_evaluator=None,
-                 program_generator=None, mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
+                 program_generator, convergence_evaluator=None, performance_evaluator=None,
+                 mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
                  epsilon=1e-12, infinity=1e300, checkpoint_directory_path='./'):
-        assert convergence_evaluator is not None, "At least a convergence evaluator must be available"
+        assert program_generator is not None, "At least a program generator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
         solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
@@ -725,7 +725,7 @@ class Optimizer:
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
                                   required_convergence=0.9,
-                                  restart_from_checkpoint=False, maximum_block_size=3, optimization_method=None):
+                                  restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None):
 
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
@@ -734,6 +734,7 @@ class Optimizer:
             approximations.append(system.get_coarse_approximation(approximations[-1], self.coarsening_factors))
             right_hand_sides.append(system.get_coarse_rhs(right_hand_sides[-1], self.coarsening_factors))
         best_expression = None
+        best_individual = None
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         solver_program = ""
@@ -837,13 +838,17 @@ class Optimizer:
                     if time < best_time and \
                             ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
                         best_expression = expression
+                        best_individual = individual
                         best_time = time
                         best_convergence_factor = convergence_factor
 
             except (KeyboardInterrupt, Exception) as e:
                 raise e
             self.mpi_comm.barrier()
-            print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}", flush=True)
+            print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}",
+                  flush=True)
+            with open('grammar_tree.txt', 'w') as file:
+                file.write(str(best_individual))
 
             relaxation_factors, improved_convergence_factor = \
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
@@ -881,6 +886,46 @@ class Optimizer:
         except (KeyboardInterrupt, Exception) as e:
             raise e
         return best_weights, time_to_solution
+
+    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
+        solver_program = ''
+
+        approximation = self.approximation
+        rhs = self.rhs
+        storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
+        solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
+        minimum_number_of_solver_iterations = 32
+        maximum_number_of_solver_iterations = 1024
+        residual_norm_functions = \
+            self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
+                                                                           solver_list,
+                                                                           minimum_number_of_solver_iterations,
+                                                                           maximum_number_of_solver_iterations)
+        for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
+            solver_program += residual_norm_function
+            solver_program += '\n'
+        levels = self.max_level - self.min_level
+        pset, _ = \
+            multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
+                                                            self.coarsening_factors, self.max_level, self.equations,
+                                                            self.operators, self.fields,
+                                                            maximum_block_size=maximum_block_size,
+                                                            depth=levels,
+                                                            LevelFinishedType=self._FinishedType,
+                                                            LevelNotFinishedType=self._NotFinishedType)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
+        expression, _ = eval(grammar_string, pset.context, {})
+        time_to_solution, convergence_factor, number_of_iterations = \
+            self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
+                                                          solver_program, infinity=self.infinity,
+                                                          number_of_samples=20)
+
+        print(f'Time: {time_to_solution}, '
+              f'Convergence factor: {convergence_factor}, '
+              f'Number of Iterations: {number_of_iterations}', flush=True)
+        cycle_function = self.program_generator.generate_cycle_function(expression, storages, self.min_level,
+                                                                        self.max_level, self.max_level)
+        return cycle_function
 
     @staticmethod
     def visualize_tree(individual, filename):
