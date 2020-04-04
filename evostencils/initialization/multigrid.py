@@ -2,6 +2,7 @@ from evostencils.expressions import base
 from evostencils.expressions import system
 from evostencils.expressions import partitioning as part
 from evostencils.expressions import smoother
+from evostencils.expressions import krylov_subspace
 from evostencils.expressions.base import ConstantStencilGenerator
 from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
@@ -284,18 +285,57 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
     pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
 
-    if not coarsest:
+    def krylov_subspace_iteration(generate_krylov_subspace_method, cycle, number_of_krylov_iterations):
+        assert isinstance(cycle.correction, base.Residual), 'Invalid production'
+        approximation = cycle.approximation
+        rhs = cycle.rhs
+        krylov_subspace_operator = generate_krylov_subspace_method(cycle.correction.operator, number_of_krylov_iterations)
+        correction = base.Multiplication(krylov_subspace_operator, cycle.correction)
+        return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning,
+                                  predecessor=cycle.predecessor), 1.0)
 
+    def conjugate_gradient(cycle, number_of_iterations):
+        return krylov_subspace_iteration(krylov_subspace.generate_conjugate_gradient, cycle, number_of_iterations)
+
+    def bicgstab(cycle, number_of_iterations):
+        return krylov_subspace_iteration(krylov_subspace.generate_bicgstab, cycle, number_of_iterations)
+
+    def minres(cycle, number_of_iterations):
+        return krylov_subspace_iteration(krylov_subspace.generate_minres, cycle, number_of_iterations)
+
+    def conjugate_residual(cycle, number_of_iterations):
+        return krylov_subspace_iteration(krylov_subspace.generate_conjugate_residual, cycle, number_of_iterations)
+
+    pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_gradient_{level}")
+    pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_gradient_{level}")
+    pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"bicgstab_{level}")
+    pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"bicgstab_{level}")
+
+    pset.addPrimitive(minres, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"minres_{level}")
+    pset.addPrimitive(minres, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"minres_{level}")
+
+    pset.addPrimitive(conjugate_residual, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_residual_{level}")
+    pset.addPrimitive(conjugate_residual, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_residual_{level}")
+
+    if not coarsest:
         pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
-                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
-                          f"coarse_cycle_{level}")
+                [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
+                multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
+                f"coarse_cycle_{level}")
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
-                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
-                          f"coarse_cycle_{level}")
+                [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
+                multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
+                f"coarse_cycle_{level}")
 
     else:
         def solve(cgs, interpolation, cycle):
@@ -348,12 +388,26 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
     # Relaxation Factors
     pset.addTerminal(1.0, TypeWrapper(float))
-    omega_min = 1/3
-    omega_max = 5/3
-    number_of_values = 32
-    step_size = (omega_max - omega_min) / number_of_values
-    for i in range(0, number_of_values + 1):
+    omega_min = 0.0
+    omega_max = 2.0
+    number_of_steps = 64
+    step_size = (omega_max - omega_min) / number_of_steps
+    for i in range(1, number_of_steps + 1):
         pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
+
+    # number of Krylov subspace method iterations
+
+    """
+    pset.addTerminal(8, TypeWrapper(int))
+    pset.addTerminal(16, TypeWrapper(int))
+    pset.addTerminal(32, TypeWrapper(int))
+    """
+    pset.addTerminal(32, TypeWrapper(int))
+    pset.addTerminal(64, TypeWrapper(int))
+    pset.addTerminal(128, TypeWrapper(int))
+    pset.addTerminal(256, TypeWrapper(int))
+    pset.addTerminal(512, TypeWrapper(int))
+    pset.addTerminal(1024, TypeWrapper(int))
 
     # Block sizes
     block_sizes = []

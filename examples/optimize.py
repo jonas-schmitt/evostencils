@@ -45,6 +45,10 @@ def main():
     # 2D Finite difference discretized linear elasticity
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
+
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
     mpi_rank = comm.Get_rank()
@@ -83,7 +87,7 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e300
-    epsilon = 1e-14
+    epsilon = 1e-12
     problem_name = program_generator.problem_name
 
     if not os.path.exists(f'{cwd}/{problem_name}'):
@@ -97,9 +101,9 @@ def main():
 
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
-    levels_per_run = 4
+    levels_per_run = max_level - min_level
     required_convergence = 0.9
-    maximum_block_size = 3
+    maximum_block_size = 8
     optimization_method = optimizer.NSGAIII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAIII":
@@ -116,7 +120,7 @@ def main():
 
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=128, gp_lambda=128,
+                                                               gp_mu=64, gp_lambda=64,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
