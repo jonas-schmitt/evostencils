@@ -252,6 +252,7 @@ class ProgramGenerator:
         total_time = 0
         sum_of_convergence_factors = 0
         number_of_iterations = None
+        count = 0
         for i in range(number_of_samples):
             result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
@@ -263,7 +264,10 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
-        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations
+            count += 1
+            if total_time > 5000:
+                break
+        return total_time / count, sum_of_convergence_factors / count, number_of_iterations
 
     def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=100):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
