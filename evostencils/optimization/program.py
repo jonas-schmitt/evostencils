@@ -904,7 +904,8 @@ class Optimizer:
         approximation = self.approximation
         rhs = self.rhs
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        solver_list = [solver for solver in krylov_subspace_methods if solver in grammar_string]
+        # solver_list = [solver for solver in krylov_subspace_methods if solver in grammar_string]
+        solver_list = krylov_subspace_methods
         iteration_list = (2**i for i in range(int(math.log2(minimum_solver_iterations)),
                                               int(math.log2(maximum_solver_iterations))))
         tmp = minimum_solver_iterations
@@ -940,24 +941,30 @@ class Optimizer:
                                                             maximum_solver_iterations=maximum_solver_iterations)
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
         expression, _ = eval(grammar_string, pset.context, {})
+        initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
+        relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
                                                           number_of_samples=20)
 
+        print(f'Time: {time_to_solution}, '
+              f'Convergence factor: {convergence_factor}, '
+              f'Number of Iterations: {number_of_iterations}', flush=True)
         if optimize_relaxation_factors:
             relaxation_factors, _ = \
                 self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program,
                                                  storages, time_to_solution)
             relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
             time_to_solution, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                               solver_program, infinity=self.infinity,
                                                               number_of_samples=20)
+            print(f'Time: {time_to_solution}, '
+                  f'Convergence factor: {convergence_factor}, '
+                  f'Number of Iterations: {number_of_iterations}', flush=True)
 
-        print(f'Time: {time_to_solution}, '
-              f'Convergence factor: {convergence_factor}, '
-              f'Number of Iterations: {number_of_iterations}', flush=True)
         cycle_function = self.program_generator.generate_cycle_function(expression, storages, self.min_level,
                                                                         self.max_level, self.max_level)
         return cycle_function
@@ -974,60 +981,6 @@ class Optimizer:
             n = g.get_node(i)
             n.attr["label"] = labels[i]
         g.draw(f"{filename}.png", "png")
-
-    @staticmethod
-    def plot_multiobjective_data(generations, convergence_data, runtime_data, label1, label2):
-        from matplotlib.ticker import MaxNLocator
-        import matplotlib.pyplot as plt
-
-        fig, ax1 = plt.subplots()
-        line1 = ax1.plot(generations, convergence_data, "b-", label=f"{label1}")
-        ax1.set_xlabel("Generation")
-        ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax1.set_ylabel("Spectral Radius", color="b")
-        for tl in ax1.get_yticklabels():
-            tl.set_color("b")
-
-        ax2 = ax1.twinx()
-        line2 = ax2.plot(generations, runtime_data, "r-", label=f"{label2}")
-        ax2.set_ylabel("Runtime per Iteration", color="r")
-        for tl in ax2.get_yticklabels():
-            tl.set_color("r")
-
-        lns = line1 + line2
-        labs = [l.get_label() for l in lns]
-        ax1.legend(lns, labs, loc="top right")
-
-        plt.show()
-
-    @staticmethod
-    def plot_minimum_fitness(logbook):
-        gen = logbook.select("gen")
-        convergence_mins = logbook.chapters["spectral_radius"].select("min")
-        runtime_mins = logbook.chapters["runtime"].select("min")
-        Optimizer.plot_multiobjective_data(gen, convergence_mins, runtime_mins, 'Minimum Spectral Radius',
-                                           'Minimum Runtime per Iteration')
-
-    @staticmethod
-    def plot_average_fitness(logbook):
-        gen = logbook.select("gen")
-        convergence_avgs = logbook.chapters["spectral_radius"].select("avg")
-        runtime_avgs = logbook.chapters["runtime"].select("avg")
-        Optimizer.plot_multiobjective_data(gen, convergence_avgs, runtime_avgs, 'Average Spectral Radius',
-                                           'Average Runtime per Iteration')
-
-    @staticmethod
-    def plot_pareto_front(pop):
-        import matplotlib.pyplot as plt
-        import numpy
-        pop.sort(key=lambda x: x.fitness.values)
-
-        front = numpy.array([ind.fitness.values for ind in pop])
-        plt.scatter(front[:, 0], front[:, 1], c="b")
-        plt.xlabel("Spectral Radius")
-        plt.ylabel("Runtime per Iteration")
-        plt.axis("tight")
-        plt.show()
 
     @staticmethod
     def dump_data_structure(data_structure, file_name):
