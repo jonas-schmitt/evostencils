@@ -887,7 +887,7 @@ class Optimizer:
             raise e
         return best_weights, time_to_solution
 
-    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
+    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size, optimize_relaxation_factors=True):
         solver_program = ''
 
         approximation = self.approximation
@@ -916,9 +916,17 @@ class Optimizer:
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
         expression, _ = eval(grammar_string, pset.context, {})
         time_to_solution, convergence_factor, number_of_iterations = \
-            self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
+                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
                                                           number_of_samples=20)
+
+
+        if optimize_relaxation_factors:
+            relaxation_factors, _ = \
+                    self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program, storages, time_to_solution)
+            relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
+            time_to_solution, convergence_factor, number_of_iterations = \
+                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level, solver_program, infinity=self.infinity, number_of_samples=20)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
