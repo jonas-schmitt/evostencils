@@ -5,9 +5,9 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import lfa_lab
 import sys
-import dill
+# import dill
 from mpi4py import MPI
-MPI.pickle.__init__(dill.dumps, dill.loads)
+# MPI.pickle.__init__(dill.dumps, dill.loads)
 
 
 def main():
@@ -117,7 +117,9 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-
+    minimum_solver_iterations = 8
+    maximum_solver_iterations = 1024
+    krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
                                                                gp_mu=64, gp_lambda=64,
@@ -126,7 +128,10 @@ def main():
                                                                gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                required_convergence=required_convergence,
-                                                               restart_from_checkpoint=restart_from_checkpoint)
+                                                               restart_from_checkpoint=restart_from_checkpoint,
+                                                               krylov_subspace_methods=krylov_subspace_methods,
+                                                               minimum_solver_iterations=minimum_solver_iterations,
+                                                               maximum_solver_iterations=maximum_solver_iterations)
     
     if mpi_rank == 0:
         print(f'ExaSlang representation:\n{program}\n', flush=True)

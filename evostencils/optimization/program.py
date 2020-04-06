@@ -725,7 +725,11 @@ class Optimizer:
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
                                   required_convergence=0.9,
-                                  restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None):
+                                  restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
+                                  krylov_subspace_methods=('ConjugateGradient', 'BiCGStab', 'MinRes',
+                                                           'ConjugateResidual'),
+                                  minimum_solver_iterations=8, maximum_solver_iterations=1024):
+        assert minimum_solver_iterations < maximum_solver_iterations, 'Invalid range of solver iterations'
 
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
@@ -749,15 +753,11 @@ class Optimizer:
         pops = []
         logbooks = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
-        # solver_list = ['ConjugateGradient']
-        minimum_number_of_solver_iterations = 32
-        maximum_number_of_solver_iterations = 1024
         residual_norm_functions = \
-            self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level+1, self.max_level,
-                                                                           solver_list,
-                                                                           minimum_number_of_solver_iterations,
-                                                                           maximum_number_of_solver_iterations)
+            self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
+                                                                           krylov_subspace_methods,
+                                                                           minimum_solver_iterations,
+                                                                           maximum_solver_iterations)
         for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
             solver_program += residual_norm_function
             solver_program += '\n'
@@ -786,7 +786,10 @@ class Optimizer:
                                                                 maximum_block_size=maximum_block_size,
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
-                                                                LevelNotFinishedType=self._NotFinishedType)
+                                                                LevelNotFinishedType=self._NotFinishedType,
+                                                                krylov_subspace_methods=krylov_subspace_methods,
+                                                                minimum_solver_iterations=minimum_solver_iterations,
+                                                                maximum_solver_iterations=maximum_solver_iterations)
 
             self._init_toolbox(pset)
             tmp = None
@@ -861,7 +864,8 @@ class Optimizer:
                                                               number_of_samples=20)
             best_expression.runtime = best_time / number_of_iterations * 1e-3
             self.mpi_comm.barrier()
-            print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}", flush=True)
+            print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
+                  flush=True)
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, self.min_level,
                                                                             max_level, self.max_level)
             solver_program += cycle_function
@@ -887,20 +891,38 @@ class Optimizer:
             raise e
         return best_weights, time_to_solution
 
-    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size, optimize_relaxation_factors=True):
+    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size,
+                                                                  optimize_relaxation_factors=True,
+                                                                  krylov_subspace_methods=('ConjugateGradient',
+                                                                                           'BiCGStab', 'MinRes',
+                                                                                           'ConjugateResidual'),
+                                                                  minimum_solver_iterations=8,
+                                                                  maximum_solver_iterations=1024):
+        assert minimum_solver_iterations < maximum_solver_iterations, 'Invalid range of solver iterations'
         solver_program = ''
 
         approximation = self.approximation
         rhs = self.rhs
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        solver_list = ['ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual']
-        minimum_number_of_solver_iterations = 32
-        maximum_number_of_solver_iterations = 1024
+        solver_list = [solver for solver in krylov_subspace_methods if solver in grammar_string]
+        iteration_list = (2**i for i in range(int(math.log2(minimum_solver_iterations)),
+                                              int(math.log2(maximum_solver_iterations))))
+        tmp = minimum_solver_iterations
+        minimum_solver_iterations = maximum_solver_iterations
+        maximum_solver_iterations = tmp
+
+        for i in iteration_list:
+            if str(i) in grammar_string:
+                if i < minimum_solver_iterations:
+                    minimum_solver_iterations = i
+                if i > maximum_solver_iterations:
+                    maximum_solver_iterations = i
+
         residual_norm_functions = \
             self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
                                                                            solver_list,
-                                                                           minimum_number_of_solver_iterations,
-                                                                           maximum_number_of_solver_iterations)
+                                                                           minimum_solver_iterations,
+                                                                           maximum_solver_iterations)
         for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
             solver_program += residual_norm_function
             solver_program += '\n'
@@ -912,21 +934,26 @@ class Optimizer:
                                                             maximum_block_size=maximum_block_size,
                                                             depth=levels,
                                                             LevelFinishedType=self._FinishedType,
-                                                            LevelNotFinishedType=self._NotFinishedType)
+                                                            LevelNotFinishedType=self._NotFinishedType,
+                                                            krylov_subspace_methods=krylov_subspace_methods,
+                                                            minimum_solver_iterations=minimum_solver_iterations,
+                                                            maximum_solver_iterations=maximum_solver_iterations)
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
         expression, _ = eval(grammar_string, pset.context, {})
         time_to_solution, convergence_factor, number_of_iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
+            self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
                                                           number_of_samples=20)
 
-
         if optimize_relaxation_factors:
             relaxation_factors, _ = \
-                    self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program, storages, time_to_solution)
+                self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program,
+                                                 storages, time_to_solution)
             relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
             time_to_solution, convergence_factor, number_of_iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level, solver_program, infinity=self.infinity, number_of_samples=20)
+                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
+                                                              solver_program, infinity=self.infinity,
+                                                              number_of_samples=20)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '

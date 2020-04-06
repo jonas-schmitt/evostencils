@@ -1,17 +1,9 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.evaluation.convergence import ConvergenceEvaluator
-from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-import lfa_lab
-import sys
-import dill
-from mpi4py import MPI
-MPI.pickle.__init__(dill.dumps, dill.loads)
 
 
 def main():
-
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
@@ -73,7 +65,13 @@ def main():
     maximum_block_size = 8
     with open('grammar_tree.txt', 'r') as file:
         grammar_string = file.read()
-    optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
+    minimum_solver_iterations = 8
+    maximum_solver_iterations = 1024
+    krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
+    optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size,
+                                                                        krylov_subspace_methods=krylov_subspace_methods,
+                                                                        minimum_solver_iterations=minimum_solver_iterations,
+                                                                        maximum_solver_iterations=maximum_solver_iterations)
 
 
 if __name__ == "__main__":

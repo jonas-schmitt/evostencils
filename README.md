@@ -10,18 +10,18 @@ cd exastencils
 sbt compile
 sbt assembly
 ```
-2. Install LFA Lab  
-  Follow these instructions: https://hrittich.github.io/lfa-lab/install.html  
-3. Install required Python packages
+2. Install required Python packages
 ```
-pip install deap sympy mpi4py dill
+pip install deap sympy mpi4py
 ```
-3. Set up the environment  
+3. Install LFA Lab (optional)
+  Follow these instructions: https://hrittich.github.io/lfa-lab/install.html 
+4. Set up the environment
 ```
 source ./setup.sh
 ```
 ## Running
-An example script can be found in the examples folder. The Poisson examples from layer 2 should work without any further adaption.
+An example script for running an optimization can be found in the examples folder.
 
 ## Publications
     Schmitt J., Kuckuk S., Köstler H.:
