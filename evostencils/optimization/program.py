@@ -790,7 +790,10 @@ class Optimizer:
                                                                 krylov_subspace_methods=krylov_subspace_methods,
                                                                 minimum_solver_iterations=minimum_solver_iterations,
                                                                 maximum_solver_iterations=maximum_solver_iterations)
-
+            # operator = terminal_list[0].operator
+            # lfa_expression = self.convergence_evaluator.transform(operator)
+            # eigenvalues = self.convergence_evaluator.compute_eigenvalues(lfa_expression._entries[0][0])
+            # self.convergence_evaluator.plot_symbol(lfa_expression._entries[0][0])
             self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
@@ -928,7 +931,7 @@ class Optimizer:
             solver_program += residual_norm_function
             solver_program += '\n'
         levels = self.max_level - self.min_level
-        pset, _ = \
+        pset, terminal_list = \
             multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
                                                             self.coarsening_factors, self.max_level, self.equations,
                                                             self.operators, self.fields,

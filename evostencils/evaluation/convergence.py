@@ -193,3 +193,14 @@ class ConvergenceEvaluator:
         except (ArithmeticError, RuntimeError, MemoryError) as _:
             return 0.0
 
+    @staticmethod
+    def plot_symbol(lfa_operator):
+        import matplotlib.pyplot as mpp
+        lfa_lab.plot.plot_2d(lfa_operator)
+        mpp.show()
+
+    @staticmethod
+    def compute_eigenvalues(lfa_operator):
+        symbol = lfa_operator.symbol()
+        eigenvalues = symbol.eigenvalues()
+        return eigenvalues

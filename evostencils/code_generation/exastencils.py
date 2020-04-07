@@ -319,8 +319,11 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        returncode = self.run_c_compiler(self._output_path_generated)
-        if returncode != 0:
+        try:
+            returncode = self.run_c_compiler(self._output_path_generated)
+            if returncode != 0:
+                return infinity, infinity, infinity
+        except subprocess.TimeoutExpired:
             return infinity, infinity, infinity
         try:
             runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated, infinity, number_of_samples)
