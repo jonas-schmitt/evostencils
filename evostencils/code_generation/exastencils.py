@@ -335,15 +335,20 @@ class ProgramGenerator:
     def parse_output(output: str, infinity: float):
         lines = output.splitlines()
         convergence_factors = []
+        rho_inf = math.sqrt(infinity)
         count = 0
         for line in lines:
             if 'convergence factor' in line:
                 tmp = line.split('convergence factor is ')
                 rho = float(tmp[-1])
-                if not math.isinf(rho) and not math.isnan(rho):
+                if math.isinf(rho) or math.isnan(rho):
+                    convergence_factors.append(rho_inf)
+                else:
                     convergence_factors.append(rho)
+                    count += 1
+
         convergence_factor = 1
-        if len(convergence_factors) > 0:
+        if count > 0:
             exponent = 1.0/len(convergence_factors)
             for rho in convergence_factors:
                 convergence_factor *= math.pow(rho, exponent)

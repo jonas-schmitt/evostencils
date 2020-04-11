@@ -332,7 +332,7 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             else:
-                values = spectral_radius * math.sqrt(self.infinity),
+                values = spectral_radius * self.infinity**0.25,
                 self.add_individual_to_cache(individual, values)
                 return values
 
@@ -378,12 +378,13 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
-            time, convergence_factor, number_of_iterations = self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                    solver_program, infinity=self.infinity,
-                    number_of_samples=5)
-            fitness = time,
-            if number_of_iterations >= 100 or convergence_factor > 1:
-                fitness = convergence_factor * math.sqrt(self.infinity),
+            time_to_convergence, convergence_factor, number_of_iterations = \
+                self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
+                                                              solver_program, infinity=self.infinity,
+                                                              number_of_samples=5)
+            fitness = time_to_convergence,
+            if number_of_iterations >= 128 or convergence_factor > 1:
+                fitness = convergence_factor * self.infinity**0.25,
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -400,12 +401,12 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
-            time, convergence_factor, iterations = \
+            time_to_convergence, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
                                                               number_of_samples=5)
 
-            values = convergence_factor, time / iterations
+            values = convergence_factor, time_to_convergence / iterations
             self.add_individual_to_cache(individual, values)
             return values
 
@@ -806,7 +807,7 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
 
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
             if optimization_method is None:
                 optimization_method = self.NSGAIII
             self.clear_individual_cache()
@@ -818,7 +819,7 @@ class Optimizer:
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
             try:
                 for j in range(0, min(len(hof), 100)):
                     individual = hof[j]
@@ -860,7 +861,7 @@ class Optimizer:
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
                                                  solver_program, storages, best_time)
             relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=100)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
             best_time, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
@@ -881,7 +882,7 @@ class Optimizer:
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         relaxation_factor_optimization.reset_status(expression)
         n = len(initial_weights)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=50)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=64)
         try:
             tmp = base_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
@@ -907,7 +908,6 @@ class Optimizer:
         approximation = self.approximation
         rhs = self.rhs
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        # solver_list = [solver for solver in krylov_subspace_methods if solver in grammar_string]
         solver_list = krylov_subspace_methods
         iteration_list = (2**i for i in range(int(math.log2(minimum_solver_iterations)),
                                               int(math.log2(maximum_solver_iterations))))
@@ -942,7 +942,7 @@ class Optimizer:
                                                             krylov_subspace_methods=krylov_subspace_methods,
                                                             minimum_solver_iterations=minimum_solver_iterations,
                                                             maximum_solver_iterations=maximum_solver_iterations)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
         expression, _ = eval(grammar_string, pset.context, {})
         initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
         relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
@@ -959,7 +959,7 @@ class Optimizer:
                 self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program,
                                                  storages, time_to_solution)
             relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=1000)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
             time_to_solution, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                               solver_program, infinity=self.infinity,

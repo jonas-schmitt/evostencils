@@ -117,10 +117,8 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    minimum_solver_iterations = 2**3
-    maximum_solver_iterations = 2**10
-    # minimum_solver_iterations = 2**8
-    # maximum_solver_iterations = 2**14
+    minimum_solver_iterations = 2**5
+    maximum_solver_iterations = 2**11
     krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     # krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
