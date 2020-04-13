@@ -396,8 +396,10 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
     # Relaxation Factors
     pset.addTerminal(1.0, TypeWrapper(float))
-    omega_min = 1.0/3.0
-    omega_max = 5.0/3.0
+    # omega_min = 1.0/3.0
+    # omega_min = 1.0/3.0
+    omega_max = 0.0
+    omega_max = 2.0
     number_of_steps = 64
     step_size = (omega_max - omega_min) / number_of_steps
     for i in range(1, number_of_steps + 1):

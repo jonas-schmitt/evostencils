@@ -842,8 +842,7 @@ class Optimizer:
                                   f'Convergence factor: {convergence_factor}, '
                                   f'Number of Iterations: {number_of_iterations}', flush=True)
 
-                    if time < best_time and \
-                            ((i == 0 and convergence_factor < 0.9) or convergence_factor < required_convergence):
+                    if time < best_time and number_of_iterations < 128 and convergence_factor < required_convergence:
                         best_expression = expression
                         best_individual = individual
                         best_time = time

@@ -102,7 +102,7 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = max_level - min_level
-    required_convergence = 0.9
+    required_convergence = 0.5
     maximum_block_size = 8
     optimization_method = optimizer.NSGAIII
     if len(sys.argv) > 1:
@@ -117,8 +117,8 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    minimum_solver_iterations = 2**5
-    maximum_solver_iterations = 2**11
+    minimum_solver_iterations = 2**7
+    maximum_solver_iterations = 2**14
     krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     # krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
