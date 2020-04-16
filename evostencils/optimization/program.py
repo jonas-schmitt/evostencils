@@ -853,8 +853,10 @@ class Optimizer:
             self.mpi_comm.barrier()
             print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}",
                   flush=True)
-            with open('grammar_tree.txt', 'w') as file:
-                file.write(str(best_individual))
+            with open('./grammar_tree.txt', 'w') as grammar_file:
+                grammar_file.write(str(best_individual))
+            print("Best individual:")
+            print(str(best_individual), flush=True)
 
             relaxation_factors, improved_convergence_factor = \
                 self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
