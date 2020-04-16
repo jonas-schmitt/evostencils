@@ -19,8 +19,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -46,8 +46,8 @@ def main():
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -117,13 +117,13 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    minimum_solver_iterations = 2**7
-    maximum_solver_iterations = 2**14
+    minimum_solver_iterations = 2**3
+    maximum_solver_iterations = 2**10
     krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     # krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=128, gp_lambda=128,
+                                                               gp_mu=64, gp_lambda=64,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
