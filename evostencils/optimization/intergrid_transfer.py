@@ -125,7 +125,8 @@ def optimize(iterations, program_generator: ProgramGenerator, max_level,
     toolbox = deap.base.Toolbox()
     toolbox.register("evaluate", evaluate)
     lambda_ = int(round((4 + 3 * log(problem_size)) * 2))
-    strategy = cma.Strategy(centroid=[1.0] * problem_size, sigma=0.5, lambda_=lambda_)
+    center = 1.0 * len(grid) * 2 / problem_size
+    strategy = cma.Strategy(centroid=[center] * problem_size, sigma=(center / 2), lambda_=lambda_)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", numpy.mean)
     stats.register("std", numpy.std)
