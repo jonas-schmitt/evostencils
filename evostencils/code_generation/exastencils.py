@@ -146,15 +146,15 @@ class ProgramGenerator:
         return self._settings_path_generated
 
     @staticmethod
-    def generate_global_weights(n: int):
+    def generate_global_weights(n: int, name='omega'):
         # Hack to change the weights after generation
         program = 'Globals {\n'
         for i in range(0, n):
-            program += f'\tVar omega_{i} : Real = 1.0\n'
+            program += f'\tVar {name}_{i} : Real = 1.0\n'
         program += '}\n'
         return program
 
-    def generate_global_weight_initializations(self, output_path, weights: List[float]):
+    def generate_global_weight_initializations(self, output_path, weights: List[float], name='omega'):
         # Hack to change the weights after generation
         weights = reversed(weights)
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
@@ -168,7 +168,7 @@ class ProgramGenerator:
         for line in lines:
             content += line
         for i, weight in enumerate(weights):
-            lines.append(f'\tomega_{i} = {weight};\n')
+            lines.append(f'\t{name}_{i} = {weight};\n')
             content += lines[-1]
         content += last_line
         with open(path_to_file, 'w') as file:
@@ -663,7 +663,7 @@ class ProgramGenerator:
             raise RuntimeError("Not implemented")
         return program
 
-    def generate_l3_file(self, min_level, max_level, program: str):
+    def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True):
         # TODO fix hacky solution
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
         output_file_path = \
@@ -677,7 +677,9 @@ class ProgramGenerator:
                     # TODO perform this check in a more accurate way
                     if ('Function gen_mgCycle@' in line and
                         any([f'Function gen_mgCycle@{level}' in line for level in range(min_level+1, max_level+1)]))\
-                            or 'Function InitFields' in line:
+                            or 'Function InitFields' in line or \
+                            (not include_restriction and 'gen_restriction' in line) or \
+                            (not include_prolongation and 'gen_prolongation' in line):
                         while line and line[0] is not '}':
                             line = input_file.readline()
                         line = input_file.readline()
@@ -793,7 +795,6 @@ class ProgramGenerator:
         return krylov_solver_function, residual_norm_function
 
     def add_solver_to_cache(self, level, solver_type: str, number_of_solver_iterations: int, program: str, valid=False):
-    # def add_solver_to_cache(self, level, solver_type: str, number_of_solver_iterations: int, program: str, valid=True):
         key = level, solver_type, number_of_solver_iterations
         self._solver_cache[key] = program, valid
 
@@ -808,7 +809,6 @@ class ProgramGenerator:
 
     def invalidate_solver_cache(self):
         self._solver_cache = {key: (value[0], False) for key, value in self._solver_cache.items()}
-        # self._solver_cache = {key: (value[0], True) for key, value in self._solver_cache.items()}
 
     def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
                                         number_of_solver_iterations: int):
@@ -838,6 +838,52 @@ class ProgramGenerator:
                         residual_norm_functions.append(residual_norm_function)
                     j *= 2
         return residual_norm_functions
+
+    @staticmethod
+    def generate_prolongation_operator(prolongation: base.Prolongation, level, parametrize=False, start_index=0):
+        program = ''
+        program += f'Operator {prolongation.name}@{level} from Stencil {{\n'
+        stencil = prolongation.generate_stencil()
+
+        def generate_stencil_entry(offset, value, k):
+            string = '['
+            for i, _ in enumerate(offset):
+                string += f'i{i}, '
+            string = string[:-2] + '] from ['
+            for i, o, in enumerate(offset):
+                string += f'0.5 * (i{i} + ({o})), '
+            if parametrize:
+                string = string[:-2] + f'] with stencil_weight_{start_index + k}'
+            else:
+                string = string[:-2] + f'] with {value}'
+            return string
+        for k, entry in enumerate(stencil.entries):
+            program += '\t' + generate_stencil_entry(*entry, k) + '\n'
+        program += '}\n'
+        return program
+
+    @staticmethod
+    def generate_restriction_operator(restriction: base.Restriction, level, parametrize=False, start_index=0):
+        program = ''
+        program += f'Operator {restriction.name}@{level} from Stencil {{\n'
+        stencil = restriction.generate_stencil()
+
+        def generate_stencil_entry(offset, value, k):
+            string = '['
+            for i, _ in enumerate(offset):
+                string += f'i{i}, '
+            string = string[:-2] + '] from ['
+            for i, o, in enumerate(offset):
+                string += f'2 * (i{i}) + ({o}), '
+            if parametrize:
+                string = string[:-2] + f'] with stencil_weight_{start_index + k}'
+            else:
+                string = string[:-2] + f'] with {value}'
+            return string
+        for k, entry in enumerate(stencil.entries):
+            program += '\t' + generate_stencil_entry(*entry, k) + '\n'
+        program += '}\n'
+        return program
 
 
 
