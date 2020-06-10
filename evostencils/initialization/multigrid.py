@@ -127,12 +127,13 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
 def generate_system_operator_from_l2_information(equations: [EquationInfo], operators: [OperatorInfo],
                                                  fields: [sympy.Symbol], level, grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
+    equations_on_level = list(filter(lambda x: x.level == level, equations))
     system_operators = []
     for op_info in operators_on_level:
         if op_info.operator_type != base.Restriction and op_info.operator_type != base.Prolongation:
             system_operators.append(op_info)
     entries = []
-    for equation in equations:
+    for equation in equations_on_level:
         row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, grid)
         entries.append(row_of_entries)
 
@@ -144,6 +145,7 @@ def generate_system_operator_from_l2_information(equations: [EquationInfo], oper
 def generate_operators_from_l2_information(equations: [EquationInfo], operators: [OperatorInfo],
                                            fields: [sympy.Symbol], level, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
+    equations_on_level = list(filter(lambda x: x.level == level, equations))
     restriction_operators = []
     prolongation_operators = []
     system_operators = []
@@ -165,7 +167,7 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     prolongation = system.Prolongation(f'P_{level}', list_of_prolongation_operators)
 
     entries = []
-    for equation in equations:
+    for equation in equations_on_level:
         row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, fine_grid)
         entries.append(row_of_entries)
 
@@ -307,7 +309,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     def conjugate_residual(cycle, number_of_iterations):
         return krylov_subspace_iteration(krylov_subspace.generate_conjugate_residual, cycle, number_of_iterations)
 
-    if 'ConjugateGradient' or 'CG' in krylov_subspace_methods:
+    if 'ConjugateGradient' in krylov_subspace_methods or 'CG' in krylov_subspace_methods:
         pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_gradient_{level}")
         pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],

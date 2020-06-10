@@ -1,6 +1,7 @@
 from evostencils.expressions import base, partitioning as part, system, transformations
 from evostencils.expressions import krylov_subspace
-from evostencils.initialization import multigrid, parser
+from evostencils.initialization import multigrid
+from evostencils.code_generation import parser
 import os
 import subprocess
 import math
@@ -30,7 +31,9 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
-                 mpi_rank=0, platform='linux'):
+                 mpi_rank=0, platform='linux', solution_equations=None):
+        if isinstance(solution_equations, str):
+            solution_equations = [solution_equations]
         self._average_generation_time = 0
         self._counter = 0
         self.timeout_copy_file = 60
@@ -53,7 +56,7 @@ class ProgramGenerator:
         self._output_path_generated = None
         self.run_exastencils_compiler()
         self._equations, self._operators, self._fields = \
-            parser.extract_l2_information(f'{base_path}/{self._debug_l3_path}', self.dimension)
+            parser.extract_l2_information(f'{base_path}/{self._debug_l3_path}', self.dimension, solution_equations)
         size = 2 ** self._max_level
         grid_size = tuple([size] * self.dimension)
         h = 1 / (2 ** self._max_level)

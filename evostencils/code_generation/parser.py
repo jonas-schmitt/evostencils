@@ -23,7 +23,7 @@ def parse_stencil_offsets(string: str, is_prolongation=False):
     return tuple(offsets)
 
 
-def extract_l2_information(file_path: str, dimension: int):
+def extract_l2_information(file_path: str, dimension: int, solution_equations=None):
     equations = []
     operators = []
     fields = []
@@ -63,18 +63,23 @@ def extract_l2_information(file_path: str, dimension: int):
                                                       operator_type)
                 operators.append(op_info)
             elif tokens[0] == 'Equation':
-                tmp = tokens[1].split('@')
-                eq_info = initialization.EquationInfo(tmp[0], int(tmp[1]), file.readline())
-                equations.append(eq_info)
+                equation_name, level = tokens[1].split('@')
+                eq_info = initialization.EquationInfo(equation_name, int(level), file.readline())
+                if solution_equations is None or equation_name in solution_equations:
+                    equations.append(eq_info)
                 file.readline()
             line = file.readline()
-    max_level = max(equations, key=lambda info: info.level).level
-    equations = [eq_info for eq_info in equations if eq_info.level == max_level]
+    assert len(equations) > 0 and len(operators) > 0, "No equations specified"
+    # max_level = max(equations, key=lambda info: info.level).level
+    # equations = [eq_info for eq_info in equations if eq_info.level == max_level]
     equations.sort(key=lambda info: info.name)
+    names_of_used_operators = set()
     for eq_info in equations:
         sympy_expr = eq_info.sympy_expr
         for symbol in sympy_expr.free_symbols:
-            if symbol.name not in (op_info.name for op_info in operators) and symbol not in fields:
+            if any(symbol.name == op_info.name and eq_info.level == op_info.level for op_info in operators):
+                names_of_used_operators.add(symbol.name + '@' + str(eq_info.level))
+            elif symbol not in fields:
                 fields.append(symbol)
     fields.sort(key=lambda s: s.name)
     for eq_info in equations:
@@ -93,8 +98,15 @@ def extract_l2_information(file_path: str, dimension: int):
             name = op_info.name
             tmp = name.split('_')
             field_name = tmp[-1]
-            op_info._associated_field = next(field for field in fields if field.name == field_name)
-    assert len(equations) == len(fields), 'The number of equations does not match with the number of fields'
+            try:
+                associated_field = next(field for field in fields if field.name == field_name)
+                op_info._associated_field = associated_field
+                names_of_used_operators.add(op_info.name + '@' + str(op_info.level))
+            except StopIteration as _:
+                pass
+    operators = [op_info for op_info in operators if op_info.name + '@' + str(op_info.level) in names_of_used_operators]
+
+    # assert len(equations) == len(fields), 'The number of equations does not match with the number of fields'
     return equations, operators, fields
 
 
