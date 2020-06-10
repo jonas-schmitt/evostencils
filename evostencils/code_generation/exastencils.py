@@ -31,7 +31,7 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
-                 mpi_rank=0, platform='linux', solution_equations=None):
+                 mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle"):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0
@@ -50,6 +50,7 @@ class ProgramGenerator:
             parser.extract_settings_information(base_path, settings_path)
         self._mpi_rank = mpi_rank
         self._platform = platform
+        self._cycle_name = cycle_name
         self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.knowledge'
         self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.settings'
         self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
@@ -208,7 +209,7 @@ class ProgramGenerator:
 
     def generate_cycle_function(self, expression: base.Expression, storages: List[CycleStorage], min_level: int, level,
                                 max_level: int, use_global_weights=False):
-        program = f'Function gen_mgCycle@{level} {{\n'
+        program = f'Function {self._cycle_name}@{level} {{\n'
         program += self.generate_multigrid(expression, storages, min_level, max_level, use_global_weights)
         program += '}\n\n'
         for key, value in self._solver_cache.items():
@@ -644,7 +645,7 @@ class ProgramGenerator:
                     else:
                         solution_field = self.get_solution_field(storages, i, grid.level, max_level)
                         program += f'\t{solution_field.to_exa()} = 0\n'
-                program += f'\tgen_mgCycle@{level}()\n'
+                program += f'\t{self._cycle_name}@{level}()\n'
                 for i, grid in enumerate(expression.grid):
                     target_field = self.get_correction_field(storages, i, grid.level)
 
@@ -678,8 +679,8 @@ class ProgramGenerator:
                 line = input_file.readline()
                 while line:
                     # TODO perform this check in a more accurate way
-                    if ('Function gen_mgCycle@' in line and
-                        any([f'Function gen_mgCycle@{level}' in line for level in range(min_level+1, max_level+1)]))\
+                    if (f'Function {self._cycle_name}@' in line and
+                        any([f'Function {self._cycle_name}@{level}' in line for level in range(min_level+1, max_level+1)]))\
                             or 'Function InitFields' in line or \
                             (not include_restriction and 'gen_restriction' in line) or \
                             (not include_prolongation and 'gen_prolongation' in line):
@@ -770,7 +771,7 @@ class ProgramGenerator:
         with open(f'{self.base_path}/{layer3_file_path}', 'r') as input_file:
             line = input_file.readline()
             while line:
-                if f'Function gen_mgCycle@{level}' in line:
+                if f'Function {self._cycle_name}@{level}' in line:
                     block_count = 1
                     while line and block_count > 0:
                         if 'print' not in line:
@@ -824,7 +825,7 @@ class ProgramGenerator:
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
         krylov_solver_function, residual_norm_function = \
             self.extract_krylov_subspace_method_from_layer3_file(layer3_file_path, level)
-        krylov_solver_function = krylov_solver_function.replace('gen_mgCycle', f'{solver_type}_{number_of_solver_iterations}')
+        krylov_solver_function = krylov_solver_function.replace(f'{self._cycle_name}', f'{solver_type}_{number_of_solver_iterations}')
         return krylov_solver_function, residual_norm_function
 
     def generate_cached_krylov_subspace_solvers(self, min_level, max_level, solver_list, minimum_number_of_solver_iterations=64, maximum_number_of_solver_iterations=1024):

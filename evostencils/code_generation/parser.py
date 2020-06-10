@@ -40,9 +40,9 @@ def extract_l2_information(file_path: str, dimension: int, solution_equations=No
                 tokens = line.split('from')
                 is_prolongation = False
                 is_restriction = False
-                if 'gen_restrictionForSol_' in name:
+                if 'restriction' in name.lower():
                     is_restriction = True
-                elif 'gen_prolongationForSol_' in name:
+                elif 'prolongation' in name.lower():
                     is_prolongation = True
                 while True:
                     tmp = tokens[1].split('with')

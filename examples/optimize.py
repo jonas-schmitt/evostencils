@@ -46,8 +46,11 @@ def main():
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    cycle_name = "VCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -58,7 +61,8 @@ def main():
         tmp = "process"
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank)
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
+                                         cycle_name=cycle_name)
 
     # Evaluate baseline program
     # program_generator.run_exastencils_compiler()
@@ -104,7 +108,7 @@ def main():
     levels_per_run = max_level - min_level
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.NSGAIII
+    optimization_method = optimizer.SOGP
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAIII":
             optimization_method = optimizer.NSGAIII
@@ -119,11 +123,11 @@ def main():
     mutation_probability = 1.0 - crossover_probability
     minimum_solver_iterations = 2**3
     maximum_solver_iterations = 2**10
-    krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
-    # krylov_subspace_methods = ()
+    # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
+    krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=64, gp_lambda=64,
+                                                               gp_mu=32, gp_lambda=32,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
