@@ -31,15 +31,16 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
-                 mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle"):
+            mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle",
+            evaluation_timeout=100, code_generation_timeout=300, c_compiler_timeout=60):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0
         self._counter = 0
         self.timeout_copy_file = 60
-        self.timeout_evaluate = 300
-        self.timeout_exastencils_compiler = 300
-        self.timeout_c_compiler = 180
+        self.timeout_evaluate = evaluation_timeout
+        self.timeout_exastencils_compiler = code_generation_timeout
+        self.timeout_c_compiler = c_compiler_timeout
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
         self._knowledge_path = knowledge_path

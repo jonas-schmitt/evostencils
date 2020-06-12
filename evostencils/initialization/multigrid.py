@@ -402,7 +402,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     omega_max = 5.0/3.0
     # omega_min = 0.0
     # omega_max = 2.0
-    number_of_steps = 64
+    number_of_steps = 100
     step_size = (omega_max - omega_min) / number_of_steps
     for i in range(1, number_of_steps + 1):
         pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
