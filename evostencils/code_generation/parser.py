@@ -46,7 +46,8 @@ def extract_l2_information(file_path: str, dimension: int, solution_equations=No
                     is_prolongation = True
                 while True:
                     tmp = tokens[1].split('with')
-                    value = float(tmp[1])
+                    value = parse_expr(tmp[1])
+                    value = value.evalf()
                     offsets = parse_stencil_offsets(tmp[0], is_prolongation)
                     stencil_entries.append((offsets, value))
                     line = file.readline()

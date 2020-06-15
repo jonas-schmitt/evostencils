@@ -93,9 +93,9 @@ class Optimizer:
             program_generator.generate_global_weight_initializations(output_path, weights)
             program_generator.run_c_compiler(output_path)
             runtime, convergence_factor, _ = program_generator.evaluate(output_path, infinity=self._gp_optimizer.infinity,
-                                                                        number_of_samples=1)
+                                                                        number_of_samples=3)
             program_generator.restore_global_initializations(output_path)
-            return convergence_factor,
+            return runtime,
         self._toolbox.register("evaluate", evaluate)
         lambda_ = int(round((4 + 3 * log(problem_size)) * 2))
         if self._gp_optimizer.is_root():

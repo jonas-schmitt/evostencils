@@ -268,8 +268,11 @@ class ProgramGenerator:
         number_of_iterations = None
         count = 0
         for i in range(number_of_samples):
-            result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
-                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
+            try:
+                result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
+            except subprocess.TimeoutExpired as _:
+                return infinity, infinity, infinity
             if not result.returncode == 0:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
