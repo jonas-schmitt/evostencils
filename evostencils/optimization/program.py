@@ -381,10 +381,10 @@ class Optimizer:
             time_to_convergence, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=5)
+                                                              number_of_samples=3)
             fitness = time_to_convergence,
-            if number_of_iterations >= 128 or convergence_factor > 1:
-                fitness = convergence_factor * self.infinity**0.25,
+            # if number_of_iterations >= 128 or convergence_factor > 1:
+            #     fitness = convergence_factor * self.infinity**0.25,
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -799,7 +799,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 4 * gp_mu
+            initial_population_size = 2 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4

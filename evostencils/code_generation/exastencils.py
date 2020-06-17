@@ -2,6 +2,7 @@ from evostencils.expressions import base, partitioning as part, system, transfor
 from evostencils.expressions import krylov_subspace
 from evostencils.initialization import multigrid
 from evostencils.code_generation import parser
+import numpy as np
 import os
 import subprocess
 import math
@@ -179,6 +180,30 @@ class ProgramGenerator:
         with open(path_to_file, 'w') as file:
             file.write(content)
 
+
+    def adapt_generated_parameters(self, mapping: dict):
+        output_path = self._output_path_generated
+        path_to_file = f'{self.base_path}/{output_path}/Global/Global_declarations.cpp'
+        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        with open(path_to_file, 'r') as file:
+            lines = file.readlines()
+        content = ''
+        for line in lines:
+            include_line = True
+            for parameter, value in mapping.items():
+                if parameter in line:
+                    tokens = line.split('=')
+                    tokens[-1] = ' ' + str(value) + ';\n'
+                    tmp = '='.join(tokens)
+                    content += tmp
+                    include_line = False
+            if include_line:
+                content += line
+        with open(path_to_file, 'w') as file:
+            file.write(content)
+
+
     def restore_global_initializations(self, output_path):
         # Hack to change the weights after generation
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
@@ -277,7 +302,7 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
             time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
-            if math.isinf(convergence_factor) or math.isnan(convergence_factor):
+            if math.isinf(convergence_factor) or math.isnan(convergence_factor) or number_of_iterations >= infinity:
                 return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
@@ -308,9 +333,25 @@ class ProgramGenerator:
         subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return output_path_generated
 
+    def compile_and_run(self, mapping, infinity=1e300, number_of_samples=1):
+        infinity_result = infinity, infinity, infinity
+        try:
+            self.adapt_generated_parameters(mapping)
+            returncode = self.run_c_compiler(self._output_path_generated)
+            if returncode != 0:
+                return infinity_result
+        except subprocess.TimeoutExpired:
+            return infinity_result
+        try:
+            runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated, infinity,
+                                                                              number_of_samples)
+            return runtime, convergence_factor, number_of_iterations
+        except subprocess.TimeoutExpired:
+            return infinity_result
+
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str,
-                              infinity=1e300, number_of_samples=1):
+                              infinity=1e300, number_of_samples=1, parameters={}):
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
         self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
         try:
@@ -327,17 +368,37 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        try:
-            returncode = self.run_c_compiler(self._output_path_generated)
-            if returncode != 0:
-                return infinity, infinity, infinity
-        except subprocess.TimeoutExpired:
-            return infinity, infinity, infinity
-        try:
-            runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated, infinity, number_of_samples)
-            return runtime, convergence_factor, number_of_iterations
-        except subprocess.TimeoutExpired:
-            return infinity, infinity, infinity
+        parameters = {'beta1': -1}
+        result = infinity, infinity, infinity
+        curr = infinity
+        prev = infinity
+        for parameter, starting_value in parameters.items():
+            value = starting_value
+            backward = False
+            step_size = 0.1
+            count = 0
+            while True:
+                runtime, convergence_factor, number_of_iterations = \
+                    self.compile_and_run({parameter: value}, number_of_samples=number_of_samples, infinity=infinity)
+                if runtime >= infinity:
+                    break
+                if runtime < result[0]:
+                    prev = curr
+                    curr = runtime
+                    result = runtime, convergence_factor, number_of_iterations
+                    optimal_value = value
+                elif runtime > curr > prev:
+                    backward = True
+                    curr = infinity
+                    prev = infinity
+                    value = starting_value
+                    count = -1
+                if backward:
+                    value -= step_size
+                else:
+                    value += step_size
+                count += 1
+        return result
 
     @staticmethod
     def parse_output(output: str, infinity: float):
@@ -345,8 +406,9 @@ class ProgramGenerator:
         convergence_factors = []
         rho_inf = math.sqrt(infinity)
         count = 0
+        number_of_iterations = 0
         for line in lines:
-            if 'convergence factor' in line:
+            if 'convergence factor' in line.lower():
                 tmp = line.split('convergence factor is ')
                 rho = float(tmp[-1])
                 if math.isinf(rho) or math.isnan(rho):
@@ -354,7 +416,18 @@ class ProgramGenerator:
                 else:
                     convergence_factors.append(rho)
                     count += 1
-
+            elif 'maximum number of solver iterations' in line.lower():
+                return infinity, infinity, infinity
+            elif 'iterations' in line.lower():
+                tmp = line.split('iterations')
+                tmp = tmp[0].split(' ')
+                try:
+                    n = int(tmp[-1])
+                except ValueError as _:
+                    print(tmp[-1])
+                    return infinity, infinity, infinity
+                if n > number_of_iterations:
+                    number_of_iterations = n
         convergence_factor = 1
         if count > 0:
             exponent = 1.0/len(convergence_factors)
@@ -364,7 +437,7 @@ class ProgramGenerator:
             convergence_factor = infinity
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
-        number_of_iterations = len(lines) - 3
+        # number_of_iterations = len(lines) - 3
         return time_to_solution, convergence_factor, number_of_iterations
 
     def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
@@ -410,7 +483,8 @@ class ProgramGenerator:
         if key[1] < max_level:
             tmp = transformed_equation
             for symbol in transformed_equation.free_symbols:
-                tmp = tmp.subs(symbol, sympy.Symbol(f'gen_error_{symbol.name}'))
+                if f'@{key[1]}' in symbol.name:
+                    tmp = tmp.subs(symbol, sympy.Symbol(f'gen_error_{symbol.name}'))
             transformed_equation = tmp
         program += f'\t\t{indentation}{unknown} => ({transformed_equation}) == {rhs}\n'
         return program
