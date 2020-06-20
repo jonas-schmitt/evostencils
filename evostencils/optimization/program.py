@@ -12,6 +12,15 @@ import math, numpy
 import numpy as np
 import time
 import itertools
+class do_nothing(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *_):
+        pass
 
 
 class suppress_output(object):
@@ -373,18 +382,25 @@ class Optimizer:
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
+                print("Memory Error", flush=True)
                 self._failed_evaluations += 1
                 values = self.infinity,
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
             time_to_convergence, convergence_factor, number_of_iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                              solver_program, infinity=self.infinity,
-                                                              number_of_samples=3)
+                    self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
+                            solver_program, infinity=self.infinity,
+                            number_of_samples=3)
             fitness = time_to_convergence,
-            # if number_of_iterations >= 128 or convergence_factor > 1:
-            #     fitness = convergence_factor * self.infinity**0.25,
+            # if number_of_iterations >= self.infinity and convergence_factor >= self.infinity:
+            #     fitness = self.infinity**0.25 * time_to_convergence,
+            #     print("Fitness: ", fitness, flush=True)
+            #     print("Runtime: ", time_to_convergence, flush=True)
+            if number_of_iterations >= self.infinity or convergence_factor > 1:
+                fitness = convergence_factor * self.infinity**0.25,
+                # print("Fitness: ", fitness, flush=True)
+                # print("Convergence factor: ", convergence_factor, flush=True)
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -799,7 +815,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 2 * gp_mu
+            initial_population_size = 4 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
@@ -842,7 +858,7 @@ class Optimizer:
                                   f'Convergence factor: {convergence_factor}, '
                                   f'Number of Iterations: {number_of_iterations}', flush=True)
 
-                    if time < best_time and number_of_iterations < 128 and convergence_factor < required_convergence:
+                    if time < best_time and convergence_factor < required_convergence:
                         best_expression = expression
                         best_individual = individual
                         best_time = time
