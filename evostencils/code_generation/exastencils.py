@@ -284,7 +284,7 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
-        result = subprocess.run(['make', '-j4', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        result = subprocess.run(['make', '-j', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
@@ -303,7 +303,9 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
             time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
-            if math.isinf(convergence_factor) or math.isnan(convergence_factor) or number_of_iterations >= infinity:
+            if number_of_iterations >= infinity or convergence_factor > 1:
+                return time_to_solution, convergence_factor, number_of_iterations
+            if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
@@ -334,10 +336,11 @@ class ProgramGenerator:
         subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return output_path_generated
 
-    def compile_and_run(self, mapping, infinity=1e300, number_of_samples=1):
+    def compile_and_run(self, mapping=None, infinity=1e300, number_of_samples=1):
         infinity_result = infinity, infinity, infinity
         try:
-            self.adapt_generated_parameters(mapping)
+            if mapping is not None:
+                self.adapt_generated_parameters(mapping)
             returncode = self.run_c_compiler(self._output_path_generated)
             if returncode != 0:
                 return infinity_result
@@ -353,6 +356,7 @@ class ProgramGenerator:
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str,
                               infinity=1e300, number_of_samples=1, parameters={}):
+        # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
         self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
         try:
@@ -362,14 +366,20 @@ class ProgramGenerator:
             end_time = time.time()
             elapsed_time = end_time - start_time
             if returncode != 0:
+                print("Code generation failed", flush=True)
                 return infinity, infinity, infinity
         except subprocess.TimeoutExpired:
+            # print("Timeout expired", flush=True)
             return infinity, infinity, infinity
         self._counter += 1
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        parameters = {'beta1': -100}
+
+        runtime, convergence_factor, number_of_iterations = \
+                        self.compile_and_run(number_of_samples=number_of_samples, infinity=infinity)
+        # print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
+        return runtime, convergence_factor, number_of_iterations
         for parameter, starting_value in parameters.items():
             def f(x):
                 runtime, convergence_factor, number_of_iterations = \
@@ -382,6 +392,9 @@ class ProgramGenerator:
             runtime, convergence_factor, number_of_iterations = \
                 self.compile_and_run({parameter: opt_res.x}, number_of_samples=number_of_samples, infinity=infinity)
         return runtime, convergence_factor, number_of_iterations
+                    print(f"Improved runtime: {runtime}, Parameter value: {value}", flush=True)
+                    if not backward:
+                        break
 
     @staticmethod
     def parse_output(output: str, infinity: float):
@@ -400,27 +413,33 @@ class ProgramGenerator:
                     convergence_factors.append(rho)
                     count += 1
             elif 'maximum number of solver iterations' in line.lower():
-                return infinity, infinity, infinity
-            elif 'iterations' in line.lower():
+                # print("Number of iterations is infinity", flush=True)
+                number_of_iterations = infinity
+            if 'iterations' in line.lower():
                 tmp = line.split('iterations')
                 tmp = tmp[0].split(' ')
                 try:
-                    n = int(tmp[-1])
+                    n = int(tmp[-2])
+                    if n > number_of_iterations:
+                        number_of_iterations = n
                 except ValueError as _:
-                    print(tmp[-1])
-                    return infinity, infinity, infinity
-                if n > number_of_iterations:
-                    number_of_iterations = n
+                    # print(tmp[-2], flush=True)
+                    number_of_iterations = infinity
+
+
         convergence_factor = 1
         if count > 0:
             exponent = 1.0/len(convergence_factors)
             for rho in convergence_factors:
                 convergence_factor *= math.pow(rho, exponent)
         else:
+            # print("Convergence factor is infinity", flush=True)
             convergence_factor = infinity
         tmp = lines[-1].split(' ')
         time_to_solution = float(tmp[-2])
         # number_of_iterations = len(lines) - 3
+        if number_of_iterations == 0:
+            number_of_iterations = infinity
         return time_to_solution, convergence_factor, number_of_iterations
 
     def generate_storage(self, min_level: int, max_level: int, finest_grids: List[base.Grid]):
