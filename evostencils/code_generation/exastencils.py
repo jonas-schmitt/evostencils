@@ -9,6 +9,7 @@ import math
 import sympy
 import time
 from typing import List
+from scipy.optimize import minimize_scalar
 
 
 class CycleStorage:
@@ -368,37 +369,19 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        parameters = {'beta1': -1}
-        result = infinity, infinity, infinity
-        curr = infinity
-        prev = infinity
+        parameters = {'beta1': -100}
         for parameter, starting_value in parameters.items():
-            value = starting_value
-            backward = False
-            step_size = 0.1
-            count = 0
-            while True:
+            def f(x):
                 runtime, convergence_factor, number_of_iterations = \
-                    self.compile_and_run({parameter: value}, number_of_samples=number_of_samples, infinity=infinity)
-                if runtime >= infinity:
-                    break
-                if runtime < result[0]:
-                    prev = curr
-                    curr = runtime
-                    result = runtime, convergence_factor, number_of_iterations
-                    optimal_value = value
-                elif runtime > curr > prev:
-                    backward = True
-                    curr = infinity
-                    prev = infinity
-                    value = starting_value
-                    count = -1
-                if backward:
-                    value -= step_size
-                else:
-                    value += step_size
-                count += 1
-        return result
+                    self.compile_and_run({parameter: x}, number_of_samples=number_of_samples, infinity=infinity)
+                return runtime
+            bounds = [starting_value, 1]
+            options = {'maxiter': 100}
+            opt_res = minimize_scalar(f, method='bounded', bounds=bounds, options=options)
+            print('Optimal parameter value:', opt_res.x)
+            runtime, convergence_factor, number_of_iterations = \
+                self.compile_and_run({parameter: opt_res.x}, number_of_samples=number_of_samples, infinity=infinity)
+        return runtime, convergence_factor, number_of_iterations
 
     @staticmethod
     def parse_output(output: str, infinity: float):
