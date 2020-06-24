@@ -379,6 +379,7 @@ class Optimizer:
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
+        # with do_nothing():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
