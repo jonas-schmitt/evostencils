@@ -962,8 +962,8 @@ class Optimizer:
                                                             maximum_solver_iterations=maximum_solver_iterations)
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
         expression, _ = eval(grammar_string, pset.context, {})
-        initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
-        relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
+        # initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
+        # relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,

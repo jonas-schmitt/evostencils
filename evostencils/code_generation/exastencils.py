@@ -9,7 +9,7 @@ import math
 import sympy
 import time
 from typing import List
-from scipy.optimize import minimize_scalar
+# from scipy.optimize import minimize_scalar
 
 
 class CycleStorage:
@@ -375,42 +375,45 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        ks = [150, 250, 350]
+        ks = [100, 150, 200, 250, 300]
         runtime = 0
         convergence_factor = 0
         number_of_iterations = 0
-        inf_conv = False
-        inf_its = False
+        infinite_convergence_factor = False
+        infinite_number_of_iterations = False
         for k in ks:
             tmp1, tmp2, tmp3 = self.compile_and_run({'k': k}, number_of_samples=1, infinity=infinity)
             if tmp2 >= infinity:
-                inf_conv = True
+                infinite_convergence_factor = True
             if tmp3 >= infinity:
-                inf_its = True
+                infinite_number_of_iterations = True
             runtime += tmp1 / len(ks)
             convergence_factor += tmp2 / len(ks)
             number_of_iterations += tmp3 / len(ks)
-        if inf_conv:
+        if infinite_convergence_factor:
             convergence_factor = infinity
-        if inf_its:
+        if infinite_number_of_iterations:
             number_of_iterations = infinity
         # runtime, convergence_factor, number_of_iterations = \
         #                 self.compile_and_run(number_of_samples=1, infinity=infinity)
         print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
-        if runtime > 2000 or convergence_factor >= infinity or number_of_iterations >= infinity:
+        return runtime, convergence_factor, number_of_iterations
+
+        """
+        if runtime > 5000 or convergence_factor >= infinity or number_of_iterations >= infinity:
             return runtime, convergence_factor, number_of_iterations
         runtime, convergence_factor, number_of_iterations = infinity, infinity, infinity
         parameters = {'beta1': -100}
         for parameter, starting_value in parameters.items():
             def f(x):
                 number_of_iterations = 0
-                ks = [250]
+                ks = [150, 250, 350]
                 for k in ks:
                     _, __, tmp = self.compile_and_run({parameter: x, 'k': k}, number_of_samples=1, infinity=infinity)
                 number_of_iterations += tmp
                 return number_of_iterations / len(ks)
             bounds = [starting_value, 0]
-            options = {'maxiter': 32}
+            options = {'maxiter': 100}
             print("Running parameter optimization", flush=True)
             opt_res = minimize_scalar(f, method='bounded', bounds=bounds, options=options)
             print("Optimal parameter value:", opt_res.x, flush=True)
@@ -425,6 +428,7 @@ class ProgramGenerator:
             # runtime, convergence_factor, number_of_iterations = self.compile_and_run({parameter: opt_res.x}, number_of_samples=number_of_samples, infinity=infinity)
         print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
         return runtime, convergence_factor, number_of_iterations
+        """
 
     @staticmethod
     def parse_output(output: str, infinity: float):
