@@ -12,6 +12,8 @@ import math, numpy
 import numpy as np
 import time
 import itertools
+import os
+
 class do_nothing(object):
     def __init__(self):
         pass
@@ -399,7 +401,7 @@ class Optimizer:
             #     print("Fitness: ", fitness, flush=True)
             #     print("Runtime: ", time_to_convergence, flush=True)
             if number_of_iterations >= self.infinity or convergence_factor > 1:
-                fitness = convergence_factor * self.infinity**0.25,
+                fitness = convergence_factor * self.infinity**0.5,
                 # print("Fitness: ", fitness, flush=True)
                 # print("Convergence factor: ", convergence_factor, flush=True)
             self.add_individual_to_cache(individual, fitness)
@@ -421,9 +423,14 @@ class Optimizer:
             time_to_convergence, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
-                                                              number_of_samples=5)
-
-            values = convergence_factor, time_to_convergence / iterations
+                                                              number_of_samples=1)
+            if iterations >= self.infinity:
+                if convergence_factor < self.infinity:
+                    values = convergence_factor * self.infinity**0.5, self.infinity
+                else:
+                    values = self.infinity, self.infinity
+            else:
+                values = iterations, time_to_convergence / iterations
             self.add_individual_to_cache(individual, values)
             return values
 
@@ -705,7 +712,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
 
@@ -732,7 +739,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
         hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
 
@@ -744,6 +751,7 @@ class Optimizer:
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
                                   required_convergence=0.9,
                                   restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
+                                  optimize_relaxation_factors=True,
                                   krylov_subspace_methods=('ConjugateGradient', 'BiCGStab', 'MinRes',
                                                            'ConjugateResidual'),
                                   minimum_solver_iterations=8, maximum_solver_iterations=1024):
@@ -826,7 +834,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
             if optimization_method is None:
-                optimization_method = self.NSGAIII
+                optimization_method = self.NSGAII
             self.clear_individual_cache()
             pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                                 gp_crossover_probability, gp_mutation_probability,
@@ -836,32 +844,34 @@ class Optimizer:
             pops.append(pop)
             best_time = self.infinity
             best_convergence_factor = self.infinity
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
+            evaluation_min_level = min_level
+            evaluation_max_level = max_level
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+            output_directory_path = f'./hall_of_fame_{i}_{self.program_generator.problem_name}'
+            if not os.path.exists(output_directory_path):
+                os.makedirs(output_directory_path)
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             try:
                 for j in range(0, min(len(hof), 100)):
                     individual = hof[j]
                     expression = self.compile_individual(individual, pset)[0]
-                    estimated_convergence_factor = self.convergence_evaluator.compute_spectral_radius(expression)
-                    if not estimated_convergence_factor < 0.9:
-                        continue
                     time, convergence_factor, number_of_iterations = \
-                        self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
+                        self._program_generator.generate_and_evaluate(expression, storages, evaluation_min_level,
+                                                                      evaluation_max_level,
                                                                       solver_program, infinity=self.infinity,
-                                                                      number_of_samples=20)
+                                                                      number_of_samples=10)
                     if self.is_root():
-                        if i == 0:
-                            print(f'Time: {time}, '
-                                  f'Convergence factor: {convergence_factor} '
-                                  f'(Estimation: {estimated_convergence_factor}), '
-                                  f'Number of Iterations: {number_of_iterations}', flush=True)
-                        else:
-                            print(f'Time: {time}, '
-                                  f'Convergence factor: {convergence_factor}, '
-                                  f'Number of Iterations: {number_of_iterations}', flush=True)
+                        print(f'\nTime: {time}, '
+                              f'Convergence factor: {convergence_factor}, '
+                              f'Number of Iterations: {number_of_iterations}', flush=True)
+
+                        with open(f'{output_directory_path}/individual_{j}.txt', 'w') as grammar_file:
+                            grammar_file.write(str(individual) + '\n')
+                        print('Tree representation:', flush=True)
+                        print(str(individual), flush=True)
 
                     if time < best_time and convergence_factor < required_convergence:
                         best_expression = expression
-                        best_individual = individual
                         best_time = time
                         best_convergence_factor = convergence_factor
 
@@ -870,26 +880,22 @@ class Optimizer:
             self.mpi_comm.barrier()
             print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}",
                   flush=True)
-            with open('./grammar_tree.txt', 'w') as grammar_file:
-                grammar_file.write(str(best_individual))
-            print("Best individual:")
-            print(str(best_individual), flush=True)
-
-            relaxation_factors, improved_convergence_factor = \
-                self.optimize_relaxation_factors(best_expression, es_generations, min_level, max_level,
+            if optimize_relaxation_factors and es_generations > 0:
+                relaxation_factors, improved_convergence_factor = \
+                    self.optimize_relaxation_factors(best_expression, es_generations, evaluation_min_level, evaluation_max_level,
                                                  solver_program, storages, best_time)
-            relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
-            best_time, convergence_factor, number_of_iterations = \
-                self._program_generator.generate_and_evaluate(best_expression, storages, min_level, max_level,
+                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
+                self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+                best_time, convergence_factor, number_of_iterations = \
+                    self._program_generator.generate_and_evaluate(best_expression, storages, evaluation_min_level, evaluation_max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=20)
-            best_expression.runtime = best_time / number_of_iterations * 1e-3
-            self.mpi_comm.barrier()
-            print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
-                  flush=True)
+                                                              number_of_samples=10)
+                best_expression.runtime = best_time / number_of_iterations * 1e-3
+                self.mpi_comm.barrier()
+                print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
+                      flush=True)
             cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, self.min_level,
-                                                                            max_level, self.max_level)
+                                                                            evaluation_max_level, self.max_level)
             solver_program += cycle_function
 
         self.mpi_comm.barrier()
@@ -974,7 +980,7 @@ class Optimizer:
               f'Number of Iterations: {number_of_iterations}', flush=True)
         if optimize_relaxation_factors:
             relaxation_factors, _ = \
-                self.optimize_relaxation_factors(expression, 50, self.min_level, self.max_level, solver_program,
+                self.optimize_relaxation_factors(expression, 150, self.min_level, self.max_level, solver_program,
                                                  storages, time_to_solution)
             relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)

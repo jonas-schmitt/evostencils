@@ -288,7 +288,7 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
-    def evaluate(self, executable_path, infinity=1e300, number_of_samples=1):
+    def evaluate(self, executable_path, infinity=1e100, number_of_samples=1):
         total_time = 0
         sum_of_convergence_factors = 0
         number_of_iterations = None
@@ -314,7 +314,7 @@ class ProgramGenerator:
                 break
         return total_time / count, sum_of_convergence_factors / count, number_of_iterations
 
-    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=100):
+    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=128):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
         self.generate_adapted_layer_files(iteration_limit)
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
@@ -336,7 +336,7 @@ class ProgramGenerator:
         subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return output_path_generated
 
-    def compile_and_run(self, mapping=None, infinity=1e300, number_of_samples=1):
+    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=1):
         infinity_result = infinity, infinity, infinity
         try:
             if mapping is not None:
@@ -354,9 +354,8 @@ class ProgramGenerator:
             return infinity_result
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str,
-                              infinity=1e300, number_of_samples=1, parameters={}):
-        print("Generate and evaluate", flush=True)
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=1):
+        # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
         self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
         try:
@@ -375,60 +374,10 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        ks = [100, 150, 200, 250, 300]
-        runtime = 0
-        convergence_factor = 0
-        number_of_iterations = 0
-        infinite_convergence_factor = False
-        infinite_number_of_iterations = False
-        for k in ks:
-            tmp1, tmp2, tmp3 = self.compile_and_run({'k': k}, number_of_samples=1, infinity=infinity)
-            if tmp2 >= infinity:
-                infinite_convergence_factor = True
-            if tmp3 >= infinity:
-                infinite_number_of_iterations = True
-            runtime += tmp1 / len(ks)
-            convergence_factor += tmp2 / len(ks)
-            number_of_iterations += tmp3 / len(ks)
-        if infinite_convergence_factor:
-            convergence_factor = infinity
-        if infinite_number_of_iterations:
-            number_of_iterations = infinity
-        # runtime, convergence_factor, number_of_iterations = \
-        #                 self.compile_and_run(number_of_samples=1, infinity=infinity)
-        print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
+        runtime, convergence_factor, number_of_iterations = \
+            self.compile_and_run(number_of_samples=number_of_samples, infinity=infinity)
+        # print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
         return runtime, convergence_factor, number_of_iterations
-
-        """
-        if runtime > 5000 or convergence_factor >= infinity or number_of_iterations >= infinity:
-            return runtime, convergence_factor, number_of_iterations
-        runtime, convergence_factor, number_of_iterations = infinity, infinity, infinity
-        parameters = {'beta1': -100}
-        for parameter, starting_value in parameters.items():
-            def f(x):
-                number_of_iterations = 0
-                ks = [150, 250, 350]
-                for k in ks:
-                    _, __, tmp = self.compile_and_run({parameter: x, 'k': k}, number_of_samples=1, infinity=infinity)
-                number_of_iterations += tmp
-                return number_of_iterations / len(ks)
-            bounds = [starting_value, 0]
-            options = {'maxiter': 100}
-            print("Running parameter optimization", flush=True)
-            opt_res = minimize_scalar(f, method='bounded', bounds=bounds, options=options)
-            print("Optimal parameter value:", opt_res.x, flush=True)
-            runtime = 0
-            convergence_factor = 0
-            number_of_iterations = 0
-            for k in ks:
-                tmp1, tmp2, tmp3 = self.compile_and_run({'k': k}, number_of_samples=1, infinity=infinity)
-                runtime += tmp1 / len(ks)
-                convergence_factor+= tmp2 / len(ks)
-                number_of_iterations += tmp3 / len(ks)
-            # runtime, convergence_factor, number_of_iterations = self.compile_and_run({parameter: opt_res.x}, number_of_samples=number_of_samples, infinity=infinity)
-        print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
-        return runtime, convergence_factor, number_of_iterations
-        """
 
     @staticmethod
     def parse_output(output: str, infinity: float):

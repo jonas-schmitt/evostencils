@@ -151,7 +151,9 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     system_operators = []
     for op_info in operators_on_level:
         if op_info.operator_type == base.Restriction:
-            restriction_operators.append(op_info)
+            #TODO hacky solution for now
+            if not "gen_restrictionForSol" in op_info.name:
+                restriction_operators.append(op_info)
         elif op_info.operator_type == base.Prolongation:
             prolongation_operators.append(op_info)
         else:

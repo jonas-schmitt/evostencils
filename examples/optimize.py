@@ -19,8 +19,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -48,9 +48,12 @@ def main():
 
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "VCycle"
+
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    # cycle_name = "VCycle"
+
+    cycle_name= "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -90,7 +93,7 @@ def main():
     runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
-    infinity = 1e300
+    infinity = 1e100
     epsilon = 1e-12
     problem_name = program_generator.problem_name
 
@@ -108,12 +111,12 @@ def main():
     levels_per_run = max_level - min_level
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.SOGP
+    optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
-        if sys.argv[1].upper() == "NSGAIII":
-            optimization_method = optimizer.NSGAIII
-        elif sys.argv[1].upper() == "NSGAII":
+        if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
+        elif sys.argv[1].upper() == "NSGAIII":
+            optimization_method = optimizer.NSGAIII
         elif sys.argv[1].upper() == "SOGP":
             optimization_method = optimizer.SOGP
         elif sys.argv[1].upper() == "RANDOM":
@@ -127,7 +130,7 @@ def main():
     krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=32, gp_lambda=32,
+                                                               gp_mu=100, gp_lambda=100,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
