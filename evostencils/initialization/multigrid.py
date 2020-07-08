@@ -11,6 +11,7 @@ from evostencils.types import partitioning, level_control
 from evostencils.types.wrapper import TypeWrapper
 from evostencils.genetic_programming import PrimitiveSetTyped
 from deap import gp
+import numpy as np
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
 import itertools
@@ -400,14 +401,11 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
     # Relaxation Factors
     pset.addTerminal(1.0, TypeWrapper(float))
-    omega_min = 1.0/3.0
-    omega_max = 5.0/3.0
-    # omega_min = 0.0
-    # omega_max = 2.0
-    number_of_steps = 100
-    step_size = (omega_max - omega_min) / number_of_steps
-    for i in range(1, number_of_steps + 1):
-        pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
+    samples = 100
+    interval = np.linspace(1.0/samples, 2.0, samples)
+    for omega in interval:
+        pset.addTerminal(omega, TypeWrapper(float))
+
     # number of Krylov subspace method iterations
     if len(krylov_subspace_methods) > 0:
         i = minimum_solver_iterations

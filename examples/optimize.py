@@ -19,8 +19,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -49,11 +49,11 @@ def main():
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    # cycle_name = "VCycle"
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    cycle_name = "VCycle"
 
-    cycle_name= "gen_mgCycle"
+    # cycle_name= "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -94,7 +94,7 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-12
+    epsilon = 1e-6
     problem_name = program_generator.problem_name
 
     if not os.path.exists(f'{cwd}/{problem_name}'):

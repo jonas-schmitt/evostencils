@@ -423,7 +423,7 @@ class Optimizer:
             time_to_convergence, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
-                                                              number_of_samples=1)
+                                                              number_of_samples=3)
             if iterations >= self.infinity:
                 if convergence_factor < self.infinity:
                     values = convergence_factor * self.infinity**0.5, self.infinity
