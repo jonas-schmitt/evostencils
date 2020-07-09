@@ -24,10 +24,10 @@ source ./setup.sh
 An example script for running an optimization can be found in the examples folder.
 
 ## Publications
-```
-Jonas Schmitt, Sebastian Kuckuk, and Harald Köstler
-Constructing efficient multigrid solvers with genetic programming
-In Proceedings of the 2020 Genetic and Evolutionary Computation Conference (GECCO ’20). 
-Association for Computing Machinery, New York, NY, USA, 1012–1020.
-DOI:https://doi.org/10.1145/3377930.3389811
-```
+
+Jonas Schmitt, Sebastian Kuckuk, and Harald Köstler  
+Constructing efficient multigrid solvers with genetic programming  
+In Proceedings of the 2020 Genetic and Evolutionary Computation Conference (GECCO ’20)   
+Association for Computing Machinery, New York, NY, USA, 1012–1020  
+DOI: https://doi.org/10.1145/3377930.3389811  
+
