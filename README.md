@@ -24,6 +24,6 @@ source ./setup.sh
 An example script for running an optimization can be found in the examples folder.
 
 ## Publications
-    Schmitt J., Kuckuk S., Köstler H.:
-    Optimizing Geometric Multigrid Methods with Evolutionary Computation
-    Preprint available on arXiv: https://arxiv.org/abs/1910.02749
+```
+Jonas Schmitt, Sebastian Kuckuk, and Harald Köstler. 2020. Constructing efficient multigrid solvers with genetic programming. In Proceedings of the 2020 Genetic and Evolutionary Computation Conference (GECCO ’20). Association for Computing Machinery, New York, NY, USA, 1012–1020. DOI:https://doi.org/10.1145/3377930.3389811
+```
