@@ -401,10 +401,10 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
     # Relaxation Factors
     pset.addTerminal(1.0, TypeWrapper(float))
-    samples = 100
-    interval = np.linspace(1.0/samples, 2.0, samples)
-    for omega in interval:
-        pset.addTerminal(omega, TypeWrapper(float))
+    # samples = 100
+    # interval = np.linspace(1.0/samples, 2.0, samples)
+    # for omega in interval:
+    #     pset.addTerminal(omega, TypeWrapper(float))
 
     # number of Krylov subspace method iterations
     if len(krylov_subspace_methods) > 0:

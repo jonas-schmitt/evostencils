@@ -19,8 +19,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -49,11 +49,11 @@ def main():
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "VCycle"
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    # cycle_name = "VCycle"
 
-    # cycle_name= "gen_mgCycle"
+    cycle_name= "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -109,9 +109,10 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = max_level - min_level
+    assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
-    maximum_block_size = 8
-    optimization_method = optimizer.NSGAII
+    maximum_block_size = 1
+    optimization_method = optimizer.SOGP
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
@@ -130,7 +131,7 @@ def main():
     krylov_subspace_methods = ()
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=100, gp_lambda=100,
+                                                               gp_mu=8, gp_lambda=8,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
