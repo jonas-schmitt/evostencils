@@ -391,15 +391,31 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
-            time_to_convergence, convergence_factor, number_of_iterations = \
-                    self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                            solver_program, infinity=self.infinity,
-                            number_of_samples=3)
-            fitness = time_to_convergence,
-            # if number_of_iterations >= self.infinity and convergence_factor >= self.infinity:
-            #     fitness = self.infinity**0.25 * time_to_convergence,
-            #     print("Fitness: ", fitness, flush=True)
-            #     print("Runtime: ", time_to_convergence, flush=True)
+            initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
+            n = len(initial_weights)
+            tmp = solver_program + self.program_generator.generate_global_weights(n)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            self.max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
+            program_generator = self.program_generator
+            output_path = program_generator._output_path_generated
+            average_time_to_convergence = 0
+            number_of_samples = 20
+            for i in range(number_of_samples):
+                weights = [random.gauss(1.0, 0.2) for _ in range(n)]
+                program_generator.generate_global_weight_initializations(output_path, weights)
+                program_generator.run_c_compiler(output_path)
+                time_to_convergence, convergence_factor, number_of_iterations = \
+                    program_generator.evaluate(output_path,
+                                               infinity=self.infinity,
+                                               number_of_samples=1)
+                average_time_to_convergence += time_to_convergence / number_of_samples
+                program_generator.restore_global_initializations(output_path)
+            # time_to_convergence, convergence_factor, number_of_iterations = \
+            #         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
+            #                 solver_program, infinity=self.infinity,
+            #                 number_of_samples=3)
+            fitness = average_time_to_convergence,
             if number_of_iterations >= self.infinity or convergence_factor > 1:
                 fitness = convergence_factor * self.infinity**0.5,
                 # print("Fitness: ", fitness, flush=True)
