@@ -456,17 +456,56 @@ class Optimizer:
                 self.add_individual_to_cache(individual, values)
                 return values
             expression = expression1
+            initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
+            relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
+            relaxation_factor_optimization.reset_status(expression)
+            n = len(initial_weights)
+            tmp = solver_program + self.program_generator.generate_global_weights(n)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            self.max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
+            program_generator = self.program_generator
+            output_path = program_generator._output_path_generated
+            average_time_to_convergence = 0
+            average_convergence_factor = 0
+            average_number_of_iterations = 0
+            number_of_samples = 20
+            count = 0
+            threshold = number_of_samples // 2
+
+            program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
+                                                       settings_path=program_generator.settings_path_generated)
+            weights = []
+            for _ in range(n):
+                w = random.gauss(1.0, 0.2)
+                while w < 0 or w > 2.0:
+                    w = random.gauss(1.0, 0.2)
+                weights.append(w)
+            for i in range(number_of_samples):
+                if count > threshold:
+                    break
+                program_generator.generate_global_weight_initializations(output_path, weights)
+                program_generator.run_c_compiler(output_path)
+                time_to_convergence, convergence_factor, number_of_iterations = \
+                    program_generator.evaluate(output_path,
+                                               infinity=self.infinity,
+                                               number_of_samples=1)
+                if number_of_iterations >= self.infinity or convergence_factor > 1:
+                    count += 1
+                average_time_to_convergence += time_to_convergence / number_of_samples
+                average_convergence_factor += convergence_factor / number_of_samples
+                average_number_of_iterations += number_of_iterations / number_of_samples
+                program_generator.restore_global_initializations(output_path)
             time_to_convergence, convergence_factor, iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity,
                                                               number_of_samples=3)
-            if iterations >= self.infinity:
-                if convergence_factor < self.infinity:
-                    values = convergence_factor * self.infinity**0.5, self.infinity
+            values = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            if average_number_of_iterations >= self.infinity:
+                if average_convergence_factor < self.infinity:
+                    values = average_convergence_factor * self.infinity**0.5, self.infinity
                 else:
                     values = self.infinity, self.infinity
-            else:
-                values = iterations, time_to_convergence / iterations
             self.add_individual_to_cache(individual, values)
             return values
 
