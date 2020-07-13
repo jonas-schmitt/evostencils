@@ -56,8 +56,8 @@ def main():
     operators = program_generator.operators
     fields = program_generator.fields
 
-    infinity = 1e300
-    epsilon = 1e-12
+    infinity = 1e100
+    epsilon = 1e-6
     problem_name = program_generator.problem_name
 
     if not os.path.exists(f'{cwd}/{problem_name}'):
@@ -66,17 +66,16 @@ def main():
                           program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity)
     maximum_block_size = 8
-    with open('grammar_tree.txt', 'r') as file:
-        grammar_string = file.read()
     minimum_solver_iterations = 2**3
     maximum_solver_iterations = 2**10
-    # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     krylov_subspace_methods = ()
+    with open('grammar_tree.txt', 'r') as file:
+        grammar_string = file.read()
     optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size,
                                                                         krylov_subspace_methods=krylov_subspace_methods,
                                                                         minimum_solver_iterations=minimum_solver_iterations,
                                                                         maximum_solver_iterations=maximum_solver_iterations,
-                                                                        optimize_relaxation_factors=True)
+                                                                        optimize_relaxation_factors=False)
 
 
 if __name__ == "__main__":

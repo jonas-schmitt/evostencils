@@ -88,6 +88,7 @@ class Optimizer:
     def optimize(self, expression: base.Expression, problem_size, generations, storages, evaluation_time):
 
         def evaluate(weights):
+            restrict_relaxation_factors(weights, 0.0, 2.0)
             program_generator = self._gp_optimizer.program_generator
             output_path = program_generator._output_path_generated
             program_generator.generate_global_weight_initializations(output_path, weights)
