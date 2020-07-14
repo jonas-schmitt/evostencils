@@ -700,7 +700,7 @@ class Optimizer:
                 print("Increasing problem size", flush=True)
                 # TODO use local information instead of a global reinitialization of all members
                 self.reinitialize(self.min_level + 1, self.max_level + 1)
-                maximum_block_size = 1
+                maximum_block_size = 8
                 levels_per_run = self.max_level - self.min_level
                 pset, _ = \
                     multigrid_initialization.generate_primitive_set(self.approximation, self.rhs, self.dimension,
