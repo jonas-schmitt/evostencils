@@ -9,6 +9,7 @@ import math
 import sympy
 import time
 from typing import List
+# import shutil TODO replace 'cp' calls with subprocess with shutil.copyfile
 # from scipy.optimize import minimize_scalar
 
 
@@ -49,6 +50,8 @@ class ProgramGenerator:
         self._settings_path = settings_path
         self._dimension, self._min_level, self._max_level = \
             parser.extract_knowledge_information(base_path, knowledge_path)
+        self._original_min_level = self.min_level
+        self._original_max_level = self.max_level
         self._base_path_prefix, self._problem_name, self._debug_l3_path, self._output_path = \
             parser.extract_settings_information(base_path, settings_path)
         self._mpi_rank = mpi_rank
@@ -59,6 +62,7 @@ class ProgramGenerator:
         self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         self._output_path_generated = None
         self.run_exastencils_compiler()
+        self._solution_equations = solution_equations
         self._equations, self._operators, self._fields = \
             parser.extract_l2_information(f'{base_path}/{self._debug_l3_path}', self.dimension, solution_equations)
         size = 2 ** self._max_level
@@ -141,6 +145,10 @@ class ProgramGenerator:
         return self._max_level
 
     @property
+    def solution_equations(self):
+        return self._solution_equations
+
+    @property
     def mpi_rank(self):
         return self._mpi_rank
 
@@ -151,6 +159,31 @@ class ProgramGenerator:
     @property
     def settings_path_generated(self):
         return self._settings_path_generated
+
+
+    def reinitialize(self, min_level, max_level):
+        self.generate_level_adapted_knowledge_file(min_level, max_level)
+        self._dimension, self._min_level, self._max_level = \
+            parser.extract_knowledge_information(self.base_path, self.knowledge_path_generated)
+        original_file = f'{self.base_path}/{self.knowledge_path}'
+        generated_file = f'{self.base_path}/{self.knowledge_path_generated}'
+        subprocess.run(['cp', original_file, f'{original_file}.backup'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        subprocess.run(['cp', generated_file, original_file],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        self.run_exastencils_compiler()
+        self._equations, self._operators, self._fields = \
+            parser.extract_l2_information(f'{self.base_path}/{self._debug_l3_path}', self.dimension, self.solution_equations)
+        size = 2 ** self._max_level
+        grid_size = tuple([size] * self.dimension)
+        h = 1 / (2 ** self._max_level)
+        step_size = tuple([h] * self.dimension)
+        tmp = tuple([2] * self.dimension)
+        self._coarsening_factor = [tmp for _ in range(len(self.fields))]
+        self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
+        subprocess.run(['cp', f'{original_file}.backup', original_file],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+
 
     @staticmethod
     def generate_global_weights(n: int, name='omega'):
@@ -314,7 +347,7 @@ class ProgramGenerator:
                 break
         return total_time / count, sum_of_convergence_factors / count, number_of_iterations
 
-    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=128):
+    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
         self.generate_adapted_layer_files(iteration_limit)
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
