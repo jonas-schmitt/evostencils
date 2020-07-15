@@ -763,7 +763,8 @@ class ProgramGenerator:
             raise RuntimeError("Not implemented")
         return program
 
-    def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True):
+    def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True,
+                         global_values={}):
         # TODO fix hacky solution
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
         output_file_path = \
@@ -780,9 +781,21 @@ class ProgramGenerator:
                             or 'Function InitFields' in line or \
                             (not include_restriction and 'gen_restriction' in line) or \
                             (not include_prolongation and 'gen_prolongation' in line):
-                        while line and line[0] is not '}':
+                        while line and not line[0] == '}':
                             line = input_file.readline()
                         line = input_file.readline()
+                    if 'Globals' in line:
+                        output_file.write(line)
+                        line = input_file.readline()
+                        while line and '}' not in line:
+                            tokens = line.split('=')
+                            lhs_tokens = tokens[0].split()
+                            if len(tokens) == 2 and lhs_tokens[0] == 'Expr' and lhs_tokens[1] in global_values:
+                                tmp = tokens[0] + ' = ' + str(global_values[lhs_tokens[1]]) + '\n'
+                                output_file.write(tmp)
+                            else:
+                                output_file.write(line)
+                            line = input_file.readline()
                     if 'Field' not in line or line not in self._field_declaration_cache:
                         output_file.write(line)
                     line = input_file.readline()

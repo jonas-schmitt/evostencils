@@ -100,7 +100,8 @@ class Optimizer:
         self._individual_cache_misses = 0
         self._timeout_counter_limit = 10000
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20):
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
+                                     parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level)
         program_generator = self.program_generator
         dimension = program_generator.dimension
@@ -130,7 +131,8 @@ class Optimizer:
         storages = self._program_generator.generate_storage(min_level, max_level, finest_grid)
         self.toolbox.register('evaluate', evaluation_function, pset=pset,
                               storages=storages, min_level=min_level, max_level=max_level,
-                              solver_program=program, number_of_samples=number_of_samples)
+                              solver_program=program, number_of_samples=number_of_samples,
+                              parameter_values=parameter_values)
 
     @staticmethod
     def _init_creator():
@@ -413,7 +415,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=20):
+                                  number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
@@ -435,7 +437,7 @@ class Optimizer:
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function, global_values=parameter_values)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
@@ -486,7 +488,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=20):
+                                     number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
@@ -506,7 +508,7 @@ class Optimizer:
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function, global_values=parameter_values)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
@@ -653,7 +655,7 @@ class Optimizer:
 
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
-                          program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof):
+                          program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof):
 
         mstats.register("avg", np.mean)
         mstats.register("std", np.std)
@@ -709,15 +711,21 @@ class Optimizer:
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
+        level_offset = 0
         for gen in range(min_generation + 1, max_generation + 1):
             average_execution_time = self.compute_average_population_execution_time(population)
             if count >= 10 and average_execution_time < execution_time_threshold:
-                evaluation_min_level += 1
-                evaluation_max_level += 1
+                level_offset += 1
+                evaluation_min_level = min_level + level_offset
+                evaluation_max_level = max_level + level_offset
+                next_parameter_values = {}
+                for key, values in parameter_values.items():
+                    assert level_offset < len(values), 'Too few parameter values provided'
+                    next_parameter_values[key] = values[level_offset]
                 count = 0
                 print("Increasing problem size", flush=True)
                 self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                  self.evaluate_multiple_objectives)
+                                                  self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
                 invalid_ind = [ind for ind in population]
                 fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
                 for ind, fit in zip(invalid_ind, fitnesses):
@@ -819,15 +827,19 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
+             program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
         if self.is_root():
             print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
         # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
+        initial_parameter_values = {}
+        for key, values in parameter_values.items():
+            initial_parameter_values[key] = values[0]
         self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level, solver_program=program)
+                               storages=storages, min_level=min_level, max_level=max_level, solver_program=program,
+                               parameter_values=initial_parameter_values)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -836,20 +848,23 @@ class Optimizer:
         hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness == b.fitness)
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
+               program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='standard')
         self._toolbox.register("select_for_mating", tools.selTournamentDCD)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        initial_parameter_values = {}
+        for key, values in parameter_values.items():
+            initial_parameter_values[key] = values[0]
         self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
                                storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program)
+                               solver_program=program, parameter_values=initial_parameter_values)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -860,11 +875,11 @@ class Optimizer:
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
     def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_,
                 crossover_probability, mutation_probability, min_level, max_level,
-                program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
+                program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
         if self.is_root():
             print("Running NSGA-III Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
@@ -874,9 +889,12 @@ class Optimizer:
         self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
         self._toolbox.register("select_for_mating", tools.selRandom)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        initial_parameter_values = {}
+        for key, values in parameter_values.items():
+            initial_parameter_values[key] = values[0]
         self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
                                storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program)
+                               solver_program=program, parameter_values=initial_parameter_values)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -887,13 +905,14 @@ class Optimizer:
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, logbooks, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
                                   gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
                                   required_convergence=0.9,
                                   restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
                                   optimize_relaxation_factors=True,
+                                  parameter_values={},
                                   krylov_subspace_methods=('ConjugateGradient', 'BiCGStab', 'MinRes',
                                                            'ConjugateResidual'),
                                   minimum_solver_iterations=8, maximum_solver_iterations=1024):
@@ -977,7 +996,7 @@ class Optimizer:
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                     gp_crossover_probability, gp_mutation_probability,
-                                    min_level, max_level, solver_program, storages, best_expression, logbooks,
+                                    min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
 
             pops.append(pop)

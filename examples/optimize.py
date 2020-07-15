@@ -112,7 +112,7 @@ def main():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.SOGP
+    optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
@@ -129,13 +129,16 @@ def main():
     maximum_solver_iterations = 2**10
     # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     krylov_subspace_methods = ()
+    values = [40.0 * 2.0**i for i in range(100)]
+    parameter_values = {'k' : values}
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=64, gp_lambda=64,
+                                                               gp_mu=100, gp_lambda=100,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
+                                                               parameter_values=parameter_values,
                                                                required_convergence=required_convergence,
                                                                restart_from_checkpoint=restart_from_checkpoint,
                                                                krylov_subspace_methods=krylov_subspace_methods,
@@ -143,7 +146,7 @@ def main():
                                                                maximum_solver_iterations=maximum_solver_iterations)
     
     if mpi_rank == 0:
-        print(f'ExaSlang representation:\n{program}\n', flush=True)
+        print(f'Grammar representation:\n{program}\n', flush=True)
     log_dir_name = f'{problem_name}/data_{mpi_rank}'
     if not os.path.exists(log_dir_name):
         os.makedirs(log_dir_name)
