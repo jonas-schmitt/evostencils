@@ -100,7 +100,7 @@ class Optimizer:
         self._individual_cache_misses = 0
         self._timeout_counter_limit = 10000
 
-    def reinitialize(self, min_level, max_level):
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20):
         self.program_generator.reinitialize(min_level, max_level)
         program_generator = self.program_generator
         dimension = program_generator.dimension
@@ -111,19 +111,26 @@ class Optimizer:
         equations = program_generator.equations
         operators = program_generator.operators
         fields = program_generator.fields
-        self._dimension = dimension
-        self._finest_grid = finest_grid
         solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
-        self._approximation = system.Approximation('x', solution_entries)
+        approximation = system.Approximation('x', solution_entries)
         rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
-        self._rhs = system.RightHandSide('b', rhs_entries)
-        self._coarsening_factor = coarsening_factor
-        self._max_level = max_level
-        self._min_level = min_level
-        self._equations = equations
-        self._operators = operators
-        self._fields = fields
+        rhs = system.RightHandSide('b', rhs_entries)
         self._individual_cache.clear()
+        maximum_block_size = 8
+        levels_per_run = max_level - min_level
+        pset, _ = \
+            multigrid_initialization.generate_primitive_set(approximation, rhs, dimension,
+                                                            coarsening_factor, max_level, equations,
+                                                            operators, fields,
+                                                            maximum_block_size=maximum_block_size,
+                                                            depth=levels_per_run,
+                                                            LevelFinishedType=self._FinishedType,
+                                                            LevelNotFinishedType=self._NotFinishedType)
+        self.program_generator.initialize_code_generation(min_level, max_level)
+        storages = self._program_generator.generate_storage(min_level, max_level, finest_grid)
+        self.toolbox.register('evaluate', evaluation_function, pset=pset,
+                              storages=storages, min_level=min_level, max_level=max_level,
+                              solver_program=program, number_of_samples=number_of_samples)
 
     @staticmethod
     def _init_creator():
@@ -405,7 +412,8 @@ class Optimizer:
             self.add_individual_to_cache(individual, values)
             return values
 
-    def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program):
+    def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
+                                  number_of_samples=20):
         self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
@@ -426,14 +434,14 @@ class Optimizer:
             n = len(initial_weights)
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
-                                                                            self.max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
+                                                                            max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
             average_convergence_factor = 0
             average_number_of_iterations = 0
-            number_of_samples = 20
+            failed_testcases = 0
             count = 0
             threshold = number_of_samples // 2
 
@@ -446,7 +454,7 @@ class Optimizer:
                     w = random.gauss(1.0, 0.2)
                 weights.append(w)
             for i in range(number_of_samples):
-                if count > threshold:
+                if failed_testcases > threshold:
                     break
                 program_generator.generate_global_weight_initializations(output_path, weights)
                 program_generator.run_c_compiler(output_path)
@@ -455,24 +463,30 @@ class Optimizer:
                                                infinity=self.infinity,
                                                number_of_samples=1)
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
-                    count += 1
+                    failed_testcases += 1
                 average_time_to_convergence += time_to_convergence / number_of_samples
                 average_convergence_factor += convergence_factor / number_of_samples
                 average_number_of_iterations += number_of_iterations / number_of_samples
                 program_generator.restore_global_initializations(output_path)
+                count += 1
             # time_to_convergence, convergence_factor, number_of_iterations = \
             #         self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
             #                 solver_program, infinity=self.infinity,
             #                 number_of_samples=3)
             fitness = average_time_to_convergence,
-            if count > threshold:
-                fitness = average_convergence_factor * self.infinity**0.5,
+            if failed_testcases > threshold:
+                average_convergence_factor = average_convergence_factor * number_of_samples / count
+                if average_convergence_factor < self.infinity ** 0.5:
+                    fitness = average_convergence_factor * self.infinity ** 0.5,
+                else:
+                    fitness = self.infinity,
                 # print("Fitness: ", fitness, flush=True)
                 # print("Convergence factor: ", convergence_factor, flush=True)
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
-    def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program):
+    def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
+                                     number_of_samples=20):
         self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
@@ -491,15 +505,14 @@ class Optimizer:
             n = len(initial_weights)
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
-                                                                            self.max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
+                                                                            max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
             average_convergence_factor = 0
             average_number_of_iterations = 0
-            number_of_samples = 20
-            count = 0
+            failed_testcases = 0
             threshold = number_of_samples // 2
 
             program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
@@ -510,8 +523,9 @@ class Optimizer:
                 while w < 0 or w > 2.0:
                     w = random.gauss(1.0, 0.2)
                 weights.append(w)
+            count = 0
             for i in range(number_of_samples):
-                if count > threshold:
+                if failed_testcases > threshold:
                     break
                 program_generator.generate_global_weight_initializations(output_path, weights)
                 program_generator.run_c_compiler(output_path)
@@ -520,18 +534,16 @@ class Optimizer:
                                                infinity=self.infinity,
                                                number_of_samples=1)
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
-                    count += 1
+                    failed_testcases += 1
                 average_time_to_convergence += time_to_convergence / number_of_samples
                 average_convergence_factor += convergence_factor / number_of_samples
                 average_number_of_iterations += number_of_iterations / number_of_samples
                 program_generator.restore_global_initializations(output_path)
-            time_to_convergence, convergence_factor, iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
-                                                              infinity=self.infinity,
-                                                              number_of_samples=3)
+                count += 1
             values = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
-            if average_number_of_iterations >= self.infinity:
-                if average_convergence_factor < self.infinity:
+            if failed_testcases > threshold:
+                average_convergence_factor = average_convergence_factor * number_of_samples / count
+                if average_convergence_factor < self.infinity**0.5:
                     values = average_convergence_factor * self.infinity**0.5, self.infinity
                 else:
                     values = self.infinity, self.infinity
@@ -629,7 +641,8 @@ class Optimizer:
 
         return population, logbook, hof
 
-    def compute_average_population_execution_time(self, population):
+    @staticmethod
+    def compute_average_population_execution_time(population):
         avg_execution_time = 0
         for ind in population:
             execution_time = 1
@@ -692,29 +705,19 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 2
+        execution_time_threshold = 1
+        count = 0
+        evaluation_min_level = min_level
+        evaluation_max_level = max_level
         for gen in range(min_generation + 1, max_generation + 1):
             average_execution_time = self.compute_average_population_execution_time(population)
-            if average_execution_time < execution_time_threshold:
-                # TODO hacky implementation. Works but not in a generic way and right now only single-objective
+            if count >= 10 and average_execution_time < execution_time_threshold:
+                evaluation_min_level += 1
+                evaluation_max_level += 1
+                count = 0
                 print("Increasing problem size", flush=True)
-                # TODO use local information instead of a global reinitialization of all members
-                self.reinitialize(self.min_level + 1, self.max_level + 1)
-                maximum_block_size = 8
-                levels_per_run = self.max_level - self.min_level
-                pset, _ = \
-                    multigrid_initialization.generate_primitive_set(self.approximation, self.rhs, self.dimension,
-                                                                    self.coarsening_factors, self.max_level, self.equations,
-                                                                    self.operators, self.fields,
-                                                                    maximum_block_size=maximum_block_size,
-                                                                    depth=levels_per_run,
-                                                                    LevelFinishedType=self._FinishedType,
-                                                                    LevelNotFinishedType=self._NotFinishedType)
-                self.program_generator.initialize_code_generation(self.min_level, self.max_level)
-                storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-                # TODO implement this in a generic way
-                self.toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
-                                        storages=storages, min_level=self.min_level, max_level=self.max_level, solver_program=program)
+                self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
+                                                  self.evaluate_multiple_objectives)
                 invalid_ind = [ind for ind in population]
                 fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
                 for ind, fit in zip(invalid_ind, fitnesses):
@@ -779,6 +782,7 @@ class Optimizer:
                     print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
             population = self.toolbox.select(population + offspring, mu_)
+            count += 1
             record = mstats.compile(population)
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
@@ -811,7 +815,7 @@ class Optimizer:
         if self.is_root():
             print("Optimization finished", flush=True)
 
-        return population, logbook, hof
+        return population, logbook, hof, evaluation_min_level, evaluation_max_level
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
@@ -954,10 +958,6 @@ class Optimizer:
                                                                 krylov_subspace_methods=krylov_subspace_methods,
                                                                 minimum_solver_iterations=minimum_solver_iterations,
                                                                 maximum_solver_iterations=maximum_solver_iterations)
-            # operator = terminal_list[0].operator
-            # lfa_expression = self.convergence_evaluator.transform(operator)
-            # eigenvalues = self.convergence_evaluator.compute_eigenvalues(lfa_expression._entries[0][0])
-            # self.convergence_evaluator.plot_symbol(lfa_expression._entries[0][0])
             self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
@@ -974,54 +974,52 @@ class Optimizer:
             if optimization_method is None:
                 optimization_method = self.NSGAII
             self.clear_individual_cache()
-            pop, log, hof = optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
-                                                gp_crossover_probability, gp_mutation_probability,
-                                                min_level, max_level, solver_program, storages, best_expression, logbooks,
-                                                checkpoint_frequency=2, checkpoint=tmp)
+            pop, log, hof, evaluation_min_level, evaluation_max_level = \
+                optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
+                                    gp_crossover_probability, gp_mutation_probability,
+                                    min_level, max_level, solver_program, storages, best_expression, logbooks,
+                                    checkpoint_frequency=2, checkpoint=tmp)
 
             pops.append(pop)
             best_time = self.infinity
-            best_convergence_factor = self.infinity
-            evaluation_min_level = min_level
-            evaluation_max_level = max_level
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
+            best_number_of_iterations = self.infinity
+            evaluation_min_level += 1
+            evaluation_max_level += 1
+            self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
+                                              self.evaluate_multiple_objectives, number_of_samples=50)
             output_directory_path = f'./hall_of_fame_{i}_{self.program_generator.problem_name}'
             if not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
-            #TODO fix evaluation phase
             try:
                 for j in range(0, min(len(hof), 100)):
                     individual = hof[j]
-                    expression = self.compile_individual(individual, pset)[0]
-                    # time, convergence_factor, number_of_iterations = \
-                    #     self._program_generator.generate_and_evaluate(expression, storages, evaluation_min_level,
-                    #                                                   evaluation_max_level,
-                    #                                                   solver_program, infinity=self.infinity,
-                    #                                                   number_of_samples=10)
+                    if individual.fitness.values[0] >= self.infinity:
+                        break
+                    values = self.toolbox.evaluate(individual)
+                    individual.fitness.values = values
+                    time = individual.fitness.values[0] * individual.fitness.values[1]
+                    number_of_iterations = individual.fitness.values[0]
                     if self.is_root():
-                        # print(f'\nTime: {time}, '
-                        #       f'Convergence factor: {convergence_factor}, '
-                        #       f'Number of Iterations: {number_of_iterations}', flush=True)
-                        execution_time_until_convergence = 1
-                        for value in individual.fitness.values:
-                            execution_time_until_convergence *= value
-                        print(f'\nExecution time until convergence: {execution_time_until_convergence}')
+                        print(f'\nExecution time until convergence: {time}, '
+                              f'Number of Iterations: {number_of_iterations}', flush=True)
                         with open(f'{output_directory_path}/individual_{j}.txt', 'w') as grammar_file:
                             grammar_file.write(str(individual) + '\n')
                         print('Tree representation:', flush=True)
                         print(str(individual), flush=True)
 
                     if time < best_time: #  and convergence_factor < required_convergence:
-                        best_expression = expression
+                        best_individual = individual
                         best_time = time
-                        # best_convergence_factor = convergence_factor
+                        best_number_of_iterations = number_of_iterations
 
             except (KeyboardInterrupt, Exception) as e:
                 raise e
             self.mpi_comm.barrier()
-            print(f"Rank {self.mpi_rank} - Best time: {best_time}, Best convergence factor: {best_convergence_factor}",
+            print(f"Rank {self.mpi_rank} - Fastest execution time until convergence: {best_time}, "
+                  f"Number of iterations: {best_number_of_iterations}",
                   flush=True)
+            #TODO fix relaxation factor optimization
             """
             if optimize_relaxation_factors and es_generations > 0:
                 relaxation_factors, improved_convergence_factor = \
@@ -1038,12 +1036,8 @@ class Optimizer:
                 print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
                       flush=True)
             """
-            cycle_function = self.program_generator.generate_cycle_function(best_expression, storages, self.min_level,
-                                                                            evaluation_max_level, self.max_level)
-            solver_program += cycle_function
-
         self.mpi_comm.barrier()
-        return solver_program, pops, logbooks
+        return str(best_individual), pops, logbooks
 
     def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
         initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)

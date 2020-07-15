@@ -435,7 +435,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-        if number_of_terms <= maximum_number_of_generatable_terms:
+        if number_of_terms > len(fine_grid) and number_of_terms <= maximum_number_of_generatable_terms:
             pset.addTerminal(block_size_permutation, types.BlockSize)
     add_cycle(pset, terminals, types, 0, krylov_subspace_methods, coarsest)
 
