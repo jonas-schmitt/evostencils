@@ -832,7 +832,7 @@ class Optimizer:
             print("Running Single-Objective Genetic Programming", flush=True)
         self._init_single_objective_toolbox(pset)
         self._toolbox.register("select", select_unique_best)
-        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=4)
+        self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
         # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
         initial_parameter_values = {}
         for key, values in parameter_values.items():
