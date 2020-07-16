@@ -94,7 +94,7 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-6
+    epsilon = 1e-7
     problem_name = program_generator.problem_name
 
     if not os.path.exists(f'{cwd}/{problem_name}'):

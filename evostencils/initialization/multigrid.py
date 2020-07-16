@@ -195,6 +195,10 @@ class Terminals:
         self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
+        self.four_way_partitioning = part.FourWay
+        self.nine_way_partitioning = part.NineWay
+        self.eight_way_partitioning = part.EightWay
+        self.twenty_seven_way_partitioning = part.TwentySevenWay
 
 
 class Types:
@@ -402,6 +406,12 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+    if dimension == 2:
+        pset.addTerminal(terminals.four_way_partitioning, types.Partitioning, f'four_way')
+        pset.addTerminal(terminals.nine_way_partitioning, types.Partitioning, f'nine_way')
+    elif dimension == 3:
+        pset.addTerminal(terminals.eight_way_partitioning, types.Partitioning, f'eight_way')
+        pset.addTerminal(terminals.twenty_seven_way_partitioning, types.Partitioning, f'twenty_seven_way')
 
     # Relaxation Factors
     pset.addTerminal(1.0, TypeWrapper(float))
@@ -430,7 +440,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
         generate_block_size((), maximum_block_size, dimension)
-    maximum_number_of_generatable_terms = 7
+    maximum_number_of_generatable_terms = 8
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:

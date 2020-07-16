@@ -531,6 +531,31 @@ class ProgramGenerator:
         else:
             raise RuntimeError("Invalid expression")
 
+    def generate_coloring(self, partitioning, indentation):
+        program = ''
+        if partitioning == part.RedBlack:
+            program += f'{indentation}\t(('
+            for i in range(self.dimension):
+                program += f'i{i}'
+                if i < self.dimension - 1:
+                    program += ' + '
+            program += ') % 2),\n'
+        elif partitioning == part.FourWay:
+            program += f'{indentation}\t(i0 % 2),\n'
+            program += f'{indentation}\t(i1 % 2),\n'
+        elif partitioning == part.NineWay:
+            program += f'{indentation}\t(i0 % 3),\n'
+            program += f'{indentation}\t(i1 % 3),\n'
+        elif partitioning == part.EightWay:
+            program += f'{indentation}\t(i0 % 2),\n'
+            program += f'{indentation}\t(i1 % 2),\n'
+            program += f'{indentation}\t(i2 % 2),\n'
+        elif partitioning == part.TwentySevenWay:
+            program += f'{indentation}\t(i0 % 3),\n'
+            program += f'{indentation}\t(i1 % 3),\n'
+            program += f'{indentation}\t(i2 % 3),\n'
+        return program
+
     def generate_multigrid(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                            max_level: int, use_global_weights=False):
         program = ''
@@ -628,15 +653,11 @@ class ProgramGenerator:
                         for key, value in independent_equations:
                             coloring = False
                             indentation = ''
-                            if expression.partitioning == part.RedBlack:
+                            if expression.partitioning != part.Single:
                                 coloring = True
-                                program += '\tcolor with {\n\t\t(('
-                                for i in range(self.dimension):
-                                    program += f'i{i}'
-                                    if i < self.dimension - 1:
-                                        program += ' + '
-                                program += ') % 2),\n'
                                 indentation += '\t'
+                                program += f'{indentation}color with {{\n'
+                                program += self.generate_coloring(expression.partitioning, indentation)
                             if key[1] < max_level:
                                 program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
                             else:
@@ -649,15 +670,11 @@ class ProgramGenerator:
                         coloring = False
                         indentation = ''
                         if len(dependent_equations) > 0:
-                            if expression.partitioning == part.RedBlack:
+                            if expression.partitioning != part.Single:
                                 coloring = True
-                                program += '\tcolor with {\n\t\t(('
-                                for i in range(self.dimension):
-                                    program += f'i{i}'
-                                    if i < self.dimension - 1:
-                                        program += ' + '
-                                program += ') % 2),\n'
                                 indentation += '\t'
+                                program += f'{indentation}color with {{\n'
+                                program += self.generate_coloring(expression.partitioning, indentation)
                             level = dependent_equations[0][0][1]
                             if level < max_level:
                                 program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'

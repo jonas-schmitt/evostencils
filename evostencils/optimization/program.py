@@ -445,7 +445,7 @@ class Optimizer:
             average_number_of_iterations = 0
             failed_testcases = 0
             count = 0
-            threshold = number_of_samples // 2
+            threshold = number_of_samples // 4
 
             program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
                                                        settings_path=program_generator.settings_path_generated)
@@ -476,14 +476,11 @@ class Optimizer:
             #                 solver_program, infinity=self.infinity,
             #                 number_of_samples=3)
             fitness = average_time_to_convergence,
-            if failed_testcases > threshold:
-                average_convergence_factor = average_convergence_factor * number_of_samples / count
-                if average_convergence_factor < self.infinity ** 0.5:
-                    fitness = average_convergence_factor * self.infinity ** 0.5,
-                else:
-                    fitness = self.infinity,
-                # print("Fitness: ", fitness, flush=True)
-                # print("Convergence factor: ", convergence_factor, flush=True)
+            if average_number_of_iterations >= self.infinity / number_of_samples:
+                if failed_testcases >= threshold:
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                return average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -515,7 +512,7 @@ class Optimizer:
             average_convergence_factor = 0
             average_number_of_iterations = 0
             failed_testcases = 0
-            threshold = number_of_samples // 2
+            threshold = number_of_samples // 4
 
             program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
                                                        settings_path=program_generator.settings_path_generated)
@@ -537,18 +534,20 @@ class Optimizer:
                                                number_of_samples=1)
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
-                average_time_to_convergence += time_to_convergence / number_of_samples
+                    average_time_to_convergence += self.infinity / number_of_samples
+                    average_number_of_iterations += self.infinity / number_of_samples
+                else:
+                    average_time_to_convergence += time_to_convergence / number_of_samples
+                    average_number_of_iterations += number_of_iterations / number_of_samples
                 average_convergence_factor += convergence_factor / number_of_samples
-                average_number_of_iterations += number_of_iterations / number_of_samples
                 program_generator.restore_global_initializations(output_path)
                 count += 1
             values = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
-            if failed_testcases > threshold:
-                average_convergence_factor = average_convergence_factor * number_of_samples / count
-                if average_convergence_factor < self.infinity**0.5:
-                    values = average_convergence_factor * self.infinity**0.5, self.infinity
-                else:
-                    values = self.infinity, self.infinity
+            if average_number_of_iterations >= self.infinity / number_of_samples:
+                if failed_testcases >= threshold:
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                return average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             self.add_individual_to_cache(individual, values)
             return values
 
@@ -707,13 +706,14 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 1
+        execution_time_threshold = 1.5
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
         for gen in range(min_generation + 1, max_generation + 1):
             average_execution_time = self.compute_average_population_execution_time(population)
+            print("Average execution time:", average_execution_time, flush=True)
             if count >= 10 and average_execution_time < execution_time_threshold:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
