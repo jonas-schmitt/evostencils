@@ -94,7 +94,7 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-7
+    epsilon = 1e-6
     problem_name = program_generator.problem_name
 
     if not os.path.exists(f'{cwd}/{problem_name}'):
@@ -111,7 +111,7 @@ def main():
     levels_per_run = max_level - min_level
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
-    maximum_block_size = 8
+    maximum_block_size = 6
     optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":

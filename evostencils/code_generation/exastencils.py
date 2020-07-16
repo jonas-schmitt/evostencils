@@ -35,7 +35,7 @@ class Field:
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
             mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle",
-            evaluation_timeout=100, code_generation_timeout=300, c_compiler_timeout=60):
+            evaluation_timeout=100, code_generation_timeout=300, c_compiler_timeout=120):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0

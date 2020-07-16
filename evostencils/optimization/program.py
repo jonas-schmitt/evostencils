@@ -117,7 +117,7 @@ class Optimizer:
         rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
         rhs = system.RightHandSide('b', rhs_entries)
         self._individual_cache.clear()
-        maximum_block_size = 8
+        maximum_block_size = 6
         levels_per_run = max_level - min_level
         pset, _ = \
             multigrid_initialization.generate_primitive_set(approximation, rhs, dimension,
@@ -513,9 +513,11 @@ class Optimizer:
             average_number_of_iterations = 0
             failed_testcases = 0
             threshold = number_of_samples // 4
-
-            program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
-                                                       settings_path=program_generator.settings_path_generated)
+            try:
+                program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
+                                                           settings_path=program_generator.settings_path_generated)
+            except subprocess.TimeoutExpired as e:
+                return self.infinity, self.infinity
             weights = []
             for _ in range(n):
                 w = random.gauss(1.0, 0.2)
@@ -527,11 +529,11 @@ class Optimizer:
                 if failed_testcases > threshold:
                     break
                 program_generator.generate_global_weight_initializations(output_path, weights)
-                program_generator.run_c_compiler(output_path)
-                time_to_convergence, convergence_factor, number_of_iterations = \
-                    program_generator.evaluate(output_path,
-                                               infinity=self.infinity,
-                                               number_of_samples=1)
+                try:
+                    program_generator.run_c_compiler(output_path)
+                except subprocess.TimeoutExpired as e:
+                    return self.infinity, self.infinity
+                time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
                     average_time_to_convergence += self.infinity / number_of_samples
@@ -706,7 +708,7 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 1.5
+        execution_time_threshold = 2
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
