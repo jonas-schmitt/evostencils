@@ -117,7 +117,7 @@ class Optimizer:
         rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
         rhs = system.RightHandSide('b', rhs_entries)
         self._individual_cache.clear()
-        maximum_block_size = 6
+        maximum_block_size = 8
         levels_per_run = max_level - min_level
         pset, _ = \
             multigrid_initialization.generate_primitive_set(approximation, rhs, dimension,

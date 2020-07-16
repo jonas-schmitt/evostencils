@@ -111,7 +111,7 @@ def main():
     levels_per_run = max_level - min_level
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
-    maximum_block_size = 6
+    maximum_block_size = 8
     optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":

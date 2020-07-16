@@ -440,7 +440,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
         generate_block_size((), maximum_block_size, dimension)
-    maximum_number_of_generatable_terms = 8
+    maximum_number_of_generatable_terms = 6
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:
