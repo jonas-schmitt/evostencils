@@ -123,7 +123,7 @@ def main():
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
 
-    crossover_probability = 2.0/3.0
+    crossover_probability = 0.5
     mutation_probability = 1.0 - crossover_probability
     minimum_solver_iterations = 2**3
     maximum_solver_iterations = 2**10

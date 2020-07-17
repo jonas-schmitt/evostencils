@@ -13,6 +13,8 @@ import numpy as np
 import time
 import itertools
 import os
+import subprocess
+
 
 class do_nothing(object):
     def __init__(self):
@@ -148,7 +150,7 @@ class Optimizer:
 
         def mutate(individual, pset):
             operator_choice = random.random()
-            if operator_choice < 2.0/3.0:
+            if operator_choice < 0.5:
                 return mutInsert(individual, 0, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
@@ -708,7 +710,7 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 2
+        execution_time_threshold = 1.5
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
