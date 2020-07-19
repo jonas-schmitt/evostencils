@@ -702,7 +702,7 @@ class Optimizer:
             print("Number of successful evaluations in initial population:",
                   successful_evaluations, flush=True)
         self.reset_evaluation_counters()
-        population = self.toolbox.select(population, max(lambda_, successful_evaluations - successful_evaluations % 4))
+        population = self.toolbox.select(population, max(mu_, successful_evaluations - successful_evaluations % 4))
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
