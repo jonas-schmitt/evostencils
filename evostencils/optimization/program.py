@@ -419,6 +419,8 @@ class Optimizer:
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
                                   number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
+        if len(individual) > 150:
+            return self.infinity,
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
@@ -489,6 +491,8 @@ class Optimizer:
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
                                      number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
+        if len(individual) > 150:
+            return self.infinity, self.infinity
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
@@ -715,10 +719,11 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
+        optimization_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
             average_execution_time = self.compute_average_population_execution_time(population)
             print("Average execution time:", average_execution_time, flush=True)
-            if count >= 10 and average_execution_time < execution_time_threshold:
+            if count >= optimization_interval and average_execution_time < execution_time_threshold:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
@@ -734,6 +739,8 @@ class Optimizer:
                 fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
                 for ind, fit in zip(invalid_ind, fitnesses):
                     ind.fitness.values = fit
+                population = self.toolbox.select(population, mu_)
+                optimization_interval += 10
 
             if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
                 if self.is_root():
