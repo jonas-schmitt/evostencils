@@ -714,7 +714,7 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 1.5
+        execution_time_threshold = 2
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
