@@ -714,7 +714,7 @@ class Optimizer:
         receive_request_right_neighbor = None
         if self.number_of_mpi_processes > 1:
             receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-        execution_time_threshold = 2
+        execution_time_threshold = 1.5
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
@@ -735,11 +735,13 @@ class Optimizer:
                 print("Increasing problem size", flush=True)
                 self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                   self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
+                hof.clear()
                 invalid_ind = [ind for ind in population]
                 fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
                 for ind, fit in zip(invalid_ind, fitnesses):
                     ind.fitness.values = fit
                 population = self.toolbox.select(population, mu_)
+                hof.update(population)
                 optimization_interval += 10
 
             if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
@@ -992,7 +994,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 4 * gp_mu
+            initial_population_size = 8 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
