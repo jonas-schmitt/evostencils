@@ -150,7 +150,7 @@ class Optimizer:
 
         def mutate(individual, pset):
             operator_choice = random.random()
-            if operator_choice < 0.5:
+            if operator_choice < 2.0/3.0:
                 return mutInsert(individual, 0, 10, pset)
             else:
                 return mutNodeReplacement(individual, pset)
@@ -994,7 +994,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 8 * gp_mu
+            initial_population_size = 4 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
@@ -1030,7 +1030,10 @@ class Optimizer:
                         break
                     values = self.toolbox.evaluate(individual)
                     individual.fitness.values = values
-                    time = individual.fitness.values[0] * individual.fitness.values[1]
+                    if len(individual.fitness.values) == 2:
+                        time = individual.fitness.values[0] * individual.fitness.values[1]
+                    else:
+                        time = individual.fitness.values[0]
                     number_of_iterations = individual.fitness.values[0]
                     if self.is_root():
                         print(f'\nExecution time until convergence: {time}, '
