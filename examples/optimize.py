@@ -1,9 +1,9 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.evaluation.convergence import ConvergenceEvaluator
+# from evostencils.evaluation.convergence import ConvergenceEvaluator
 from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-import lfa_lab
+# import lfa_lab
 import sys
 # import dill
 from mpi4py import MPI
@@ -83,8 +83,8 @@ def main():
     operators = program_generator.operators
     fields = program_generator.fields
 
-    lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
-    convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
+    # lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
+    # convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
     bytes_per_word = 8
     # Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz
     peak_performance = 26633.33 * 1e6
@@ -102,7 +102,7 @@ def main():
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=nprocs,
-                          convergence_evaluator=convergence_evaluator,
+                          # convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
@@ -112,7 +112,7 @@ def main():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.NSGAII
+    optimization_method = optimizer.SOGP
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
@@ -133,7 +133,7 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=64, gp_lambda=64,
+                                                               gp_mu=100, gp_lambda=5,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
                                                                gp_generations=100, es_generations=150,

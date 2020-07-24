@@ -16,6 +16,9 @@ import os
 import subprocess
 
 
+def flatten(l: list):
+    return [item for sublist in l for item in sublist]
+
 class do_nothing(object):
     def __init__(self):
         pass
@@ -267,82 +270,6 @@ class Optimizer:
 
     def is_root(self):
         return self.mpi_rank == 0
-
-    def mpi_get_left_neighbor(self):
-        if self.mpi_rank > 0:
-            return self.mpi_rank - 1
-        else:
-            return self.number_of_mpi_processes - 1
-
-    def mpi_get_right_neighbor(self):
-        if self.mpi_rank < self.number_of_mpi_processes - 1:
-            return self.mpi_rank + 1
-        else:
-            return 0
-
-    def mpi_receive_from_neighbors(self):
-        right_neighbor = self.mpi_get_right_neighbor()
-        left_neighbor = self.mpi_get_left_neighbor()
-        left_request = self.mpi_comm.irecv(source=left_neighbor, tag=left_neighbor)
-        right_request = self.mpi_comm.irecv(source=right_neighbor, tag=right_neighbor)
-        return left_request, right_request
-
-    def mpi_send_to_neighbors(self, data):
-        right_neighbor = self.mpi_get_right_neighbor()
-        left_neighbor = self.mpi_get_left_neighbor()
-        left_request = self.mpi_comm.isend(data, left_neighbor, tag=self.mpi_rank)
-        right_request = self.mpi_comm.isend(data, right_neighbor, tag=self.mpi_rank)
-        return left_request, right_request
-
-    def mpi_wait_for_receive_request(self, request):
-        counter = 0
-        cancel_request = False
-        try:
-            finished = request.Test()
-            while not finished:
-                if counter == self._timeout_counter_limit:
-                    request.Cancel()
-                    cancel_request = True
-                    break
-                counter += 1
-                time.sleep(1e-2)
-                finished = request.Test()
-            if cancel_request:
-                print("Communication timeout reached")
-                print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
-                return None
-            else:
-                return request.wait()
-        except Exception as e:
-            request.Cancel()
-            print(e)
-            print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
-            return None
-
-    def mpi_wait_for_send_request(self, request):
-        counter = 0
-        cancel_request = False
-        try:
-            finished = request.Test()
-            while not finished:
-                if counter == self._timeout_counter_limit:
-                    request.Cancel()
-                    cancel_request = True
-                    print("Communication timeout reached")
-                    print(f"Immigration of individuals failed on process with rank {self.mpi_rank}")
-                    break
-                counter += 1
-                time.sleep(1e-2)
-                finished = request.Test()
-            if cancel_request:
-                return False
-            else:
-                return True
-        except Exception as e:
-            request.Cancel()
-            print(e)
-            print(f"Emigration of individuals failed on process with rank {self.mpi_rank}")
-            return False
 
     def reset_evaluation_counters(self):
         self._failed_evaluations = 0
@@ -681,7 +608,8 @@ class Optimizer:
             population = checkpoint.population
             min_generation = checkpoint.generation
         else:
-            population = self._toolbox.population(n=initial_population_size)
+            initial_population_size_per_process = int(math.ceil(initial_population_size / self.number_of_mpi_processes))
+            population = self.toolbox.population(n=initial_population_size_per_process)
             min_generation = 0
         max_generation = generations
 
@@ -702,18 +630,17 @@ class Optimizer:
             print("Number of successful evaluations in initial population:",
                   successful_evaluations, flush=True)
         self.reset_evaluation_counters()
-        population = self.toolbox.select(population, max(mu_, successful_evaluations - successful_evaluations % 4))
+
+
+        if self.number_of_mpi_processes > 1:
+            population = flatten(self.mpi_comm.allgather(population))
+        population = self.toolbox.select(population, mu_)
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
-        immigration_interval = 5
-        receive_request_left_neighbor = None
-        receive_request_right_neighbor = None
-        if self.number_of_mpi_processes > 1:
-            receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
         execution_time_threshold = 1.5
         count = 0
         evaluation_min_level = min_level
@@ -722,7 +649,8 @@ class Optimizer:
         optimization_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
             average_execution_time = self.compute_average_population_execution_time(population)
-            print("Average execution time:", average_execution_time, flush=True)
+            if self.is_root():
+                print("Average execution time:", average_execution_time, flush=True)
             if count >= optimization_interval and average_execution_time < execution_time_threshold:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
@@ -732,7 +660,8 @@ class Optimizer:
                     assert level_offset < len(values), 'Too few parameter values provided'
                     next_parameter_values[key] = values[level_offset]
                 count = 0
-                print("Increasing problem size", flush=True)
+                if self.is_root():
+                    print("Increasing problem size", flush=True)
                 self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                   self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
                 hof.clear()
@@ -742,28 +671,8 @@ class Optimizer:
                     ind.fitness.values = fit
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 10
-
-            if gen % immigration_interval == 0 and self.number_of_mpi_processes > 1:
-                if self.is_root():
-                    print("Exchanging colonies", flush=True)
-
-                send_request_left_neighbor, send_request_right_neighbor = \
-                    self.mpi_send_to_neighbors(population[:len(population)//2])
-
-                self.mpi_wait_for_send_request(send_request_left_neighbor)
-                left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
-                if left_neighbor_population is not None:
-                    population.extend(left_neighbor_population)
-
-                self.mpi_wait_for_send_request(send_request_right_neighbor)
-                right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
-                if right_neighbor_population is not None:
-                    population.extend(right_neighbor_population)
-
-                receive_request_left_neighbor, receive_request_right_neighbor = self.mpi_receive_from_neighbors()
-                population = self.toolbox.select(population, mu_)
-                self.mpi_comm.barrier()
+                if optimization_interval <= 10:
+                    optimization_interval += 10
             # Vary the population
             selected = self.toolbox.select_for_mating(population, lambda_)
             parents = [self.toolbox.clone(ind) for ind in selected]
@@ -787,6 +696,10 @@ class Optimizer:
             fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
+
+            if self.number_of_mpi_processes > 1:
+                offspring = flatten(self.mpi_comm.allgather(offspring))
+
             hof.update(offspring)
 
             if gen % checkpoint_frequency == 0:
@@ -809,29 +722,6 @@ class Optimizer:
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             if self.is_root():
                 print(logbook.stream, flush=True)
-        if self.is_root():
-            print("Exchanging colonies", flush=True)
-
-        if self.number_of_mpi_processes > 1:
-            send_request_left_neighbor, send_request_right_neighbor = \
-                self.mpi_send_to_neighbors(population[:len(population) // 2])
-
-            self.mpi_wait_for_send_request(send_request_left_neighbor)
-            left_neighbor_population = self.mpi_wait_for_receive_request(receive_request_left_neighbor)
-            if left_neighbor_population is not None:
-                population.extend(left_neighbor_population)
-
-            self.mpi_wait_for_send_request(send_request_right_neighbor)
-            right_neighbor_population = self.mpi_wait_for_receive_request(receive_request_right_neighbor)
-            if right_neighbor_population is not None:
-                population.extend(right_neighbor_population)
-
-            self.mpi_comm.barrier()
-            number_of_immigrants = max(10, 2 * len(population) // self.number_of_mpi_processes)
-            colonies = self.mpi_comm.allgather(population[:number_of_immigrants])
-            immigrants = list(itertools.chain.from_iterable(colonies))
-            population.extend(immigrants)
-
         hof.update(population)
         if self.is_root():
             print("Optimization finished", flush=True)
@@ -974,8 +864,9 @@ class Optimizer:
                     continue
             approximation = approximations[i]
 
-            self._convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
-            if i > 0:
+            if self.convergence_evaluator is not None:
+                self.convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
+            if i > 0 and self.performance_evaluator is not None:
                 self.performance_evaluator.set_runtime_of_coarse_grid_solver(0.0)
 
             rhs = right_hand_sides[i]
@@ -994,7 +885,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 4 * gp_mu
+            initial_population_size = gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
@@ -1002,7 +893,7 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
 
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
                 optimization_method = self.NSGAII
             self.clear_individual_cache()
@@ -1023,37 +914,37 @@ class Optimizer:
             if not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
-            try:
-                for j in range(0, min(len(hof), 100)):
-                    individual = hof[j]
-                    if individual.fitness.values[0] >= self.infinity:
-                        break
-                    values = self.toolbox.evaluate(individual)
-                    individual.fitness.values = values
-                    if len(individual.fitness.values) == 2:
-                        time = individual.fitness.values[0] * individual.fitness.values[1]
-                    else:
-                        time = individual.fitness.values[0]
-                    number_of_iterations = individual.fitness.values[0]
-                    if self.is_root():
-                        print(f'\nExecution time until convergence: {time}, '
-                              f'Number of Iterations: {number_of_iterations}', flush=True)
-                        with open(f'{output_directory_path}/individual_{j}.txt', 'w') as grammar_file:
-                            grammar_file.write(str(individual) + '\n')
-                        print('Tree representation:', flush=True)
-                        print(str(individual), flush=True)
 
-                    if time < best_time: #  and convergence_factor < required_convergence:
+            fitness_values = []
+            for j in range(0, min(len(hof), 5)):
+                individual = hof[j]
+                if individual.fitness.values[0] >= self.infinity:
+                    continue
+                if j % self.number_of_mpi_processes == self.mpi_rank:
+                    values = self.toolbox.evaluate(individual)
+                    fitness_values.append((j, values))
+            self.mpi_comm.barrier()
+            tmp = self.mpi_comm.gather(fitness_values, root=0)
+            if self.is_root():
+                fitness_values = flatten(tmp)
+                for j, values in fitness_values:
+                    individual = hof[j]
+                    time = values[0] * values[1]
+                    number_of_iterations = values[0]
+                    print(f'\nExecution time until convergence: {time}, '
+                          f'Number of Iterations: {number_of_iterations}', flush=True)
+                    with open(f'{output_directory_path}/individual_{j}.txt', 'w') as grammar_file:
+                        grammar_file.write(str(individual) + '\n')
+                    print('Tree representation:', flush=True)
+                    print(str(individual), flush=True)
+
+                    if time < best_time: # and convergence_factor < required_convergence:
                         best_individual = individual
                         best_time = time
                         best_number_of_iterations = number_of_iterations
+                print(f"\nFastest execution time until convergence: {best_time}, "
+                      f"Number of iterations: {best_number_of_iterations}", flush=True)
 
-            except (KeyboardInterrupt, Exception) as e:
-                raise e
-            self.mpi_comm.barrier()
-            print(f"Rank {self.mpi_rank} - Fastest execution time until convergence: {best_time}, "
-                  f"Number of iterations: {best_number_of_iterations}",
-                  flush=True)
             #TODO fix relaxation factor optimization
             """
             if optimize_relaxation_factors and es_generations > 0:
