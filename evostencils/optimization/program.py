@@ -631,7 +631,6 @@ class Optimizer:
                   successful_evaluations, flush=True)
         self.reset_evaluation_counters()
 
-
         if self.number_of_mpi_processes > 1:
             population = flatten(self.mpi_comm.allgather(population))
         population = self.toolbox.select(population, mu_)
@@ -665,10 +664,11 @@ class Optimizer:
                 self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                   self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
                 hof.clear()
-                invalid_ind = [ind for ind in population]
-                fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
-                for ind, fit in zip(invalid_ind, fitnesses):
-                    ind.fitness.values = fit
+                fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
+                             if i % self.number_of_mpi_processes == self.mpi_rank]
+                fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
+                for i, values in fitnesses:
+                    population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 if optimization_interval <= 10:
@@ -885,7 +885,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = gp_mu
+            initial_population_size = 2 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4
