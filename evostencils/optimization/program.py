@@ -375,22 +375,27 @@ class Optimizer:
             average_convergence_factor = 0
             average_number_of_iterations = 0
             failed_testcases = 0
-            count = 0
             threshold = number_of_samples // 4
-
-            program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
-                                                       settings_path=program_generator.settings_path_generated)
+            try:
+                program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
+                                                           settings_path=program_generator.settings_path_generated)
+            except subprocess.TimeoutExpired as e:
+                return self.infinity, self.infinity
             weights = []
             for _ in range(n):
                 w = random.gauss(1.0, 0.2)
                 while w < 0 or w > 2.0:
                     w = random.gauss(1.0, 0.2)
                 weights.append(w)
+            count = 0
             for i in range(number_of_samples):
                 if failed_testcases > threshold:
                     break
                 program_generator.generate_global_weight_initializations(output_path, weights)
-                program_generator.run_c_compiler(output_path)
+                try:
+                    program_generator.run_c_compiler(output_path)
+                except subprocess.TimeoutExpired as e:
+                    return self.infinity, self.infinity
                 time_to_convergence, convergence_factor, number_of_iterations = \
                     program_generator.evaluate(output_path,
                                                infinity=self.infinity,
@@ -640,7 +645,7 @@ class Optimizer:
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
-        execution_time_threshold = 1.5
+        execution_time_threshold = 1.0
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
@@ -885,7 +890,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 2 * gp_mu
+            initial_population_size = 4 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4

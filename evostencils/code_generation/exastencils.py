@@ -317,7 +317,7 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
-        result = subprocess.run(['make', '-j', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        result = subprocess.run(['make', '-j8', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
