@@ -724,7 +724,7 @@ class Optimizer:
             count += 1
             record = mstats.compile(population)
             # Update the statistics with the new population
-            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            logbook.record(gen=gen, nevals=len(offspring), **record)
             if self.is_root():
                 print(logbook.stream, flush=True)
         hof.update(population)
@@ -890,7 +890,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 4 * gp_mu
+            initial_population_size = 2 * gp_mu
             initial_population_size -= initial_population_size % 4
             gp_mu -= gp_mu % 4
             gp_lambda -= gp_lambda % 4

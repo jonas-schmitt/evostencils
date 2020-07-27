@@ -9,7 +9,7 @@ import math
 import sympy
 import time
 from typing import List
-# import shutil TODO replace 'cp' calls with subprocess with shutil.copyfile
+import shutil # TODO replace 'cp' calls with subprocess with shutil.copyfile
 # from scipy.optimize import minimize_scalar
 
 
@@ -46,21 +46,36 @@ class ProgramGenerator:
         self.timeout_c_compiler = c_compiler_timeout
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
-        self._knowledge_path = knowledge_path
-        self._settings_path = settings_path
         self._dimension, self._min_level, self._max_level = \
             parser.extract_knowledge_information(base_path, knowledge_path)
         self._original_min_level = self.min_level
         self._original_max_level = self.max_level
-        self._base_path_prefix, self._problem_name, self._debug_l3_path, self._output_path = \
+        self._base_path_prefix, self._problem_name, self._debug_l3_path, _ = \
             parser.extract_settings_information(base_path, settings_path)
         self._mpi_rank = mpi_rank
         self._platform = platform
         self._cycle_name = cycle_name
-        self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.knowledge'
-        self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.settings'
-        self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
+        self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.knowledge'
+        self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.settings'
+        self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.exa3'
         self._output_path_generated = None
+
+        process_local_knowledge_path = knowledge_path.replace(".knowledge", f"_base_{mpi_rank}.knowledge")
+        shutil.copyfile(f'{base_path}/{knowledge_path}', f'{base_path}/{process_local_knowledge_path}')
+        process_local_settings_path = settings_path.replace(".settings", f"_base_{mpi_rank}.settings")
+        config_name = f'{self.problem_name}_base_{self.mpi_rank}'
+        self.generate_adapted_settings_file(config_name=config_name, input_file_path=settings_path,
+                                            output_file_path=process_local_settings_path, l2file_required=True)
+        for i in range(1, 5):
+            src = f'{base_path}/{self._base_path_prefix}/{self.problem_name}.exa{i}'
+            dest = f'{base_path}/{self._base_path_prefix}/{config_name}.exa{i}'
+            if os.path.exists(src):
+                shutil.copyfile(src, dest)
+
+        self._settings_path = process_local_settings_path
+        self._knowledge_path = process_local_knowledge_path
+        self._debug_l3_path = self._debug_l3_path.replace(self.problem_name, config_name)
+
         self.run_exastencils_compiler()
         self._solution_equations = solution_equations
         self._equations, self._operators, self._fields = \
@@ -103,10 +118,6 @@ class ProgramGenerator:
     @property
     def base_path(self):
         return self._base_path
-
-    @property
-    def output_path(self):
-        return self._output_path
 
     @property
     def platform(self):
@@ -167,10 +178,8 @@ class ProgramGenerator:
             parser.extract_knowledge_information(self.base_path, self.knowledge_path_generated)
         original_file = f'{self.base_path}/{self.knowledge_path}'
         generated_file = f'{self.base_path}/{self.knowledge_path_generated}'
-        subprocess.run(['cp', original_file, f'{original_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-        subprocess.run(['cp', generated_file, original_file],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(original_file, f'{original_file}.backup')
+        shutil.copyfile(generated_file, original_file)
         self.run_exastencils_compiler()
         self._equations, self._operators, self._fields = \
             parser.extract_l2_information(f'{self.base_path}/{self._debug_l3_path}', self.dimension, self.solution_equations)
@@ -181,9 +190,7 @@ class ProgramGenerator:
         tmp = tuple([2] * self.dimension)
         self._coarsening_factor = [tmp for _ in range(len(self.fields))]
         self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
-        subprocess.run(['cp', f'{original_file}.backup', original_file],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-
+        shutil.copyfile(f'{original_file}.backup', original_file)
 
     @staticmethod
     def generate_global_weights(n: int, name='omega'):
@@ -198,8 +205,7 @@ class ProgramGenerator:
         # Hack to change the weights after generation
         weights = reversed(weights)
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
-        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(path_to_file, f'{path_to_file}.backup')
         with open(path_to_file, 'r') as file:
             lines = file.readlines()
             last_line = lines[-1]
@@ -218,8 +224,7 @@ class ProgramGenerator:
     def adapt_generated_parameters(self, mapping: dict):
         output_path = self._output_path_generated
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_declarations.cpp'
-        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(path_to_file, f'{path_to_file}.backup')
         with open(path_to_file, 'r') as file:
             lines = file.readlines()
         content = ''
@@ -241,8 +246,7 @@ class ProgramGenerator:
     def restore_global_initializations(self, output_path):
         # Hack to change the weights after generation
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
-        subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(f'{path_to_file}.backup', path_to_file)
 
     @staticmethod
     def get_solution_field(storages: List[CycleStorage], index: int, level: int, max_level: int):
@@ -364,9 +368,9 @@ class ProgramGenerator:
         _, __, ___, output_path_generated = \
             parser.extract_settings_information(self.base_path, settings_path)
         self._output_path_generated = output_path_generated
-        debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
-        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
-        subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_base_', '_')
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
+        shutil.copyfile(debug_l3_path, l3_path)
         return output_path_generated
 
     def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=1):
@@ -783,7 +787,7 @@ class ProgramGenerator:
     def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True,
                          global_values={}):
         # TODO fix hacky solution
-        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
@@ -821,17 +825,21 @@ class ProgramGenerator:
 
                 output_file.write(program)
 
-    def generate_adapted_settings_file(self, l2file_required=False):
+    def generate_adapted_settings_file(self, config_name=None, input_file_path=None, output_file_path=None, l2file_required=False):
         base_path = self.base_path
-        input_file_path = self.settings_path
-        output_file_path = self.settings_path_generated
+        if input_file_path is None:
+            input_file_path = self.settings_path
+        if output_file_path is None:
+            output_file_path = self.settings_path_generated
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{base_path}/{output_file_path}', 'w') as output_file:
                 for line in input_file:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'configName':
-                        output_file.write(f'  {lhs}\t = "{self.problem_name}_{self.mpi_rank}"\n')
+                        if config_name is None:
+                            config_name = f'{self.problem_name}_{self.mpi_rank}'
+                        output_file.write(f'  {lhs}\t = "{config_name}"\n')
                     elif l2file_required:
                         output_file.write(line)
                     elif not lhs == 'l2file':
@@ -869,12 +877,9 @@ class ProgramGenerator:
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}.exa3'
         output_file_path = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         tmp = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}'
-        subprocess.run(['cp', f'{tmp}.exa1', f'{tmp}_{self.mpi_rank}.exa1'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-        subprocess.run(['cp', f'{tmp}.exa2', f'{tmp}_{self.mpi_rank}.exa2'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-        subprocess.run(['cp', f'{tmp}.exa4', f'{tmp}_{self.mpi_rank}.exa4'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        for i in [1, 2, 4]:
+            if os.path.exists(f'{tmp}.exa{i}'):
+                shutil.copyfile(f'{tmp}.exa{i}', f'{tmp}_{self.mpi_rank}.exa{i}')
 
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{base_path}/{output_file_path}', 'w') as output_file:
