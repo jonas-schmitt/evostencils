@@ -655,7 +655,7 @@ class Optimizer:
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
-                if i == self.mpi_rank:
+                if i != self.mpi_rank:
                     self.individual_cache.update(cache)
             average_execution_time = self.compute_average_population_execution_time(population)
             if self.is_root():
