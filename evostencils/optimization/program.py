@@ -625,6 +625,7 @@ class Optimizer:
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
 
+
         invalid_ind = [ind for ind in population]
         self.reset_evaluation_counters()
         fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
@@ -652,6 +653,10 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
+            individual_caches = self.mpi_comm.allgather(self.individual_cache)
+            for i, cache in enumerate(individual_caches):
+                if i == self.mpi_rank:
+                    self.individual_cache.update(cache)
             average_execution_time = self.compute_average_population_execution_time(population)
             if self.is_root():
                 print("Average execution time:", average_execution_time, flush=True)
