@@ -14,6 +14,7 @@ import time
 import itertools
 import os
 import subprocess
+from mpi4py import MPI
 
 
 def flatten(l: list):
@@ -104,6 +105,7 @@ class Optimizer:
         self._individual_cache_hits = 0
         self._individual_cache_misses = 0
         self._timeout_counter_limit = 10000
+        self._total_evaluation_time = 0
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
                                      parameter_values={}):
@@ -275,6 +277,10 @@ class Optimizer:
         self._failed_evaluations = 0
         self._total_number_of_evaluations = 0
 
+    @property
+    def total_evaluation_time(self):
+        return self._total_evaluation_time
+
     def generate_individual(self):
         return self._toolbox.individual()
 
@@ -416,7 +422,9 @@ class Optimizer:
                 if failed_testcases >= threshold:
                     average_convergence_factor = average_convergence_factor * number_of_samples / count
                     average_number_of_iterations = average_number_of_iterations * number_of_samples / count
-                return average_convergence_factor**0.5 * average_number_of_iterations**0.5,
+                fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
+            else:
+                self._total_evaluation_time += fitness[0]
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -432,9 +440,9 @@ class Optimizer:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
                 self._failed_evaluations += 1
-                values = self.infinity, self.infinity
-                self.add_individual_to_cache(individual, values)
-                return values
+                fitness = self.infinity, self.infinity
+                self.add_individual_to_cache(individual, fitness)
+                return fitness
             expression = expression1
             initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
             relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
@@ -482,14 +490,16 @@ class Optimizer:
                 average_convergence_factor += convergence_factor / number_of_samples
                 program_generator.restore_global_initializations(output_path)
                 count += 1
-            values = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
             if average_number_of_iterations >= self.infinity / number_of_samples:
                 if failed_testcases >= threshold:
                     average_convergence_factor = average_convergence_factor * number_of_samples / count
                     average_number_of_iterations = average_number_of_iterations * number_of_samples / count
-                return average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
-            self.add_individual_to_cache(individual, values)
-            return values
+                fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
+            else:
+                self._total_evaluation_time += fitness[0] * fitness[1]
+            self.add_individual_to_cache(individual, fitness)
+            return fitness
 
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
                                       _, __, min_level, max_level,
@@ -582,25 +592,6 @@ class Optimizer:
 
         return population, logbook, hof
 
-    @staticmethod
-    def compute_average_population_execution_time(population):
-        avg_execution_time = 0
-        count = 0
-        number_of_invalid_individuals = 0.0
-        for ind in population:
-            if len(ind) <= 150:
-                execution_time = 1
-                for value in ind.fitness.values:
-                    execution_time *= value
-                if execution_time < self.infinity:
-                    avg_execution_time += execution_time / 1000
-                    count += 1
-                else:
-                    number_of_invalid_individuals += 1.0
-        if number_of_invalid_individuals / len(population) > 0.1:
-            return self.infinity
-        return avg_execution_time / count
-
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
                           program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof):
@@ -650,26 +641,26 @@ class Optimizer:
             population = flatten(self.mpi_comm.allgather(population))
         population = self.toolbox.select(population, mu_)
         hof.update(population)
-        average_execution_time = self.compute_average_population_execution_time(population)
-        if self.is_root():
-            print("Average execution time:", average_execution_time, flush=True)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(population), **record)
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
-        execution_time_threshold = 1.5
         count = 0
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
+        self._total_evaluation_time = 0
+        evaluation_time_threshold = 1.0
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
                 if i != self.mpi_rank:
                     self.individual_cache.update(cache)
-            if count >= optimization_interval and average_execution_time < execution_time_threshold:
+            if count >= optimization_interval and \
+                    self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
+                self._total_evaluation_time = 0
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
@@ -691,6 +682,8 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 optimization_interval += 10
+            else:
+                self._total_evaluation_time = 0
             # Vary the population
             selected = self.toolbox.select_for_mating(population, lambda_)
             parents = [self.toolbox.clone(ind) for ind in selected]
@@ -719,10 +712,9 @@ class Optimizer:
                 offspring = flatten(self.mpi_comm.allgather(offspring))
 
             hof.update(offspring)
-
-            average_execution_time = self.compute_average_population_execution_time(offspring)
+            self._total_evaluation_time = self.mpi_comm.allreduce(self.total_evaluation_time, op=MPI.SUM)
             if self.is_root():
-                print("Average execution time:", average_execution_time, flush=True)
+                print("Average evaluation time:", self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3), flush=True)
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
