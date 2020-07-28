@@ -586,13 +586,19 @@ class Optimizer:
     def compute_average_population_execution_time(population):
         avg_execution_time = 0
         count = 0
+        number_of_invalid_individuals = 0.0
         for ind in population:
             if len(ind) <= 150:
                 execution_time = 1
                 for value in ind.fitness.values:
                     execution_time *= value
-                avg_execution_time += execution_time / 1000
-                count += 1
+                if execution_time < self.infinity:
+                    avg_execution_time += execution_time / 1000
+                    count += 1
+                else:
+                    number_of_invalid_individuals += 1.0
+        if number_of_invalid_individuals / len(population) > 0.1:
+            return self.infinity
         return avg_execution_time / count
 
     def ea_mu_plus_lambda(self, initial_population_size, generations, mu_, lambda_,
@@ -648,7 +654,7 @@ class Optimizer:
         if self.is_root():
             print("Average execution time:", average_execution_time, flush=True)
         record = mstats.compile(population) if mstats is not None else {}
-        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
+        logbook.record(gen=min_generation, nevals=len(population), **record)
         if self.is_root():
             print(logbook.stream, flush=True)
         # Begin the generational process
@@ -659,11 +665,10 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 10
         for gen in range(min_generation + 1, max_generation + 1):
-            if gen % 3 == 0:
-                individual_caches = self.mpi_comm.allgather(self.individual_cache)
-                for i, cache in enumerate(individual_caches):
-                    if i != self.mpi_rank:
-                        self.individual_cache.update(cache)
+            individual_caches = self.mpi_comm.allgather(self.individual_cache)
+            for i, cache in enumerate(individual_caches):
+                if i != self.mpi_rank:
+                    self.individual_cache.update(cache)
             if count >= optimization_interval and average_execution_time < execution_time_threshold:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
@@ -685,8 +690,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                if optimization_interval <= 10:
-                    optimization_interval += 10
+                optimization_interval += 10
             # Vary the population
             selected = self.toolbox.select_for_mating(population, lambda_)
             parents = [self.toolbox.clone(ind) for ind in selected]
