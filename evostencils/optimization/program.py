@@ -385,7 +385,7 @@ class Optimizer:
             try:
                 program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
                                                            settings_path=program_generator.settings_path_generated)
-            except subprocess.TimeoutExpired as e:
+            except subprocess.TimeoutExpired as _:
                 return self.infinity, self.infinity
             weights = []
             for _ in range(n):
@@ -400,12 +400,12 @@ class Optimizer:
                 program_generator.generate_global_weight_initializations(output_path, weights)
                 try:
                     program_generator.run_c_compiler(output_path)
-                except subprocess.TimeoutExpired as e:
+                except subprocess.TimeoutExpired as _:
                     return self.infinity, self.infinity
-                time_to_convergence, convergence_factor, number_of_iterations = \
-                    program_generator.evaluate(output_path,
-                                               infinity=self.infinity,
-                                               number_of_samples=1)
+                try:
+                    time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
+                except (FileNotFoundError, subprocess.TimeoutExpired) as _:
+                    time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
                 average_time_to_convergence += time_to_convergence / number_of_samples
@@ -462,7 +462,7 @@ class Optimizer:
             try:
                 program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
                                                            settings_path=program_generator.settings_path_generated)
-            except subprocess.TimeoutExpired as e:
+            except subprocess.TimeoutExpired as _:
                 return self.infinity, self.infinity
             weights = []
             for _ in range(n):
@@ -477,9 +477,13 @@ class Optimizer:
                 program_generator.generate_global_weight_initializations(output_path, weights)
                 try:
                     program_generator.run_c_compiler(output_path)
-                except subprocess.TimeoutExpired as e:
+                except subprocess.TimeoutExpired as _:
                     return self.infinity, self.infinity
-                time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
+                try:
+                    time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
+                except (FileNotFoundError, subprocess.TimeoutExpired) as _:
+                    time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
+
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
                     average_time_to_convergence += self.infinity / number_of_samples
@@ -651,8 +655,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        self._total_evaluation_time = 0
-        evaluation_time_threshold = 1.0
+        evaluation_time_threshold = 1.5
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -660,7 +663,6 @@ class Optimizer:
                     self.individual_cache.update(cache)
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
-                self._total_evaluation_time = 0
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
@@ -682,8 +684,7 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 optimization_interval += 10
-            else:
-                self._total_evaluation_time = 0
+
             # Vary the population
             selected = self.toolbox.select_for_mating(population, lambda_)
             parents = [self.toolbox.clone(ind) for ind in selected]
@@ -703,16 +704,17 @@ class Optimizer:
                 offspring.append(child2)
 
             # Evaluate the individuals with an invalid fitness
+            self._total_evaluation_time = 0
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
+            self._total_evaluation_time = self.mpi_comm.allreduce(self.total_evaluation_time, op=MPI.SUM)
 
             if self.number_of_mpi_processes > 1:
                 offspring = flatten(self.mpi_comm.allgather(offspring))
 
             hof.update(offspring)
-            self._total_evaluation_time = self.mpi_comm.allreduce(self.total_evaluation_time, op=MPI.SUM)
             if self.is_root():
                 print("Average evaluation time:", self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3), flush=True)
 
