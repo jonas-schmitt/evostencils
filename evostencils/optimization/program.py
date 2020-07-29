@@ -404,7 +404,7 @@ class Optimizer:
                     return self.infinity, self.infinity
                 try:
                     time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
-                except (FileNotFoundError, subprocess.TimeoutExpired) as _:
+                except:
                     time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
@@ -481,7 +481,7 @@ class Optimizer:
                     return self.infinity, self.infinity
                 try:
                     time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
-                except (FileNotFoundError, subprocess.TimeoutExpired) as _:
+                except:
                     time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
 
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
@@ -673,8 +673,12 @@ class Optimizer:
                 count = 0
                 if self.is_root():
                     print("Increasing problem size", flush=True)
-                self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                  self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
+                if len(population[0].fitness.values) == 2:
+                    self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
+                                                      self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
+                else:
+                    self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
+                                                      self.evaluate_single_objective, parameter_values=next_parameter_values)
                 hof.clear()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
