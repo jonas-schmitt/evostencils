@@ -97,7 +97,7 @@ def main():
     epsilon = 1e-6
     problem_name = program_generator.problem_name
 
-    if not os.path.exists(f'{cwd}/{problem_name}'):
+    if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
         os.makedirs(f'{cwd}/{problem_name}')
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
@@ -147,13 +147,13 @@ def main():
     
     if mpi_rank == 0:
         print(f'Grammar representation:\n{program}\n', flush=True)
-    log_dir_name = f'{problem_name}/data_{mpi_rank}'
-    if not os.path.exists(log_dir_name):
-        os.makedirs(log_dir_name)
-    for i, log in enumerate(stats):
-        optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
-    for i, pop in enumerate(pops):
-        optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
+        log_dir_name = f'{problem_name}/data'
+        if not os.path.exists(log_dir_name):
+            os.makedirs(log_dir_name)
+        for i, log in enumerate(stats):
+            optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
+        for i, pop in enumerate(pops):
+            optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
 
 
 if __name__ == "__main__":

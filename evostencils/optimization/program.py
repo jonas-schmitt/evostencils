@@ -775,7 +775,7 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
-        hof = tools.HallOfFame(100, similar=lambda a, b: a.fitness == b.fitness)
+        hof = tools.HallOfFame(256, similar=lambda a, b: a.fitness == b.fitness)
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
@@ -941,13 +941,13 @@ class Optimizer:
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
                                               self.evaluate_multiple_objectives, number_of_samples=50,
                                               parameter_values=next_parameter_values)
-            output_directory_path = f'./hall_of_fame_{i}_{self.program_generator.problem_name}'
-            if not os.path.exists(output_directory_path):
+            output_directory_path = f'./hall_of_fame_{self.program_generator.problem_name}'
+            if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
 
             fitness_values = []
-            for j in range(0, min(len(hof), 100)):
+            for j in range(0, min(len(hof), 128)):
                 individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
