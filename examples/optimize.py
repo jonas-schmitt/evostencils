@@ -133,10 +133,10 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=80, gp_lambda=4,
+                                                               gp_mu=128, gp_lambda=1,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=50, es_generations=150,
+                                                               gp_generations=100, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                parameter_values=parameter_values,
                                                                required_convergence=required_convergence,

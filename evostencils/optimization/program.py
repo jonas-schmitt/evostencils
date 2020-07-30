@@ -690,7 +690,12 @@ class Optimizer:
                 optimization_interval += 10
 
             # Vary the population
-            selected = self.toolbox.select_for_mating(population, lambda_)
+            odd_number_of_children = False
+            number_of_parents = lambda_
+            if lambda_ % 2 == 1:
+                number_of_parents += 1
+                odd_number_of_children = True
+            selected = self.toolbox.select_for_mating(population, number_of_parents)
             parents = [self.toolbox.clone(ind) for ind in selected]
             offspring = []
             for ind1, ind2 in zip(parents[::2], parents[1::2]):
@@ -706,6 +711,8 @@ class Optimizer:
                 del child1.fitness.values, child2.fitness.values
                 offspring.append(child1)
                 offspring.append(child2)
+            if odd_number_of_children:
+                offspring.pop()
 
             # Evaluate the individuals with an invalid fitness
             self._total_evaluation_time = 0
@@ -907,8 +914,6 @@ class Optimizer:
                 tmp = checkpoint
             initial_population_size = 2 * gp_mu
             initial_population_size -= initial_population_size % 4
-            gp_mu -= gp_mu % 4
-            gp_lambda -= gp_lambda % 4
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
@@ -928,15 +933,21 @@ class Optimizer:
             best_number_of_iterations = self.infinity
             evaluation_min_level += 1
             evaluation_max_level += 1
+            next_parameter_values = {}
+            level_offset = evaluation_max_level - max_level
+            for key, values in parameter_values.items():
+                assert level_offset < len(values), 'Too few parameter values provided'
+                next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=50)
+                                              self.evaluate_multiple_objectives, number_of_samples=50,
+                                              parameter_values=next_parameter_values)
             output_directory_path = f'./hall_of_fame_{i}_{self.program_generator.problem_name}'
             if not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
 
             fitness_values = []
-            for j in range(0, min(len(hof), 5)):
+            for j in range(0, min(len(hof), 100)):
                 individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
