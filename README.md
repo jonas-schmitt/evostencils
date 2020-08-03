@@ -1,5 +1,5 @@
 # EvoStencils
-Generating optimal iterative solvers through evolutionary computation
+Constructing efficient multigrid solvers through evolutionary computation
 ## Requirements
 Python >= 3.6, sbt (for ExaStencils), MPI
 ## Setup
