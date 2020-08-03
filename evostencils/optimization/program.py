@@ -694,27 +694,35 @@ class Optimizer:
             # Vary the population
             odd_number_of_children = False
             number_of_parents = lambda_
-            if lambda_ % 2 == 1:
-                number_of_parents += 1
-                odd_number_of_children = True
+            remainder = 4 - lambda_ % 4
+            if remainder < 4:
+                number_of_parents += remainder
             selected = self.toolbox.select_for_mating(population, number_of_parents)
             parents = [self.toolbox.clone(ind) for ind in selected]
             offspring = []
             for ind1, ind2 in zip(parents[::2], parents[1::2]):
-                operator_choice = random.random()
-                if operator_choice < crossover_probability:
-                    child1, child2 = self.toolbox.mate(ind1, ind2)
-                elif operator_choice < crossover_probability + mutation_probability + self.epsilon:
-                    child1, = self.toolbox.mutate(ind1)
-                    child2, = self.toolbox.mutate(ind2)
-                else:
-                    child1 = ind1
-                    child2 = ind2
+                child1 = None
+                child2 = None
+                tries = 0
+                while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
+                                      child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
+                    operator_choice = random.random()
+                    if operator_choice < crossover_probability:
+                        child1, child2 = self.toolbox.mate(ind1, ind2)
+                    elif operator_choice < crossover_probability + mutation_probability + self.epsilon:
+                        child1, = self.toolbox.mutate(ind1)
+                        child2, = self.toolbox.mutate(ind2)
+                    else:
+                        child1 = ind1
+                        child2 = ind2
+                    tries += 1
                 del child1.fitness.values, child2.fitness.values
                 offspring.append(child1)
+                if len(offspring) == lambda_:
+                    break
                 offspring.append(child2)
-            if odd_number_of_children:
-                offspring.pop()
+                if len(offspring) == lambda_:
+                    break
 
             # Evaluate the individuals with an invalid fitness
             self._total_evaluation_time = 0
