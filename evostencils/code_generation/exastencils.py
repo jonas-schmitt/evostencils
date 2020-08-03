@@ -172,7 +172,7 @@ class ProgramGenerator:
         return self._settings_path_generated
 
 
-    def reinitialize(self, min_level, max_level):
+    def reinitialize(self, min_level, max_level, global_expressions):
         self.generate_level_adapted_knowledge_file(min_level, max_level)
         self._dimension, self._min_level, self._max_level = \
             parser.extract_knowledge_information(self.base_path, self.knowledge_path_generated)
@@ -180,6 +180,7 @@ class ProgramGenerator:
         generated_file = f'{self.base_path}/{self.knowledge_path_generated}'
         shutil.copyfile(original_file, f'{original_file}.backup')
         shutil.copyfile(generated_file, original_file)
+        self.generate_initial_l3_file(global_expressions)
         self.run_exastencils_compiler()
         self._equations, self._operators, self._fields = \
             parser.extract_l2_information(f'{self.base_path}/{self._debug_l3_path}', self.dimension, self.solution_equations)
@@ -191,6 +192,30 @@ class ProgramGenerator:
         self._coarsening_factor = [tmp for _ in range(len(self.fields))]
         self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
         shutil.copyfile(f'{original_file}.backup', original_file)
+
+    def generate_initial_l3_file(self, global_expressions):
+        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3.backup'
+        output_file_path = \
+            f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+        shutil.copyfile(output_file_path, input_file_path)
+        with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{self.base_path}/{output_file_path}', 'w') as output_file:
+                line = input_file.readline()
+                while line:
+                    if 'Globals' in line:
+                        output_file.write(line)
+                        line = input_file.readline()
+                        while line and '}' not in line:
+                            tokens = line.split('=')
+                            lhs_tokens = tokens[0].split()
+                            if len(tokens) == 2 and lhs_tokens[0] == 'Expr' and lhs_tokens[1] in global_expressions:
+                                tmp = tokens[0] + ' = ' + str(global_expressions[lhs_tokens[1]]) + '\n'
+                                output_file.write(tmp)
+                            else:
+                                output_file.write(line)
+                            line = input_file.readline()
+                    output_file.write(line)
+                    line = input_file.readline()
 
     @staticmethod
     def generate_global_weights(n: int, name='omega'):
@@ -321,7 +346,7 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
-        result = subprocess.run(['make', '-j8', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        result = subprocess.run(['make', '-j12', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
@@ -785,7 +810,7 @@ class ProgramGenerator:
         return program
 
     def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True,
-                         global_values={}):
+                         global_variable_values={}):
         # TODO fix hacky solution
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
         output_file_path = \
@@ -810,9 +835,10 @@ class ProgramGenerator:
                         line = input_file.readline()
                         while line and '}' not in line:
                             tokens = line.split('=')
-                            lhs_tokens = tokens[0].split()
-                            if len(tokens) == 2 and lhs_tokens[0] == 'Expr' and lhs_tokens[1] in global_values:
-                                tmp = tokens[0] + ' = ' + str(global_values[lhs_tokens[1]]) + '\n'
+                            tmp = tokens[0].split(':')
+                            lhs_tokens = tmp[0].split()
+                            if len(tokens) == 2 and lhs_tokens[0] == 'Var' and lhs_tokens[1] in global_variable_values:
+                                tmp = tokens[0] + ' = ' + str(global_variable_values[lhs_tokens[1]]) + '\n'
                                 output_file.write(tmp)
                             else:
                                 output_file.write(line)
@@ -824,6 +850,7 @@ class ProgramGenerator:
                         line = input_file.readline()
 
                 output_file.write(program)
+
 
     def generate_adapted_settings_file(self, config_name=None, input_file_path=None, output_file_path=None, l2file_required=False):
         base_path = self.base_path

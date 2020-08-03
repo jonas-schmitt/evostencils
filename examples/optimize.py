@@ -112,7 +112,7 @@ def main():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.SOGP
+    optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
@@ -133,10 +133,10 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                levels_per_run=levels_per_run,
-                                                               gp_mu=128, gp_lambda=1,
+                                                               gp_mu=80, gp_lambda=2,
                                                                gp_crossover_probability=crossover_probability,
                                                                gp_mutation_probability=mutation_probability,
-                                                               gp_generations=100, es_generations=150,
+                                                               gp_generations=50, es_generations=150,
                                                                maximum_block_size=maximum_block_size,
                                                                parameter_values=parameter_values,
                                                                required_convergence=required_convergence,

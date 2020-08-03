@@ -109,7 +109,7 @@ class Optimizer:
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
                                      parameter_values={}):
-        self.program_generator.reinitialize(min_level, max_level)
+        self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
         dimension = program_generator.dimension
         finest_grid = program_generator.finest_grid
@@ -374,7 +374,8 @@ class Optimizer:
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function, global_values=parameter_values)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function,
+                                                global_variable_values=parameter_values)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
@@ -451,7 +452,8 @@ class Optimizer:
             tmp = solver_program + self.program_generator.generate_global_weights(n)
             cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
                                                                             max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function, global_values=parameter_values)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function,
+                                                    global_variable_values=parameter_values)
             program_generator = self.program_generator
             output_path = program_generator._output_path_generated
             average_time_to_convergence = 0
