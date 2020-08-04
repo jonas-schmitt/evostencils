@@ -692,6 +692,8 @@ class Optimizer:
                 optimization_interval += 10
 
             number_of_parents = lambda_
+            if number_of_parents % 2 == 1:
+                number_of_parents += 1
             selected = self.toolbox.select_for_mating(population, number_of_parents)
             parents = [self.toolbox.clone(ind) for ind in selected]
             offspring = []
