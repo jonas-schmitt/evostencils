@@ -378,7 +378,7 @@ class ProgramGenerator:
 
     def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
-        self.generate_adapted_layer_files(iteration_limit)
+        self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         if self._counter == 0:
             start_time = time.time()
@@ -899,29 +899,13 @@ class ProgramGenerator:
                         output_file.write(line)
         return output_file_path
 
-    def generate_adapted_layer_files(self, iteration_limit, coarse_grid_solver_type=None, number_of_cgs_iterations=None):
+    def copy_layer_files(self):
         base_path = self.base_path
-        input_file_path = f'{self._base_path_prefix}/{self.problem_name}.exa3'
-        output_file_path = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
-        tmp = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}'
-        for i in [1, 2, 4]:
-            if os.path.exists(f'{tmp}.exa{i}'):
-                shutil.copyfile(f'{tmp}.exa{i}', f'{tmp}_{self.mpi_rank}.exa{i}')
-
-        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
-            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
-                for line in input_file:
-                    tokens = line.split('=')
-                    lhs = tokens[0].strip(' \n\t')
-                    if lhs == 'solver_maxNumIts':
-                        output_file.write(f'  {lhs}\t= {iteration_limit}\n')
-                    elif coarse_grid_solver_type is not None and lhs == 'solver_cgs':
-                        output_file.write(f'  {lhs}\t= "{coarse_grid_solver_type}"\n')
-                    elif number_of_cgs_iterations is not None and lhs == 'solver_cgs_maxNumIts':
-                        output_file.write(f'  {lhs}\t= {number_of_cgs_iterations}\n')
-                    else:
-                        output_file.write(line)
-        return output_file_path
+        input_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}'
+        output_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}'
+        for i in [1, 2, 3, 4]:
+            if os.path.exists(f'{input_file_path}.exa{i}'):
+                shutil.copyfile(f'{input_file_path}.exa{i}', f'{output_file_path}.exa{i}')
 
     def extract_krylov_subspace_method_from_layer3_file(self, layer3_file_path, level):
         krylov_solver_function = ''
@@ -975,9 +959,9 @@ class ProgramGenerator:
     def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
                                         number_of_solver_iterations: int):
         min_level = level
-        iteration_limit = 1
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, min(min_level + 1, max_level))
-        self.generate_adapted_layer_files(iteration_limit, solver_type, number_of_solver_iterations)
+        #TODO either fix or remove krylov subspace method generation
+        self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
