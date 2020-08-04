@@ -194,12 +194,12 @@ class ProgramGenerator:
         shutil.copyfile(f'{original_file}.backup', original_file)
 
     def generate_initial_l3_file(self, global_expressions):
-        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3.backup'
+        input_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3.backup'
         output_file_path = \
-            f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+            f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
         shutil.copyfile(output_file_path, input_file_path)
-        with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
-            with open(f'{self.base_path}/{output_file_path}', 'w') as output_file:
+        with open(f'{input_file_path}', 'r') as input_file:
+            with open(f'{output_file_path}', 'w') as output_file:
                 line = input_file.readline()
                 while line:
                     if 'Globals' in line:

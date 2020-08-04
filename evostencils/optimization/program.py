@@ -657,7 +657,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        evaluation_time_threshold = 1.5
+        evaluation_time_threshold = 2.0
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -691,12 +691,7 @@ class Optimizer:
                 hof.update(population)
                 optimization_interval += 10
 
-            # Vary the population
-            odd_number_of_children = False
             number_of_parents = lambda_
-            remainder = 4 - lambda_ % 4
-            if remainder < 4:
-                number_of_parents += remainder
             selected = self.toolbox.select_for_mating(population, number_of_parents)
             parents = [self.toolbox.clone(ind) for ind in selected]
             offspring = []
@@ -797,7 +792,12 @@ class Optimizer:
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
         self._toolbox.register("select", tools.selNSGA2, nd='standard')
-        self._toolbox.register("select_for_mating", tools.selTournamentDCD)
+
+        def select_for_mating(individuals, k):
+            k = k + (4 - k % 4)
+            return tools.selTournamentDCD(individuals, k)
+
+        self._toolbox.register("select_for_mating", select_for_mating)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
         initial_parameter_values = {}
         for key, values in parameter_values.items():
