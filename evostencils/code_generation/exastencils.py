@@ -416,10 +416,10 @@ class ProgramGenerator:
             return infinity_result
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=1):
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=1, global_variable_values={}):
         # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
-        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
+        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
         try:
             start_time = time.time()
             returncode = self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated,
