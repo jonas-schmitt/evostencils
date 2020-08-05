@@ -350,7 +350,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=20, parameter_values={}):
+                                  number_of_samples=10, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -430,7 +430,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=20, parameter_values={}):
+                                     number_of_samples=10, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -657,7 +657,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        evaluation_time_threshold = 2.0
+        evaluation_time_threshold = 5.0
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -796,7 +796,8 @@ class Optimizer:
         self._toolbox.register("select", tools.selNSGA2, nd='standard')
 
         def select_for_mating(individuals, k):
-            k = k + (4 - k % 4)
+            if k % 4 > 0:
+                k = k + (4 - k % 4)
             return tools.selTournamentDCD(individuals, k)
 
         self._toolbox.register("select_for_mating", select_for_mating)
@@ -827,7 +828,8 @@ class Optimizer:
         self._init_multi_objective_toolbox(pset)
         H = mu_
         reference_points = tools.uniform_reference_points(2, H)
-        mu_ = H + (4 - H % 4)
+        if H % 4 > 0:
+            mu_ = H + (4 - H % 4)
         self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
         self._toolbox.register("select_for_mating", tools.selRandom)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
@@ -925,14 +927,13 @@ class Optimizer:
             if pass_checkpoint:
                 tmp = checkpoint
             initial_population_size = 2 * gp_mu
-            initial_population_size -= initial_population_size % 4
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAII
+                optimization_method = self.SOGP
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
@@ -951,7 +952,7 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=50,
+                                              self.evaluate_multiple_objectives, number_of_samples=20,
                                               parameter_values=next_parameter_values)
             output_directory_path = f'./hall_of_fame_{self.program_generator.problem_name}'
             if self.is_root() and not os.path.exists(output_directory_path):
@@ -959,7 +960,7 @@ class Optimizer:
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
 
             fitness_values = []
-            for j in range(0, min(len(hof), 128)):
+            for j in range(0, min(len(hof), mu_)):
                 individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
