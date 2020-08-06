@@ -559,7 +559,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        evaluation_time_threshold = 10.0 # seconds
+        evaluation_time_threshold = 20.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -732,7 +732,7 @@ class Optimizer:
         reference_points = tools.uniform_reference_points(2, H)
         if H % 4 > 0:
             mu_ = H + (4 - H % 4)
-        self._toolbox.register("select", tools.selNSGA3WithMemory(reference_points, nd='standard'))
+        self._toolbox.register("select", tools.selNSGA3, ref_points=reference_points)
         self._toolbox.register("select_for_mating", tools.selRandom)
         # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
         initial_parameter_values = {}
