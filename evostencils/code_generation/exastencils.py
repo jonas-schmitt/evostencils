@@ -350,11 +350,10 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
-    def evaluate(self, executable_path, infinity=1e100, number_of_samples=1):
+    def evaluate(self, executable_path, infinity=1e100, number_of_samples=3):
         total_time = 0
         sum_of_convergence_factors = 0
-        number_of_iterations = None
-        count = 0
+        total_number_of_iterations = 0
         for i in range(number_of_samples):
             try:
                 result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
@@ -371,10 +370,8 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
-            count += 1
-            if total_time > 5000:
-                break
-        return total_time / count, sum_of_convergence_factors / count, number_of_iterations
+            total_number_of_iterations += number_of_iterations
+        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations / number_of_samples
 
     def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
@@ -398,7 +395,7 @@ class ProgramGenerator:
         shutil.copyfile(debug_l3_path, l3_path)
         return output_path_generated
 
-    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=1):
+    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=3):
         infinity_result = infinity, infinity, infinity
         try:
             if mapping is not None:
@@ -416,7 +413,7 @@ class ProgramGenerator:
             return infinity_result
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=1, global_variable_values={}):
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values={}):
         # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
         self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)

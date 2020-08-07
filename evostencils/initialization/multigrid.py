@@ -414,7 +414,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         pset.addTerminal(terminals.twenty_seven_way_partitioning, types.Partitioning, f'twenty_seven_way')
 
     # Relaxation Factors
-    pset.addTerminal(1.0, TypeWrapper(float))
     for i in range(0, 21):
         pset.addTerminal(0.5 + i * 0.05, TypeWrapper(float))
     # samples = 20

@@ -107,7 +107,7 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
                                      parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -695,7 +695,7 @@ class Optimizer:
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
         self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='standard')
+        self._toolbox.register("select", tools.selNSGA2)
 
         def select_for_mating(individuals, k):
             if k % 4 > 0:
@@ -976,14 +976,14 @@ class Optimizer:
                                                             krylov_subspace_methods=krylov_subspace_methods,
                                                             minimum_solver_iterations=minimum_solver_iterations,
                                                             maximum_solver_iterations=maximum_solver_iterations)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
         expression, _ = eval(grammar_string, pset.context, {})
         # initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
         # relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
-                                                          number_of_samples=20)
+                                                          number_of_samples=5)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
@@ -993,11 +993,11 @@ class Optimizer:
                 self.optimize_relaxation_factors(expression, 150, self.min_level, self.max_level, solver_program,
                                                  storages, time_to_solution)
             relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=128)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             time_to_solution, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=20)
+                                                              number_of_samples=5)
             print(f'Time: {time_to_solution}, '
                   f'Convergence factor: {convergence_factor}, '
                   f'Number of Iterations: {number_of_iterations}', flush=True)
