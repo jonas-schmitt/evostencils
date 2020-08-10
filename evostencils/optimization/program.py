@@ -559,7 +559,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        evaluation_time_threshold = 20.0 # seconds
+        evaluation_time_threshold = 30.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -835,7 +835,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.SOGP
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
