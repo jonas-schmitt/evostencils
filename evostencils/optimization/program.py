@@ -591,6 +591,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
+                optimization_interval += 10
 
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
