@@ -350,7 +350,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=3, parameter_values={}):
+                                  number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -380,7 +380,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=3, parameter_values={}):
+                                     number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -559,7 +559,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 10
-        evaluation_time_threshold = 30.0 # seconds
+        evaluation_time_threshold = 20.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -835,7 +835,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAIII
+                optimization_method = self.SOGP
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,

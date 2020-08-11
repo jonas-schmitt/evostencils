@@ -413,14 +413,14 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         pset.addTerminal(terminals.eight_way_partitioning, types.Partitioning, f'eight_way')
         pset.addTerminal(terminals.twenty_seven_way_partitioning, types.Partitioning, f'twenty_seven_way')
 
-    pset.addTerminal(1.0, TypeWrapper(float))
+    # pset.addTerminal(1.0, TypeWrapper(float))
     # Relaxation Factors
     # for i in range(0, 21):
     # pset.addTerminal(0.5 + i * 0.05, TypeWrapper(float))
-    # samples = 20
-    # interval = np.linspace(0.5, 1.5, samples)
-    # for omega in interval:
-    #     pset.addTerminal(omega, TypeWrapper(float))
+    samples = 36
+    interval = np.linspace(0.1, 1.9, samples)
+    for omega in interval:
+        pset.addTerminal(omega, TypeWrapper(float))
 
     # number of Krylov subspace method iterations
     if len(krylov_subspace_methods) > 0:
