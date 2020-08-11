@@ -364,8 +364,8 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
             time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
-            if number_of_iterations >= infinity or convergence_factor > 1:
-                return time_to_solution, convergence_factor, number_of_iterations
+            # if number_of_iterations >= infinity or convergence_factor > 1:
+            #     return time_to_solution, convergence_factor, number_of_iterations
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity, infinity
             total_time += time_to_solution
