@@ -417,7 +417,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     # Relaxation Factors
     # for i in range(0, 21):
     # pset.addTerminal(0.5 + i * 0.05, TypeWrapper(float))
-    samples = 36
+    samples = 37
     interval = np.linspace(0.1, 1.9, samples)
     for omega in interval:
         pset.addTerminal(omega, TypeWrapper(float))
