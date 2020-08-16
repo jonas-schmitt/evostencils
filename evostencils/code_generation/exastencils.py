@@ -371,7 +371,7 @@ class ProgramGenerator:
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
             total_number_of_iterations += number_of_iterations
-        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, number_of_iterations / number_of_samples
+        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, total_number_of_iterations / number_of_samples
 
     def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
