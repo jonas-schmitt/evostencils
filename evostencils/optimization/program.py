@@ -350,7 +350,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=10, parameter_values={}):
+                                  number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -380,7 +380,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=10, parameter_values={}):
+                                     number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -561,10 +561,6 @@ class Optimizer:
         optimization_interval = 10
         evaluation_time_threshold = 20.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
-            individual_caches = self.mpi_comm.allgather(self.individual_cache)
-            for i, cache in enumerate(individual_caches):
-                if i != self.mpi_rank:
-                    self.individual_cache.update(cache)
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
                 level_offset += 1
@@ -584,6 +580,7 @@ class Optimizer:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                       self.evaluate_single_objective, parameter_values=next_parameter_values)
                 hof.clear()
+                random.shuffle(population)
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
                 fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
@@ -592,7 +589,11 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 optimization_interval += 10
-
+            else:
+                individual_caches = self.mpi_comm.allgather(self.individual_cache)
+                for i, cache in enumerate(individual_caches):
+                    if i != self.mpi_rank:
+                        self.individual_cache.update(cache)
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -859,11 +860,11 @@ class Optimizer:
             output_directory_path = f'./hall_of_fame_{self.program_generator.problem_name}'
             if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])[:gp_mu]
+            random.shuffle(hof)
 
             fitness_values = []
-            for j in range(0, min(len(hof), gp_mu)):
-                individual = hof[j]
+            for j, individual in enumerate(hof):
                 if individual.fitness.values[0] >= self.infinity:
                     continue
                 if j % self.number_of_mpi_processes == self.mpi_rank:
