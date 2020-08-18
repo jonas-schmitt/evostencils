@@ -580,7 +580,9 @@ class Optimizer:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                       self.evaluate_single_objective, parameter_values=next_parameter_values)
                 hof.clear()
+                random.seed(gen)
                 random.shuffle(population)
+                random.seed()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
                 fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
@@ -861,7 +863,9 @@ class Optimizer:
             if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])[:gp_mu]
+            random.seed(gp_generations)
             random.shuffle(hof)
+            random.seed()
 
             fitness_values = []
             for j, individual in enumerate(hof):
