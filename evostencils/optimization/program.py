@@ -15,6 +15,7 @@ import itertools
 import os
 import subprocess
 from mpi4py import MPI
+import sys
 
 
 def flatten(l: list):
@@ -286,6 +287,14 @@ class Optimizer:
 
     def compile_individual(self, individual, pset):
         return gp.compile(individual, pset)
+
+    def synchronize_random_number_generator(self):
+        if self.is_root():
+            seed = random.randrange(sys.maxsize)
+        else:
+            seed = None
+        seed = self.mpi_comm.bcast(seed, root=0)
+        random.seed(seed)
 
     def estimate_single_objective(self, individual, pset):
         self._total_number_of_evaluations += 1
@@ -580,9 +589,10 @@ class Optimizer:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                       self.evaluate_single_objective, parameter_values=next_parameter_values)
                 hof.clear()
-                random.seed(gen)
-                random.shuffle(population)
-                random.seed()
+                if self.number_of_mpi_processes > 1:
+                    self.synchronize_random_number_generator()
+                    random.shuffle(population)
+                    random.seed()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
                 fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
@@ -788,6 +798,7 @@ class Optimizer:
             restart_from_checkpoint = False
         pops = []
         logbooks = []
+        hofs = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         residual_norm_functions = \
             self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
@@ -838,7 +849,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.SOGP
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
@@ -863,9 +874,11 @@ class Optimizer:
             if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])[:gp_mu]
-            random.seed(gp_generations)
-            random.shuffle(hof)
-            random.seed()
+            if self.number_of_mpi_processes > 1:
+                self.synchronize_random_number_generator()
+                random.shuffle(hof)
+                random.seed()
+            hofs.append(hof)
 
             fitness_values = []
             for j, individual in enumerate(hof):
@@ -914,7 +927,7 @@ class Optimizer:
                       flush=True)
             """
         self.mpi_comm.barrier()
-        return str(best_individual), pops, logbooks
+        return str(best_individual), pops, logbooks, hofs
 
     def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
         initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
