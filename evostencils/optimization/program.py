@@ -108,7 +108,7 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=5,
                                      parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -288,14 +288,6 @@ class Optimizer:
     def compile_individual(self, individual, pset):
         return gp.compile(individual, pset)
 
-    def synchronize_random_number_generator(self):
-        if self.is_root():
-            seed = random.randrange(sys.maxsize)
-        else:
-            seed = None
-        seed = self.mpi_comm.bcast(seed, root=0)
-        random.seed(seed)
-
     def estimate_single_objective(self, individual, pset):
         self._total_number_of_evaluations += 1
         if self.individual_in_cache(individual):
@@ -359,7 +351,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=10, parameter_values={}):
+                                  number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -389,7 +381,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=10, parameter_values={}):
+                                     number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -569,6 +561,7 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 10
         evaluation_time_threshold = 20.0 # seconds
+        number_of_evaluation_samples = 10
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
@@ -584,15 +577,13 @@ class Optimizer:
                     print("Increasing problem size", flush=True)
                 if len(population[0].fitness.values) == 2:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                      self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
+                                                      self.evaluate_multiple_objectives, number_of_samples=number_of_evaluation_samples,
+                                                      parameter_values=next_parameter_values)
                 else:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                      self.evaluate_single_objective, parameter_values=next_parameter_values)
+                                                      self.evaluate_single_objective, number_of_samples=number_of_evaluation_samples,
+                                                      parameter_values=next_parameter_values)
                 hof.clear()
-                if self.number_of_mpi_processes > 1:
-                    self.synchronize_random_number_generator()
-                    random.shuffle(population)
-                    random.seed()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
                 fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
@@ -601,6 +592,12 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 optimization_interval += 10
+                tmp = number_of_evaluation_samples // 2
+                if number_of_evaluation_samples % 2 == 1:
+                    tmp += 1
+                number_of_evaluation_samples = tmp
+                if number_of_evaluation_samples < 2:
+                    number_of_evaluation_samples = 2
             else:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
@@ -874,10 +871,6 @@ class Optimizer:
             if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])[:gp_mu]
-            if self.number_of_mpi_processes > 1:
-                self.synchronize_random_number_generator()
-                random.shuffle(hof)
-                random.seed()
             hofs.append(hof)
 
             fitness_values = []
