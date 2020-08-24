@@ -134,7 +134,7 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=100, gp_lambda=2,
+                                                                     gp_mu=100, gp_lambda=3,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=100, es_generations=150,

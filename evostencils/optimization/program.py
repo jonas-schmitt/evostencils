@@ -592,12 +592,9 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
                 optimization_interval += 10
-                tmp = number_of_evaluation_samples // 2
-                if number_of_evaluation_samples % 2 == 1:
-                    tmp += 1
-                number_of_evaluation_samples = tmp
-                if number_of_evaluation_samples < 2:
-                    number_of_evaluation_samples = 2
+                number_of_evaluation_samples = number_of_evaluation_samples // 2
+                if number_of_evaluation_samples < 1:
+                    number_of_evaluation_samples = 1
             else:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
