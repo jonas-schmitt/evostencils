@@ -561,7 +561,7 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 10
         evaluation_time_threshold = 20.0 # seconds
-        number_of_evaluation_samples = 10
+        number_of_evaluation_samples = 5
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
