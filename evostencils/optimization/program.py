@@ -864,9 +864,6 @@ class Optimizer:
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
                                               self.evaluate_multiple_objectives, number_of_samples=5,
                                               parameter_values=next_parameter_values)
-            output_directory_path = f'./hall_of_fame_{self.program_generator.problem_name}'
-            if self.is_root() and not os.path.exists(output_directory_path):
-                os.makedirs(output_directory_path)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
@@ -888,8 +885,6 @@ class Optimizer:
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
                           f'Number of Iterations: {number_of_iterations}', flush=True)
-                    with open(f'{output_directory_path}/individual_{j}.txt', 'w') as grammar_file:
-                        grammar_file.write(str(individual) + '\n')
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
 
