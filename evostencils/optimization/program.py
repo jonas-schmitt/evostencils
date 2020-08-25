@@ -402,11 +402,11 @@ class Optimizer:
                                                               infinity=self.infinity,
                                                               number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
-            if average_number_of_iterations >= self.infinity / number_of_samples:
+            fitness = average_number_of_iterations, average_time_to_convergence
+            if average_number_of_iterations >= self.infinity:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
-                self._total_evaluation_time += fitness[0] * fitness[1]
+                self._total_evaluation_time += average_time_to_convergence
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -595,11 +595,11 @@ class Optimizer:
                 number_of_evaluation_samples = number_of_evaluation_samples // 2
                 if number_of_evaluation_samples < 1:
                     number_of_evaluation_samples = 1
-            else:
-                individual_caches = self.mpi_comm.allgather(self.individual_cache)
-                for i, cache in enumerate(individual_caches):
-                    if i != self.mpi_rank:
-                        self.individual_cache.update(cache)
+
+            individual_caches = self.mpi_comm.allgather(self.individual_cache)
+            for i, cache in enumerate(individual_caches):
+                if i != self.mpi_rank:
+                    self.individual_cache.update(cache)
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -843,7 +843,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAIII
+                optimization_method = self.NSGAII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
@@ -867,11 +867,12 @@ class Optimizer:
             output_directory_path = f'./hall_of_fame_{self.program_generator.problem_name}'
             if self.is_root() and not os.path.exists(output_directory_path):
                 os.makedirs(output_directory_path)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])[:gp_mu]
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []
-            for j, individual in enumerate(hof):
+            for j in range(0, min(len(hof), gp_mu)):
+                individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
                 if j % self.number_of_mpi_processes == self.mpi_rank:
@@ -883,7 +884,7 @@ class Optimizer:
                 fitness_values = flatten(tmp)
                 for j, values in fitness_values:
                     individual = hof[j]
-                    time = values[0] * values[1]
+                    time = values[1]
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
                           f'Number of Iterations: {number_of_iterations}', flush=True)
