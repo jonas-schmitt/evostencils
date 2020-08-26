@@ -351,7 +351,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=10, parameter_values={}):
+                                  number_of_samples=8, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -373,7 +373,7 @@ class Optimizer:
                                                               infinity=self.infinity, number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
             fitness = average_time_to_convergence,
-            if average_number_of_iterations >= self.infinity:
+            if average_number_of_iterations > self.infinity**0.5:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             else:
                 self._total_evaluation_time += fitness[0]
@@ -381,7 +381,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=10, parameter_values={}):
+                                     number_of_samples=8, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -402,8 +402,8 @@ class Optimizer:
                                                               infinity=self.infinity,
                                                               number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_number_of_iterations, average_time_to_convergence
-            if average_number_of_iterations >= self.infinity:
+            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            if average_number_of_iterations > self.infinity**0.5:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
                 self._total_evaluation_time += average_time_to_convergence
@@ -561,7 +561,7 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 10
         evaluation_time_threshold = 20.0 # seconds
-        number_of_evaluation_samples = 5
+        number_of_evaluation_samples = 4
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
@@ -843,7 +843,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAII
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
@@ -862,14 +862,14 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=5,
+                                              self.evaluate_multiple_objectives, number_of_samples=1,
                                               parameter_values=next_parameter_values)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []
-            for j in range(0, min(len(hof), gp_mu)):
-                individual = hof[j]
+            for j in range(0, min(len(pop), gp_mu)):
+                individual = pop[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
                 if j % self.number_of_mpi_processes == self.mpi_rank:
@@ -880,8 +880,8 @@ class Optimizer:
             if self.is_root():
                 fitness_values = flatten(tmp)
                 for j, values in fitness_values:
-                    individual = hof[j]
-                    time = values[1]
+                    individual = pop[j]
+                    time = values[0] * values[1]
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
                           f'Number of Iterations: {number_of_iterations}', flush=True)
