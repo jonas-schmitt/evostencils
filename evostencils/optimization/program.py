@@ -351,7 +351,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=8, parameter_values={}):
+                                  number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -372,16 +372,16 @@ class Optimizer:
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity, number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_time_to_convergence,
+            fitness = average_number_of_iterations,
             if average_number_of_iterations > self.infinity**0.5:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             else:
-                self._total_evaluation_time += fitness[0]
+                self._total_evaluation_time += average_time_to_convergence
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=8, parameter_values={}):
+                                     number_of_samples=5, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -559,9 +559,8 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 10
+        optimization_interval = 50
         evaluation_time_threshold = 20.0 # seconds
-        number_of_evaluation_samples = 4
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
@@ -577,12 +576,10 @@ class Optimizer:
                     print("Increasing problem size", flush=True)
                 if len(population[0].fitness.values) == 2:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                      self.evaluate_multiple_objectives, number_of_samples=number_of_evaluation_samples,
-                                                      parameter_values=next_parameter_values)
+                                                      self.evaluate_multiple_objectives, parameter_values=next_parameter_values)
                 else:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
-                                                      self.evaluate_single_objective, number_of_samples=number_of_evaluation_samples,
-                                                      parameter_values=next_parameter_values)
+                                                      self.evaluate_single_objective, parameter_values=next_parameter_values)
                 hof.clear()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
@@ -591,10 +588,6 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 10
-                number_of_evaluation_samples = number_of_evaluation_samples // 2
-                if number_of_evaluation_samples < 1:
-                    number_of_evaluation_samples = 1
 
             individual_caches = self.mpi_comm.allgather(self.individual_cache)
             for i, cache in enumerate(individual_caches):
@@ -843,7 +836,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAIII
+                optimization_method = self.SOGP
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,

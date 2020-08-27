@@ -113,7 +113,7 @@ def main():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.NSGAIII
+    optimization_method = optimizer.SOGP
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII
@@ -130,11 +130,11 @@ def main():
     maximum_solver_iterations = 2**10
     # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     krylov_subspace_methods = ()
-    values = [40.0 * 2.0**i for i in range(100)]
+    values = [160.0 * 2.0**i for i in range(100)]
     parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=100, gp_lambda=4,
+                                                                     gp_mu=100, gp_lambda=2,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=100, es_generations=150,
