@@ -372,7 +372,7 @@ class Optimizer:
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity, number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_number_of_iterations,
+            fitness = average_time_to_convergence,
             if average_number_of_iterations > self.infinity**0.5:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             else:
@@ -836,7 +836,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.SOGP
+                optimization_method = self.NSGAII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
