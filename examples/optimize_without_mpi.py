@@ -5,10 +5,6 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 # import lfa_lab
 import sys
-# import dill
-from mpi4py import MPI
-# MPI.pickle.__init__(dill.dumps, dill.loads)
-
 
 def main():
 
@@ -50,15 +46,15 @@ def main():
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_MPI_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_MPI_fromL3.knowledge'
     cycle_name = "VCycle"
 
     # cycle_name= "gen_mgCycle"
 
-    comm = MPI.COMM_WORLD
-    nprocs = comm.Get_size()
-    mpi_rank = comm.Get_rank()
+    comm = None
+    nprocs = 1
+    mpi_rank = 0
     if nprocs > 1:
         tmp = "processes"
     else:
@@ -134,7 +130,7 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=100, gp_lambda=2,
+                                                                     gp_mu=32, gp_lambda=32,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=60, es_generations=150,

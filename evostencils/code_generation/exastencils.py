@@ -317,6 +317,7 @@ class ProgramGenerator:
         return program
 
     def run_exastencils_compiler(self, knowledge_path=None, settings_path=None):
+        # print("Generate", flush=True)
         if knowledge_path is None:
             knowledge_path = self.knowledge_path
         if settings_path is None:
@@ -346,11 +347,13 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
-        result = subprocess.run(['make', '-j12', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        # print("Compile", flush=True)
+        result = subprocess.run(['make', '-j16', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
     def evaluate(self, executable_path, infinity=1e100, number_of_samples=3):
+        # print("Evaluate", flush=True)
         total_time = 0
         sum_of_convergence_factors = 0
         total_number_of_iterations = 0
@@ -358,6 +361,9 @@ class ProgramGenerator:
             try:
                 result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
+                # result = subprocess.run(["mpiexec", "--map-by", "ppr:1:core", "--bind-to", "core", f'{self.base_path}/{executable_path}/exastencils'],
+                #                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                #                         timeout=self.timeout_evaluate)
             except subprocess.TimeoutExpired as _:
                 return infinity, infinity, infinity
             if not result.returncode == 0:

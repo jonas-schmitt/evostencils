@@ -14,7 +14,7 @@ import time
 import itertools
 import os
 import subprocess
-from mpi4py import MPI
+# from mpi4py import MPI
 import sys
 
 
@@ -108,7 +108,7 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=5,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
                                      parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -282,6 +282,37 @@ class Optimizer:
     def total_evaluation_time(self):
         return self._total_evaluation_time
 
+    def allgather(self, data):
+        if self.mpi_comm is None:
+            return data
+        else:
+            return flatten(self.mpi_comm.allgather(data))
+
+    def gather(self, data):
+        if self.mpi_comm is None:
+            return data
+        else:
+            tmp = self.mpi_comm.gather(data)
+            if self.is_root():
+                return flatten(tmp)
+            else:
+                return tmp
+
+
+    def allreduce(self, variable):
+        if self.mpi_comm is None:
+            return variable
+        else:
+            from mpi4py import MPI
+            return self.mpi_comm.allreduce(variable, op=MPI.SUM)
+
+
+
+    def barrier(self):
+        if self.mpi_comm is not None:
+            self.mpi_comm.barrier()
+
+
     def generate_individual(self):
         return self._toolbox.individual()
 
@@ -326,6 +357,7 @@ class Optimizer:
             return self.get_cached_fitness(individual)
         self._total_number_of_evaluations += 1
         with suppress_output():
+        # with do_nothing():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
@@ -388,6 +420,7 @@ class Optimizer:
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
+        # with do_nothing():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
@@ -546,8 +579,7 @@ class Optimizer:
                   successful_evaluations, flush=True)
         self.reset_evaluation_counters()
 
-        if self.number_of_mpi_processes > 1:
-            population = flatten(self.mpi_comm.allgather(population))
+        population = self.allgather(population)
         population = self.toolbox.select(population, mu_)
         hof.update(population)
         record = mstats.compile(population) if mstats is not None else {}
@@ -559,7 +591,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 50
+        optimization_interval = 20
         evaluation_time_threshold = 20.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -583,16 +615,17 @@ class Optimizer:
                 hof.clear()
                 fitnesses = [(i, self.toolbox.evaluate(ind)) for i, ind in enumerate(population)
                              if i % self.number_of_mpi_processes == self.mpi_rank]
-                fitnesses = flatten(self.mpi_comm.allgather(fitnesses))
+                fitnesses = self.allgather(fitnesses)
                 for i, values in fitnesses:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-
-            individual_caches = self.mpi_comm.allgather(self.individual_cache)
-            for i, cache in enumerate(individual_caches):
-                if i != self.mpi_rank:
-                    self.individual_cache.update(cache)
+                optimization_interval += 20
+            if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
+                individual_caches = self.mpi_comm.allgather(self.individual_cache)
+                for i, cache in enumerate(individual_caches):
+                    if i != self.mpi_rank:
+                        self.individual_cache.update(cache)
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -629,10 +662,8 @@ class Optimizer:
             fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
-            self._total_evaluation_time = self.mpi_comm.allreduce(self.total_evaluation_time, op=MPI.SUM)
-
-            if self.number_of_mpi_processes > 1:
-                offspring = flatten(self.mpi_comm.allgather(offspring))
+            self._total_evaluation_time = self.allreduce(self.total_evaluation_time)
+            offspring = self.allgather(offspring)
 
             hof.update(offspring)
             if self.is_root():
@@ -868,10 +899,9 @@ class Optimizer:
                 if j % self.number_of_mpi_processes == self.mpi_rank:
                     values = self.toolbox.evaluate(individual)
                     fitness_values.append((j, values))
-            self.mpi_comm.barrier()
-            tmp = self.mpi_comm.gather(fitness_values, root=0)
+            self.barrier()
+            fitness_values = self.gather(fitness_values)
             if self.is_root():
-                fitness_values = flatten(tmp)
                 for j, values in fitness_values:
                     individual = pop[j]
                     time = values[0] * values[1]
@@ -901,11 +931,11 @@ class Optimizer:
                                                               solver_program, infinity=self.infinity,
                                                               number_of_samples=10)
                 best_expression.runtime = best_time / number_of_iterations * 1e-3
-                self.mpi_comm.barrier()
+                self.mpi_barrier()
                 print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
                       flush=True)
             """
-        self.mpi_comm.barrier()
+        self.barrier()
         return str(best_individual), pops, logbooks, hofs
 
     def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
