@@ -108,7 +108,7 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=10,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
                                      parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -381,7 +381,7 @@ class Optimizer:
             values = spectral_radius, runtime
             self.add_individual_to_cache(individual, values)
             return values
-
+    """
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
                                   number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
@@ -440,6 +440,160 @@ class Optimizer:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
                 self._total_evaluation_time += average_time_to_convergence
+            self.add_individual_to_cache(individual, fitness)
+            return fitness
+    """
+    def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
+                                  number_of_samples=20, parameter_values={}):
+        self._total_number_of_evaluations += 1
+        if len(individual) > 150:
+            return self.infinity,
+        if self.individual_in_cache(individual):
+            return self.get_cached_fitness(individual)
+        with suppress_output():
+        # with do_nothing():
+            try:
+                expression1, expression2 = self.compile_individual(individual, pset)
+            except MemoryError:
+                print("Memory Error", flush=True)
+                self._failed_evaluations += 1
+                values = self.infinity,
+                self.add_individual_to_cache(individual, values)
+                return values
+            expression = expression1
+            initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
+            relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
+            relaxation_factor_optimization.reset_status(expression)
+            n = len(initial_weights)
+            tmp = solver_program + self.program_generator.generate_global_weights(n)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function,
+                                                    global_variable_values=parameter_values)
+            program_generator = self.program_generator
+            output_path = program_generator._output_path_generated
+            average_time_to_convergence = 0
+            average_convergence_factor = 0
+            average_number_of_iterations = 0
+            failed_testcases = 0
+            threshold = number_of_samples // 10
+            try:
+                program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
+                                                           settings_path=program_generator.settings_path_generated)
+            except subprocess.TimeoutExpired as _:
+                return self.infinity, self.infinity
+            weights = []
+            for _ in range(n):
+                w = random.gauss(1.0, 0.2)
+                while w < 0 or w > 2.0:
+                    w = random.gauss(1.0, 0.2)
+                weights.append(w)
+            count = 0
+            for i in range(number_of_samples):
+                if failed_testcases > threshold:
+                    break
+                program_generator.generate_global_weight_initializations(output_path, weights)
+                try:
+                    program_generator.run_c_compiler(output_path)
+                except subprocess.TimeoutExpired as _:
+                    return self.infinity, self.infinity
+                try:
+                    time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
+                except:
+                    time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
+                if number_of_iterations >= self.infinity or convergence_factor > 1:
+                    failed_testcases += 1
+                average_time_to_convergence += time_to_convergence / number_of_samples
+                average_convergence_factor += convergence_factor / number_of_samples
+                average_number_of_iterations += number_of_iterations / number_of_samples
+                program_generator.restore_global_initializations(output_path)
+                count += 1
+            fitness = average_time_to_convergence,
+            if average_number_of_iterations >= self.infinity**0.5:
+                if failed_testcases >= threshold:
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
+            else:
+                self._total_evaluation_time += fitness[0]
+            self.add_individual_to_cache(individual, fitness)
+            return fitness
+
+    def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
+                                     number_of_samples=20, parameter_values={}):
+        self._total_number_of_evaluations += 1
+        if len(individual) > 150:
+            return self.infinity, self.infinity
+        if self.individual_in_cache(individual):
+            return self.get_cached_fitness(individual)
+        with suppress_output():
+            try:
+                expression1, expression2 = self.compile_individual(individual, pset)
+            except MemoryError:
+                self._failed_evaluations += 1
+                fitness = self.infinity, self.infinity
+                self.add_individual_to_cache(individual, fitness)
+                return fitness
+            expression = expression1
+            initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
+            relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
+            relaxation_factor_optimization.reset_status(expression)
+            n = len(initial_weights)
+            tmp = solver_program + self.program_generator.generate_global_weights(n)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            max_level, use_global_weights=True)
+            self.program_generator.generate_l3_file(min_level, max_level, tmp + cycle_function,
+                                                    global_variable_values=parameter_values)
+            program_generator = self.program_generator
+            output_path = program_generator._output_path_generated
+            average_time_to_convergence = 0
+            average_convergence_factor = 0
+            average_number_of_iterations = 0
+            failed_testcases = 0
+            threshold = number_of_samples // 10
+            try:
+                program_generator.run_exastencils_compiler(knowledge_path=program_generator.knowledge_path_generated,
+                                                           settings_path=program_generator.settings_path_generated)
+            except subprocess.TimeoutExpired as _:
+                return self.infinity, self.infinity
+            weights = []
+            for _ in range(n):
+                w = random.gauss(1.0, 0.2)
+                while w < 0 or w > 2.0:
+                    w = random.gauss(1.0, 0.2)
+                weights.append(w)
+            count = 0
+            for i in range(number_of_samples):
+                if failed_testcases > threshold:
+                    break
+                program_generator.generate_global_weight_initializations(output_path, weights)
+                try:
+                    program_generator.run_c_compiler(output_path)
+                except subprocess.TimeoutExpired as _:
+                    return self.infinity, self.infinity
+                try:
+                    time_to_convergence, convergence_factor, number_of_iterations = program_generator.evaluate(output_path, infinity=self.infinity, number_of_samples=1)
+                except:
+                    time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
+
+                if number_of_iterations >= self.infinity or convergence_factor > 1:
+                    failed_testcases += 1
+                    average_time_to_convergence += self.infinity / number_of_samples
+                    average_number_of_iterations += self.infinity / number_of_samples
+                else:
+                    average_time_to_convergence += time_to_convergence / number_of_samples
+                    average_number_of_iterations += number_of_iterations / number_of_samples
+                average_convergence_factor += convergence_factor / number_of_samples
+                program_generator.restore_global_initializations(output_path)
+                count += 1
+            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            if average_number_of_iterations >= self.infinity**0.5:
+                if failed_testcases >= threshold:
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
+            else:
+                self._total_evaluation_time += fitness[0] * fitness[1]
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -886,7 +1040,7 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=1,
+                                              self.evaluate_multiple_objectives, number_of_samples=3,
                                               parameter_values=next_parameter_values)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
