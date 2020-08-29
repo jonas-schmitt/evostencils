@@ -108,7 +108,7 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=10,
                                      parameter_values={}):
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -383,7 +383,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=5, parameter_values={}):
+                                  number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -413,7 +413,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=5, parameter_values={}):
+                                     number_of_samples=20, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -591,7 +591,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 20
+        optimization_interval = 10
         evaluation_time_threshold = 20.0 # seconds
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -620,7 +620,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 20
+                optimization_interval += 10
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
