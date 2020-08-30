@@ -72,7 +72,7 @@ class Optimizer:
     def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
                  program_generator, convergence_evaluator=None, performance_evaluator=None,
                  mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
-                 epsilon=1e-12, infinity=1e300, checkpoint_directory_path='./'):
+                 epsilon=1e-12, infinity=1e100, checkpoint_directory_path='./'):
         assert program_generator is not None, "At least a program generator must be available"
         self._dimension = dimension
         self._finest_grid = finest_grid
@@ -107,9 +107,11 @@ class Optimizer:
         self._individual_cache_misses = 0
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
+        self._average_time_to_convergence = infinity
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=20,
                                      parameter_values={}):
+        self._average_time_to_convergence = self.infinity
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
         dimension = program_generator.dimension
@@ -503,11 +505,20 @@ class Optimizer:
                     time_to_convergence, convergence_factor, number_of_iterations = self.infinity, self.infinity, self.infinity
                 if number_of_iterations >= self.infinity or convergence_factor > 1:
                     failed_testcases += 1
-                average_time_to_convergence += time_to_convergence / number_of_samples
+                    average_time_to_convergence += self.infinity / number_of_samples
+                    average_number_of_iterations += self.infinity / number_of_samples
+                else:
+                    average_time_to_convergence += time_to_convergence / number_of_samples
+                    average_number_of_iterations += number_of_iterations / number_of_samples
                 average_convergence_factor += convergence_factor / number_of_samples
-                average_number_of_iterations += number_of_iterations / number_of_samples
                 program_generator.restore_global_initializations(output_path)
                 count += 1
+                if count == number_of_samples // 2 and average_time_to_convergence * number_of_samples / count > self._average_time_to_convergence:
+                    average_time_to_convergence = average_time_to_convergence * number_of_samples / count
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                    break
+
             fitness = average_time_to_convergence,
             if average_number_of_iterations >= self.infinity**0.5:
                 if failed_testcases >= threshold:
@@ -586,6 +597,12 @@ class Optimizer:
                 average_convergence_factor += convergence_factor / number_of_samples
                 program_generator.restore_global_initializations(output_path)
                 count += 1
+                if count == number_of_samples // 2 and average_time_to_convergence * number_of_samples / count > self._average_time_to_convergence:
+                    average_time_to_convergence = average_time_to_convergence * number_of_samples / count
+                    average_convergence_factor = average_convergence_factor * number_of_samples / count
+                    average_number_of_iterations = average_number_of_iterations * number_of_samples / count
+                    break
+
             fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
             if average_number_of_iterations >= self.infinity**0.5:
                 if failed_testcases >= threshold:
@@ -696,6 +713,7 @@ class Optimizer:
         mstats.register("std", np.std)
         mstats.register("min", np.min)
         mstats.register("max", np.max)
+        self._average_time_to_convergence = self.infinity
 
         random.seed()
         use_checkpoint = False
@@ -774,7 +792,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 10
+                optimization_interval += 20
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
@@ -837,6 +855,14 @@ class Optimizer:
                     print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
             population = self.toolbox.select(population + offspring, mu_)
+            total_time_to_convergence = 0
+            if len(population[0].fitness.values) == 1:
+                for ind in population:
+                    total_time_to_convergence += ind.fitness.values[0]
+            else:
+                for ind in population:
+                    total_time_to_convergence += ind.fitness.values[0] * ind.fitness.values[1]
+            self._average_time_to_convergence = total_time_to_convergence / len(population)
             count += 1
             record = mstats.compile(population)
             # Update the statistics with the new population
@@ -1040,7 +1066,7 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=3,
+                                              self.evaluate_multiple_objectives, number_of_samples=10,
                                               parameter_values=next_parameter_values)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
