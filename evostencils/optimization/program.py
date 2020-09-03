@@ -1070,14 +1070,14 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=3,
+                                              self.evaluate_multiple_objectives, number_of_samples=1,
                                               parameter_values=next_parameter_values)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []
-            for j in range(0, min(len(pop), gp_mu)):
-                individual = pop[j]
+            for j in range(0, min(len(hof), gp_mu)):
+                individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
                 if j % self.number_of_mpi_processes == self.mpi_rank:
@@ -1087,7 +1087,7 @@ class Optimizer:
             fitness_values = self.gather(fitness_values)
             if self.is_root():
                 for j, values in fitness_values:
-                    individual = pop[j]
+                    individual = hof[j]
                     time = values[0] * values[1]
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
