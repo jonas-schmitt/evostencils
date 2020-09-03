@@ -437,7 +437,7 @@ class Optimizer:
                                                               infinity=self.infinity,
                                                               number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_number_of_iterations, average_time_to_convergence
+            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
             if average_number_of_iterations > self.infinity**0.5:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
@@ -865,7 +865,7 @@ class Optimizer:
                     total_time_to_convergence += ind.fitness.values[0]
             else:
                 for ind in population:
-                    total_time_to_convergence += ind.fitness.values[1]
+                    total_time_to_convergence += ind.fitness.values[0] * ind.fitness.values[1]
             self._average_time_to_convergence = total_time_to_convergence / len(population)
             count += 1
             record = mstats.compile(population)
@@ -1088,7 +1088,7 @@ class Optimizer:
             if self.is_root():
                 for j, values in fitness_values:
                     individual = pop[j]
-                    time = values[1]
+                    time = values[0] * values[1]
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
                           f'Number of Iterations: {number_of_iterations}', flush=True)
