@@ -148,11 +148,13 @@ def main():
 
     if mpi_rank == 0:
         print(f'Grammar representation:\n{program}\n', flush=True)
+        if not os.path.exists(f'./{problem_name}'):
+            os.makedir(f'./{problem_name}')
         j = 0
-        log_dir_name = f'{problem_name}/data_{j}'
+        log_dir_name = f'./{problem_name}/data_{j}'
         while os.path.exists(log_dir_name):
             j += 1
-            log_dir_name = f'{problem_name}/data_{j}'
+            log_dir_name = f'./{problem_name}/data_{j}'
         os.makedirs(log_dir_name)
         for i, log in enumerate(stats):
             optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
