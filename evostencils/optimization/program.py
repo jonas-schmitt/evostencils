@@ -109,7 +109,7 @@ class Optimizer:
         self._total_evaluation_time = 0
         self._average_time_to_convergence = infinity
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=1,
                                      parameter_values={}):
         self._average_time_to_convergence = self.infinity
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
@@ -385,12 +385,12 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=5, parameter_values={}):
+                                  number_of_samples=1, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
-        if self.individual_in_cache(individual):
-            return self.get_cached_fitness(individual)
+        # if self.individual_in_cache(individual):
+        #     return self.get_cached_fitness(individual)
         with suppress_output():
         # with do_nothing():
             try:
@@ -399,7 +399,7 @@ class Optimizer:
                 print("Memory Error", flush=True)
                 self._failed_evaluations += 1
                 fitness = self.infinity,
-                self.add_individual_to_cache(individual, fitness)
+                # self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
@@ -411,16 +411,16 @@ class Optimizer:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             else:
                 self._total_evaluation_time += average_time_to_convergence
-            self.add_individual_to_cache(individual, fitness)
+            # self.add_individual_to_cache(individual, fitness)
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=5, parameter_values={}):
+                                     number_of_samples=1, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
-        if self.individual_in_cache(individual):
-            return self.get_cached_fitness(individual)
+        # if self.individual_in_cache(individual):
+        #     return self.get_cached_fitness(individual)
         with suppress_output():
         # with do_nothing():
             try:
@@ -428,7 +428,7 @@ class Optimizer:
             except MemoryError:
                 self._failed_evaluations += 1
                 fitness = self.infinity, self.infinity
-                self.add_individual_to_cache(individual, fitness)
+                # self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
@@ -442,7 +442,7 @@ class Optimizer:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
                 self._total_evaluation_time += average_time_to_convergence
-            self.add_individual_to_cache(individual, fitness)
+            # self.add_individual_to_cache(individual, fitness)
             return fitness
     """
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
@@ -766,7 +766,7 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 50
         evaluation_time_threshold = 20.0 # seconds
-        number_of_samples = 3
+        number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
@@ -794,11 +794,13 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
+            """
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
                     if i != self.mpi_rank:
                         self.individual_cache.update(cache)
+            """
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -809,8 +811,9 @@ class Optimizer:
                 child1 = None
                 child2 = None
                 tries = 0
-                while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
-                                      child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
+                # while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
+                #                       child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
+                while tries < 10 and (child1 is None or len(child1) > 150 or child2 is None or len(child2) > 150):
                     operator_choice = random.random()
                     if operator_choice < crossover_probability:
                         child1, child2 = self.toolbox.mate(ind1, ind2)
@@ -1048,7 +1051,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.NSGAII
+                optimization_method = self.NSGAIII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
