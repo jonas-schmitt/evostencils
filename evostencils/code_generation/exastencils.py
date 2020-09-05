@@ -439,10 +439,25 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        runtime, convergence_factor, number_of_iterations = \
-            self.compile_and_run(number_of_samples=number_of_samples, infinity=infinity)
+        average_runtime = 0
+        average_convergence_factor = 0
+        average_number_of_iterations = 0
+        mapping = global_variable_values.copy()
+        n = 2
+        for i in range(n):
+            runtime, convergence_factor, number_of_iterations = \
+                self.compile_and_run(mapping=mapping, number_of_samples=number_of_samples, infinity=infinity)
+            average_runtime += runtime
+            average_convergence_factor += convergence_factor
+            average_number_of_iterations += number_of_iterations
+            if number_of_iterations >= infinity or convergence_factor > 1:
+                return average_runtime, average_convergence_factor, average_number_of_iterations
+            mapping['k'] *= 2
+        average_runtime /= n
+        average_convergence_factor /= n
+        average_number_of_iterations /= n
         # print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
-        return runtime, convergence_factor, number_of_iterations
+        return average_runtime, average_convergence_factor, average_number_of_iterations
 
     @staticmethod
     def parse_output(output: str, infinity: float):
