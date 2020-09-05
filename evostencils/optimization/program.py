@@ -764,8 +764,8 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 50
-        evaluation_time_threshold = 20.0 # seconds
+        optimization_interval = 40
+        evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -794,6 +794,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
+                optimization_interval += 20
             """
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
@@ -899,7 +900,7 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
-        hof = tools.HallOfFame(256, similar=lambda a, b: a.fitness == b.fitness)
+        hof = tools.HallOfFame(2 * mu_, similar=lambda a, b: str(a) == str(b))
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
@@ -931,7 +932,7 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
-        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+        hof = tools.ParetoFront(similar=lambda a, b: str(a) == str(b))
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -962,7 +963,7 @@ class Optimizer:
         stats_size = tools.Statistics(len)
         mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
-        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
+        hof = tools.ParetoFront(similar=lambda a, b: str(a) == str(b))
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
@@ -1076,7 +1077,7 @@ class Optimizer:
             hofs.append(hof)
 
             fitness_values = []
-            for j in range(0, min(len(hof), gp_mu)):
+            for j in range(0, min(len(hof), 2 * gp_mu)):
                 individual = hof[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
