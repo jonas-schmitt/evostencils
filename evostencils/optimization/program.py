@@ -600,7 +600,7 @@ class Optimizer:
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
-                level_offset += 1
+                # level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
                 next_parameter_values = {}
@@ -895,7 +895,8 @@ class Optimizer:
             evaluation_min_level += 1
             evaluation_max_level += 1
             next_parameter_values = {}
-            level_offset = evaluation_max_level - max_level
+            # level_offset = evaluation_max_level - max_level
+            level_offset = 0
             for key, values in parameter_values.items():
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
