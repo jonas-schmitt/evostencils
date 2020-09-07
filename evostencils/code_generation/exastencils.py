@@ -443,7 +443,10 @@ class ProgramGenerator:
         average_convergence_factor = 0
         average_number_of_iterations = 0
         mapping = global_variable_values.copy()
-        n = 2
+        n = 3
+        if 'k' not in mapping:
+            n = 1
+
         for i in range(n):
             runtime, convergence_factor, number_of_iterations = \
                 self.compile_and_run(mapping=mapping, number_of_samples=number_of_samples, infinity=infinity)
@@ -452,7 +455,8 @@ class ProgramGenerator:
             average_number_of_iterations += number_of_iterations
             if number_of_iterations >= infinity or convergence_factor > 1:
                 return average_runtime, average_convergence_factor, average_number_of_iterations
-            mapping['k'] *= 2
+            if n > 1:
+                mapping['k'] *= 2
         average_runtime /= n
         average_convergence_factor /= n
         average_number_of_iterations /= n

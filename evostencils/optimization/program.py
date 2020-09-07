@@ -594,7 +594,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 40
+        optimization_interval = 150
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
@@ -624,7 +624,6 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 20
             """
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
@@ -1025,7 +1024,7 @@ class Optimizer:
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
-                                                          number_of_samples=5)
+                                                          number_of_samples=1)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
