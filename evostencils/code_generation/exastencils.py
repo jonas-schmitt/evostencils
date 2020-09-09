@@ -352,18 +352,19 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
-    def evaluate(self, executable_path, infinity=1e100, number_of_samples=3):
+    def evaluate(self, executable_path, infinity=1e100, number_of_samples=3, with_mpi=False):
         # print("Evaluate", flush=True)
         total_time = 0
         sum_of_convergence_factors = 0
         total_number_of_iterations = 0
         for i in range(number_of_samples):
             try:
-                result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
-                # result = subprocess.run(["mpiexec", "--map-by", "ppr:1:core", "--bind-to", "core", f'{self.base_path}/{executable_path}/exastencils'],
-                #                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                #                         timeout=self.timeout_evaluate)
+                if with_mpi:
+                    result = subprocess.run(["mpiexec", "--map-by", "ppr:1:core", "--bind-to", "core", f'{self.base_path}/{executable_path}/exastencils'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=self.timeout_evaluate)
+                else:
+                    result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
             except subprocess.TimeoutExpired as _:
                 return infinity, infinity, infinity
             if not result.returncode == 0:
@@ -417,6 +418,40 @@ class ProgramGenerator:
             return runtime, convergence_factor, number_of_iterations
         except subprocess.TimeoutExpired:
             return infinity_result
+
+
+    def generate_and_evaluate_list_of_expressions(self, list_of_expression: [base.Expression], storages: List[CycleStorage],
+                                                  min_level: int, max_level: int, solver_program: str, infinity=1e100,
+                                                  number_of_samples=1, global_variable_values={}):
+        # print("Generate and evaluate", flush=True)
+        n = len(list_of_expression)
+        for i, expression in enumerate(list_of_expression):
+            j = i+1
+            for k in range(1, 5):
+                src = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa{k}'
+                dest = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa{k}'
+                if os.path.exists(src):
+                    shutil.copyfile(src, dest)
+
+            cycle_function = self.generate_cycle_function(expression[0], storages, min_level, max_level, self.max_level)
+            self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
+            shutil.copyfile(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3',
+                            f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa3')
+            shutil.copyfile(f'{self.base_path}/{self.knowledge_path_generated}', f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.knowledge')
+            self.generate_adapted_settings_file(f'{self.problem_name}_{j}', output_file_path=f'{self._base_path_prefix}/{self.problem_name}_{j}.settings')
+
+        cwd = os.getcwd()
+        subprocess.run(['mpiexec', '--map-by', 'ppr:1:core', '--bind-to', 'core', 'python',
+                        f'{cwd}/evostencils/code_generation/generate_and_compile.py',
+                        str(n), self.absolute_compiler_path, self.base_path,
+                        self._base_path_prefix, self.problem_name, self.platform],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        results = []
+        for i in range(1, n + 1):
+            path_to_executable = f'generated/{self.problem_name}_{i}'
+            result = self.evaluate(path_to_executable, infinity, number_of_samples, with_mpi=True)
+            results.append(result)
+        return results
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values={}):
