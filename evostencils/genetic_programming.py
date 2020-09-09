@@ -200,11 +200,6 @@ def select_unique_best(individuals, k, fit_attr="fitness"):
         key = str(ind)
         if key not in dictionary:
             dictionary[key] = i
-        else:
-            index = dictionary[key]
-            values = individuals[index].fitness.values
-            new_values = tuple(min(value, ind.fitness.values[j]) for j, value in enumerate(values))
-            individuals[index].fitness.values = new_values
     unique_indices = dictionary.items()
     unique_individuals = [individuals[i] for _, i in unique_indices]
     return sorted(unique_individuals, key=attrgetter(fit_attr), reverse=True)[:k]

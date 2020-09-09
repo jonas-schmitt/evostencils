@@ -126,7 +126,7 @@ class Optimizer:
         approximation = system.Approximation('x', solution_entries)
         rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
         rhs = system.RightHandSide('b', rhs_entries)
-        self._individual_cache.clear()
+        self.clear_individual_cache()
         maximum_block_size = 8
         levels_per_run = max_level - min_level
         pset, _ = \
@@ -389,8 +389,8 @@ class Optimizer:
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
-        # if self.individual_in_cache(individual):
-        #     return self.get_cached_fitness(individual)
+        if self.individual_in_cache(individual):
+            return self.get_cached_fitness(individual)
         with suppress_output():
         # with do_nothing():
             try:
@@ -399,7 +399,7 @@ class Optimizer:
                 print("Memory Error", flush=True)
                 self._failed_evaluations += 1
                 fitness = self.infinity,
-                # self.add_individual_to_cache(individual, fitness)
+                self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
@@ -411,7 +411,7 @@ class Optimizer:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
             else:
                 self._total_evaluation_time += average_time_to_convergence
-            # self.add_individual_to_cache(individual, fitness)
+            self.add_individual_to_cache(individual, fitness)
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
@@ -419,8 +419,8 @@ class Optimizer:
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
-        # if self.individual_in_cache(individual):
-        #     return self.get_cached_fitness(individual)
+        if self.individual_in_cache(individual):
+            return self.get_cached_fitness(individual)
         with suppress_output():
         # with do_nothing():
             try:
@@ -428,7 +428,7 @@ class Optimizer:
             except MemoryError:
                 self._failed_evaluations += 1
                 fitness = self.infinity, self.infinity
-                # self.add_individual_to_cache(individual, fitness)
+                self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
@@ -442,7 +442,7 @@ class Optimizer:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
             else:
                 self._total_evaluation_time += average_time_to_convergence
-            # self.add_individual_to_cache(individual, fitness)
+            self.add_individual_to_cache(individual, fitness)
             return fitness
 
     def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
@@ -594,13 +594,13 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 150
+        optimization_interval = 30
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
                     self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
-                # level_offset += 1
+                level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
                 next_parameter_values = {}
@@ -624,13 +624,12 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-            """
+                optimization_interval = 100
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
                     if i != self.mpi_rank:
                         self.individual_cache.update(cache)
-            """
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -641,9 +640,8 @@ class Optimizer:
                 child1 = None
                 child2 = None
                 tries = 0
-                # while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
-                #                       child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
-                while tries < 10 and (child1 is None or len(child1) > 150 or child2 is None or len(child2) > 150):
+                while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
+                                      child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
                     operator_choice = random.random()
                     if operator_choice < crossover_probability:
                         child1, child2 = self.toolbox.mate(ind1, ind2)
@@ -895,8 +893,7 @@ class Optimizer:
             evaluation_min_level += 1
             evaluation_max_level += 1
             next_parameter_values = {}
-            # level_offset = evaluation_max_level - max_level
-            level_offset = 0
+            level_offset = evaluation_max_level - max_level
             for key, values in parameter_values.items():
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
