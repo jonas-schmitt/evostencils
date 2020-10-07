@@ -594,8 +594,8 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 30
-        evaluation_time_threshold = self.infinity # seconds
+        optimization_interval = 20
+        evaluation_time_threshold = 10 # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -624,7 +624,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval = 100
+                optimization_interval += 20
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
