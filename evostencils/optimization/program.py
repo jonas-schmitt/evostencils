@@ -157,11 +157,14 @@ class Optimizer:
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
-            operator_choice = random.random()
-            if operator_choice < 2.0/3.0:
-                return mutInsert(individual, 0, 10, pset)
-            else:
-                return mutNodeReplacement(individual, pset)
+            return mutInsert(individual, 0, 10, pset)
+
+            # Use two different mutation operators
+            # operator_choice = random.random()
+            # if operator_choice < 2.0/3.0:
+            #     return mutInsert(individual, 0, 10, pset)
+            # else:
+            #     return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
 
@@ -879,7 +882,7 @@ class Optimizer:
 
             self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
             if optimization_method is None:
-                optimization_method = self.SOGP
+                optimization_method = self.NSGAII
             self.clear_individual_cache()
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,

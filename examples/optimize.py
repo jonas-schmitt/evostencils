@@ -49,7 +49,6 @@ def main():
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-
     settings_path = f'Helmholtz/2D_FD_Helmholtz_Complex_fromL3.settings'
     knowledge_path = f'Helmholtz/2D_FD_Helmholtz_Complex_fromL3.knowledge'
     cycle_name = "VCycle"
@@ -113,7 +112,7 @@ def main():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
     maximum_block_size = 8
-    optimization_method = optimizer.SOGP
+    optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
             optimization_method = optimizer.NSGAII

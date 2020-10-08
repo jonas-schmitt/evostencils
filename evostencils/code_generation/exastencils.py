@@ -738,34 +738,38 @@ class ProgramGenerator:
                             independent_equations.clear()
                         for key, value in independent_equations:
                             coloring = False
+                            jacobi_prefix = "with jacobi "
                             indentation = ''
                             if expression.partitioning != part.Single:
                                 coloring = True
+                                jacobi_prefix = ""
                                 indentation += '\t'
                                 program += f'{indentation}color with {{\n'
                                 program += self.generate_coloring(expression.partitioning, indentation)
                             if key[1] < max_level:
-                                program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} {jacobi_prefix}relax {weight} {{\n'
                             else:
-                                program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at {key[0]}@{key[1]} {jacobi_prefix}relax {weight} {{\n'
                             program += self.generate_solve_locally(key, value, indentation, max_level)
                             program += f'\t{indentation}}}\n'
                             if coloring:
                                 program += '\t}\n'
 
                         coloring = False
+                        jacobi_prefix = "with jacobi "
                         indentation = ''
                         if len(dependent_equations) > 0:
                             if expression.partitioning != part.Single:
                                 coloring = True
+                                jacobi_prefix = ""
                                 indentation += '\t'
                                 program += f'{indentation}color with {{\n'
                                 program += self.generate_coloring(expression.partitioning, indentation)
                             level = dependent_equations[0][0][1]
                             if level < max_level:
-                                program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} {jacobi_prefix}relax {weight} {{\n'
                             else:
-                                program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} {jacobi_prefix}relax {weight} {{\n'
                             for key, value in dependent_equations:
                                 program += self.generate_solve_locally(key, value, indentation, max_level)
                             program += f'\t{indentation}}}\n'
