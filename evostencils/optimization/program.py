@@ -595,7 +595,7 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 20
-        evaluation_time_threshold = 10 # seconds
+        evaluation_time_threshold = 20 # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -900,12 +900,12 @@ class Optimizer:
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
                                               self.evaluate_multiple_objectives, number_of_samples=1,
                                               parameter_values=next_parameter_values)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
+            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []
-            for j in range(0, min(len(hof), 2 * gp_mu)):
-                individual = hof[j]
+            for j in range(0, len(pop)):
+                individual = pop[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
                 if j % self.number_of_mpi_processes == self.mpi_rank:
@@ -915,7 +915,7 @@ class Optimizer:
             fitness_values = self.gather(fitness_values)
             if self.is_root():
                 for j, values in fitness_values:
-                    individual = hof[j]
+                    individual = pop[j]
                     time = values[0] * values[1]
                     number_of_iterations = values[0]
                     print(f'\nExecution time until convergence: {time}, '
