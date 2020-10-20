@@ -157,14 +157,12 @@ class Optimizer:
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
-            return mutInsert(individual, 0, 10, pset)
-
             # Use two different mutation operators
-            # operator_choice = random.random()
-            # if operator_choice < 2.0/3.0:
-            #     return mutInsert(individual, 0, 10, pset)
-            # else:
-            #     return mutNodeReplacement(individual, pset)
+            operator_choice = random.random()
+            if operator_choice < 2.0/3.0:
+                return mutInsert(individual, 0, 10, pset)
+            else:
+                return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
 
@@ -597,8 +595,8 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 20
-        evaluation_time_threshold = 20 # seconds
+        optimization_interval = 30
+        evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -627,7 +625,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 20
+                optimization_interval += 10
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
@@ -890,6 +888,7 @@ class Optimizer:
                                     min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
 
+            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
             pops.append(pop)
             best_time = self.infinity
             best_number_of_iterations = self.infinity
@@ -903,7 +902,7 @@ class Optimizer:
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
                                               self.evaluate_multiple_objectives, number_of_samples=1,
                                               parameter_values=next_parameter_values)
-            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []

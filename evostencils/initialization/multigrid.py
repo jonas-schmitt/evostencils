@@ -415,12 +415,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         pset.addTerminal(terminals.twenty_seven_way_partitioning, types.Partitioning, f'twenty_seven_way')
     """
 
-    # Relaxation Factors
-    samples = 17
-    interval = np.linspace(0.6, 1.4, samples)
-
-    # samples = 37
-    # interval = np.linspace(0.1, 1.9, samples)
+    samples = 21
+    interval = np.linspace(0.5, 1.5, samples)
     for omega in interval:
         pset.addTerminal(omega, TypeWrapper(float))
 
