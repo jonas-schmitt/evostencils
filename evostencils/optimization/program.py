@@ -597,8 +597,8 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 20
-        evaluation_time_threshold = 20 # seconds
+        optimization_interval = 30
+        evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             if count >= optimization_interval and \
@@ -627,7 +627,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 20
+                optimization_interval += 10
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
@@ -893,6 +893,7 @@ class Optimizer:
             pops.append(pop)
             best_time = self.infinity
             best_number_of_iterations = self.infinity
+            best_average_fitness = self.infinity
             evaluation_min_level += 1
             evaluation_max_level += 1
             next_parameter_values = {}
@@ -921,17 +922,24 @@ class Optimizer:
                     individual = pop[j]
                     time = values[0] * values[1]
                     number_of_iterations = values[0]
+                    if individual.fitness.values > 1:
+                        average_fitness = 0.5 * (individual.fitness.values[0] + number_of_iterations)
+                    else:
+                        average_fitness = 0.5 * (individual.fitness.values[0] + time)
+
                     print(f'\nExecution time until convergence: {time}, '
                           f'Number of Iterations: {number_of_iterations}', flush=True)
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
 
-                    if time < best_time: # and convergence_factor < required_convergence:
+                    if average_fitness < best_average_fitness: # and convergence_factor < required_convergence:
                         best_individual = individual
                         best_time = time
                         best_number_of_iterations = number_of_iterations
-                print(f"\nFastest execution time until convergence: {best_time}, "
-                      f"Number of iterations: {best_number_of_iterations}", flush=True)
+                        best_average_fitness = average_fitness
+                print(f"\nExecution time until convergence: {best_time}, "
+                      f"Number of iterations: {best_number_of_iterations}",
+                      f"Best average fitness: {best_average_fitness}", flush=True)
 
             #TODO fix relaxation factor optimization
             """
