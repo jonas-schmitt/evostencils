@@ -922,7 +922,7 @@ class Optimizer:
                     time = values[0] * values[1]
                     number_of_iterations = values[0]
                     if individual.fitness.values > 1:
-                        average_fitness = 0.5 * (individual.fitness.values[0] + number_of_iterations)
+                        average_fitness = 0.5 * (individual.fitness.values[0] * individual.fitness.values[1] + time)
                     else:
                         average_fitness = 0.5 * (individual.fitness.values[0] + time)
 
@@ -938,7 +938,7 @@ class Optimizer:
                         best_average_fitness = average_fitness
                 print(f"\nExecution time until convergence: {best_time}, "
                       f"Number of iterations: {best_number_of_iterations}",
-                      f"Best average fitness: {best_average_fitness}", flush=True)
+                      f"Best average time: {best_average_fitness}", flush=True)
 
             #TODO fix relaxation factor optimization
             """
