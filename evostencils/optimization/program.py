@@ -157,14 +157,12 @@ class Optimizer:
         self._toolbox.register("mate", gp.cxOnePoint)
 
         def mutate(individual, pset):
-            return mutInsert(individual, 0, 10, pset)
-
             # Use two different mutation operators
-            # operator_choice = random.random()
-            # if operator_choice < 2.0/3.0:
-            #     return mutInsert(individual, 0, 10, pset)
-            # else:
-            #     return mutNodeReplacement(individual, pset)
+            operator_choice = random.random()
+            if operator_choice < 2.0/3.0:
+                return mutInsert(individual, 0, 10, pset)
+            else:
+                return mutNodeReplacement(individual, pset)
 
         self._toolbox.register("mutate", mutate, pset=pset)
 
@@ -890,6 +888,7 @@ class Optimizer:
                                     min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
 
+            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
             pops.append(pop)
             best_time = self.infinity
             best_number_of_iterations = self.infinity
@@ -904,7 +903,7 @@ class Optimizer:
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
                                               self.evaluate_multiple_objectives, number_of_samples=1,
                                               parameter_values=next_parameter_values)
-            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
+            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
             fitness_values = []
