@@ -595,7 +595,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 30
+        optimization_interval = 40
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
@@ -625,7 +625,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-                optimization_interval += 10
+                optimization_interval += 20
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 individual_caches = self.mpi_comm.allgather(self.individual_cache)
                 for i, cache in enumerate(individual_caches):
@@ -901,7 +901,7 @@ class Optimizer:
                 assert level_offset < len(values), 'Too few parameter values provided'
                 next_parameter_values[key] = values[level_offset]
             self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=1,
+                                              self.evaluate_multiple_objectives, number_of_samples=3,
                                               parameter_values=next_parameter_values)
             hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
@@ -921,7 +921,7 @@ class Optimizer:
                     individual = pop[j]
                     time = values[0] * values[1]
                     number_of_iterations = values[0]
-                    if individual.fitness.values > 1:
+                    if len(individual.fitness.values) > 1:
                         average_fitness = 0.5 * (individual.fitness.values[0] * individual.fitness.values[1] + time)
                     else:
                         average_fitness = 0.5 * (individual.fitness.values[0] + time)

@@ -49,8 +49,8 @@ def main():
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_Complex_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_Complex_fromL3.knowledge'
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     cycle_name = "VCycle"
 
     # cycle_name= "gen_mgCycle"
