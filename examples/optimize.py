@@ -94,7 +94,7 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-6
+    epsilon = 1e-7
     problem_name = program_generator.problem_name
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
@@ -133,10 +133,10 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=100, gp_lambda=2,
+                                                                     gp_mu=128, gp_lambda=2,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=100, es_generations=150,
+                                                                     gp_generations=150, es_generations=150,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,

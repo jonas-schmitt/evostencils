@@ -595,7 +595,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 40
+        optimization_interval = 50
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
@@ -873,7 +873,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 2 * gp_mu
+            initial_population_size = 4 * gp_mu
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
@@ -887,58 +887,27 @@ class Optimizer:
                                     gp_crossover_probability, gp_mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
-
-            pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
+            if len(pop[0].fitness.values) == 2:
+                pop = sorted(pop, key=lambda ind: ind.fitness.values[0]*ind.fitness.values[1])
+                hof = sorted(hof, key=lambda ind: ind.fitness.values[0]*ind.fitness.values[1])
+            else:
+                pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
+                hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             pops.append(pop)
-            best_time = self.infinity
-            best_number_of_iterations = self.infinity
-            best_average_fitness = self.infinity
-            evaluation_min_level += 1
-            evaluation_max_level += 1
-            next_parameter_values = {}
-            level_offset = evaluation_max_level - max_level
-            for key, values in parameter_values.items():
-                assert level_offset < len(values), 'Too few parameter values provided'
-                next_parameter_values[key] = values[level_offset]
-            self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, solver_program,
-                                              self.evaluate_multiple_objectives, number_of_samples=3,
-                                              parameter_values=next_parameter_values)
-            hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             hofs.append(hof)
 
-            fitness_values = []
             for j in range(0, len(pop)):
                 individual = pop[j]
                 if individual.fitness.values[0] >= self.infinity:
                     continue
-                if j % self.number_of_mpi_processes == self.mpi_rank:
-                    values = self.toolbox.evaluate(individual)
-                    fitness_values.append((j, values))
-            self.barrier()
-            fitness_values = self.gather(fitness_values)
-            if self.is_root():
-                for j, values in fitness_values:
-                    individual = pop[j]
-                    time = values[0] * values[1]
-                    number_of_iterations = values[0]
-                    if len(individual.fitness.values) > 1:
-                        average_fitness = 0.5 * (individual.fitness.values[0] * individual.fitness.values[1] + time)
+                if self.is_root():
+                    if len(individual.fitness.values) == 2:
+                        print(f'\nExecution time until convergence: {individual.fitness.values[0] * individual.fitness.values[1]}, '
+                              f'Number of Iterations: {individual.fitness.values[0]}', flush=True)
                     else:
-                        average_fitness = 0.5 * (individual.fitness.values[0] + time)
-
-                    print(f'\nExecution time until convergence: {time}, '
-                          f'Number of Iterations: {number_of_iterations}', flush=True)
+                        print(f'\nExecution time until convergence: {individual.fitness.values[0]}', flush=True)
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
-
-                    if average_fitness < best_average_fitness: # and convergence_factor < required_convergence:
-                        best_individual = individual
-                        best_time = time
-                        best_number_of_iterations = number_of_iterations
-                        best_average_fitness = average_fitness
-                print(f"\nExecution time until convergence: {best_time}, "
-                      f"Number of iterations: {best_number_of_iterations}",
-                      f"Best average time: {best_average_fitness}", flush=True)
 
             #TODO fix relaxation factor optimization
             """
