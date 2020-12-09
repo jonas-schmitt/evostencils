@@ -895,12 +895,9 @@ class Optimizer:
                 hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
             pops.append(pop)
             hofs.append(hof)
-
-            for j in range(0, len(pop)):
-                individual = pop[j]
-                if individual.fitness.values[0] >= self.infinity:
-                    continue
-                if self.is_root():
+            best_individual = hof[0]
+            if self.is_root():
+                for individual in hof:
                     if len(individual.fitness.values) == 2:
                         print(f'\nExecution time until convergence: {individual.fitness.values[0] * individual.fitness.values[1]}, '
                               f'Number of Iterations: {individual.fitness.values[0]}', flush=True)
@@ -908,6 +905,7 @@ class Optimizer:
                         print(f'\nExecution time until convergence: {individual.fitness.values[0]}', flush=True)
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
+            self.barrier()
 
             #TODO fix relaxation factor optimization
             """

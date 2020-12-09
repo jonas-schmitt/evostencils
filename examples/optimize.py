@@ -146,7 +146,7 @@ def main():
                                                                      maximum_solver_iterations=maximum_solver_iterations)
 
     if mpi_rank == 0:
-        print(f'Grammar representation:\n{program}\n', flush=True)
+        print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
             os.makedir(f'./{problem_name}')
         j = 0
