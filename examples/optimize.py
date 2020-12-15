@@ -148,7 +148,7 @@ def main():
     if mpi_rank == 0:
         print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
-            os.makedir(f'./{problem_name}')
+            os.makedirs(f'./{problem_name}')
         j = 0
         log_dir_name = f'./{problem_name}/data_{j}'
         while os.path.exists(log_dir_name):
