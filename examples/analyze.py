@@ -80,57 +80,62 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-6
+    epsilon = 1e-7
     problem_name = program_generator.problem_name
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators,
                           fields,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity)
-    path = "../helmholtz-results/results_05"
+    path = "../helmholtz-results/results_k05"
+    # path = "../helmholtz-results/results_k1"
     nexperiments = 5
-    plot_average_number_of_iterations(optimizer, path, nexperiments)
-    plot_average_runtime_per_iteration(optimizer, path, nexperiments)
-    plot_average_execution_time(optimizer, path, nexperiments)
+    plot_minimum_solving_time(optimizer, path, "minimum-solving-time.pdf", nexperiments)
     plot_pareto_front(optimizer, path, nexperiments)
 
 
 def plot_pareto_front(optimizer, base_path='./', number_of_experiments=1):
     hofs = []
     front = []
+    global_hof = tools.ParetoFront()
     for i in range(number_of_experiments):
         pop = optimizer.load_data_structure(f'{base_path}/data_{i}/pop_0.p')
-        hof = tools.ParetoFront(similar=lambda a, b: str(a) == str(b))
+        hof = tools.ParetoFront()
         hof.update(pop)
         hofs.append(hof)
-        front += [(*ind.fitness.values, i + 1) for ind in hof]
+        front += [(*ind.fitness.values, 1) for ind in hof]
+        global_hof.update(pop)
 
-    columns = ['Number of Iterations', 'Runtime per Iteration (ms)', 'Experiment']
-    df = pd.DataFrame(front, columns=columns)
+    global_front = [(*ind.fitness.values, 'red') for ind in global_hof]
+    columns = ['Number of Iterations', 'Execution Time per Iteration (ms)', 'Experiment']
+    df1 = pd.DataFrame(front, columns=columns)
+    df2 = pd.DataFrame(global_front, columns=columns)
     rc('text', usetex=True)
+    plt.rcParams["font.family"] = "Times New Roman"
     sns.set(style="white")
     sns.set_context("paper")
     sns.despine()
-    # palette = sns.color_palette("colorblind", n_colors=3)
-    palette = sns.color_palette("colorblind", n_colors=number_of_experiments)
-    sns.relplot(x=columns[0], y=columns[1], hue=columns[2], style=columns[2],
-                data=df, kind='line', markers=True, dashes=False, palette=palette, legend=False)
-
-    # sns.relplot(x=columns[0], y=columns[1], hue=columns[3], style=columns[2],
-    #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
-    # plt.xlim(0, 35)
+    fig, ax = plt.subplots()
+    sns.scatterplot(x=columns[0], y=columns[1], style=columns[2], hue=columns[2],
+                    data=df1, markers=['o']*(number_of_experiments), legend=False, ax=ax)
+    sns.lineplot(x=columns[0], y=columns[1], color='red',
+                data=df2, legend=False,
+                ax=ax)
+    # plt.xlim(3000, 10000)
+    # plt.ylim(0, 100)
     plt.tight_layout()
     plt.savefig("pareto-front.pdf", quality=100, dpi=300)
 
-def plot_average_number_of_iterations(optimizer, base_path='./', number_of_experiments=1):
+def plot_minimum_number_of_iterations(optimizer, base_path='./', number_of_experiments=1):
     data = []
     for i in range(number_of_experiments):
         log = optimizer.load_data_structure(f'{base_path}/data_{i}/log_0.p')
-        minimum_iterations = log.chapters["number_of_iterations"].select("avg")
+        minimum_iterations = log.chapters["number_of_iterations"].select("min")
         stats = [(gen+1, iterations, i+1) for gen, iterations in enumerate(minimum_iterations) if iterations < 10000]
         data += stats
-    columns = ['Generation', 'Average Number of Iterations', 'Experiment']
+    columns = ['Generation', 'Minimum Number of Iterations', 'Experiment']
     df = pd.DataFrame(data, columns=columns)
     rc('text', usetex=True)
+    plt.rcParams["font.family"] = "Times New Roman"
     sns.set(style="white")
     sns.set_context("paper")
     sns.despine()
@@ -143,18 +148,19 @@ def plot_average_number_of_iterations(optimizer, base_path='./', number_of_exper
     #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
     # plt.xlim(0, 35)
     plt.tight_layout()
-    plt.savefig("average-iterations.pdf", quality=100, dpi=300)
+    plt.savefig("minimum-iterations.pdf", quality=100, dpi=300)
 
-def plot_average_runtime_per_iteration(optimizer, base_path='./', number_of_experiments=1):
+def plot_minimum_runtime_per_iteration(optimizer, base_path='./', number_of_experiments=1):
     data = []
     for i in range(number_of_experiments):
         log = optimizer.load_data_structure(f'{base_path}/data_{i}/log_0.p')
-        minimum_runtime = log.chapters["execution_time"].select("avg")
+        minimum_runtime = log.chapters["execution_time"].select("min")
         stats = [(gen+1, runtime, i+1) for gen, runtime in enumerate(minimum_runtime) if runtime < 10000]
         data += stats
-    columns = ['Generation', 'Average Runtime per Iteration (ms)', 'Experiment']
+    columns = ['Generation', 'Minimum Execution Time per Iteration (ms)', 'Experiment']
     df = pd.DataFrame(data, columns=columns)
     rc('text', usetex=True)
+    plt.rcParams["font.family"] = "Times New Roman"
     sns.set(style="white")
     sns.set_context("paper")
     sns.despine()
@@ -168,19 +174,22 @@ def plot_average_runtime_per_iteration(optimizer, base_path='./', number_of_expe
     #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
     # plt.xlim(0, 35)
     plt.tight_layout()
-    plt.savefig("average-runtime-per-iteration.pdf", quality=100, dpi=300)
+    plt.savefig("minimum-runtime-per-iteration.pdf", quality=100, dpi=300)
 
-def plot_average_execution_time(optimizer, base_path='./', number_of_experiments=1):
+def plot_minimum_solving_time(optimizer, base_path='./', file_name=None, number_of_experiments=10, min_generation=0, max_generation=150):
     data = []
     for i in range(number_of_experiments):
         log = optimizer.load_data_structure(f'{base_path}/data_{i}/log_0.p')
-        minimum_runtime = log.chapters["execution_time"].select("avg")
-        minimum_number_of_iterations = log.chapters["number_of_iterations"].select("avg")
-        stats = [(gen+1, tmp[0]*tmp[1], i+1) for gen, tmp in enumerate(zip(minimum_number_of_iterations, minimum_runtime)) if tmp[0] < 10000]
+        minimum_runtime = log.chapters["execution_time"].select("min")
+        minimum_runtime = minimum_runtime[min_generation:max_generation]
+        minimum_number_of_iterations = log.chapters["number_of_iterations"].select("min")
+        minimum_number_of_iterations = minimum_number_of_iterations[min_generation:max_generation]
+        stats = [(gen+1, tmp[0]*tmp[1]*1e-3, i+1) for gen, tmp in enumerate(zip(minimum_number_of_iterations, minimum_runtime)) if tmp[0] < 10000]
         data += stats
-    columns = ['Generation', 'Average Execution Time (ms)', 'Experiment']
+    columns = ['Generation', 'Minimum Solving Time (s)', 'Experiment']
     df = pd.DataFrame(data, columns=columns)
     rc('text', usetex=True)
+    plt.rcParams["font.family"] = "Times New Roman"
     sns.set(style="white")
     sns.set_context("paper")
     sns.despine()
@@ -194,7 +203,9 @@ def plot_average_execution_time(optimizer, base_path='./', number_of_experiments
     #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
     # plt.xlim(0, 35)
     plt.tight_layout()
-    plt.savefig("average-execution-time.pdf", quality=100, dpi=300)
+    if file_name is None:
+        file_name = "minimum-solving-time.pdf"
+    plt.savefig(file_name, quality=100, dpi=300)
 
 
 if __name__ == "__main__":
