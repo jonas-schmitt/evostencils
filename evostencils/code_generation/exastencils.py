@@ -332,7 +332,7 @@ class ProgramGenerator:
                         tokens = line.split(" ")
                         field_access = tokens[-1]
                         tokens = field_access.split("@")
-                        level = int(tokens[-1])
+                        level = tokens[-1]
                         field = tokens[0]
                         tokens = field.split("[")
                         field_name = tokens[0]
@@ -341,7 +341,7 @@ class ProgramGenerator:
 
     def generate_from_patched_l4_file(self):
         base_path = self.base_path
-        input_file_path = self.settings_path_generated + ".backup"
+        input_file_path = self.settings_path_generated + ".input"
         output_file_path = self.settings_path_generated
         shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{input_file_path}')
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
