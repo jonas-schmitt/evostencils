@@ -322,6 +322,7 @@ class ProgramGenerator:
         input_file_path = self._debug_l4_path_generated
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
+        shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{output_file_path}.backup')
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{base_path}/{output_file_path}', 'w') as output_file:
                 for line in input_file:
@@ -339,9 +340,16 @@ class ProgramGenerator:
                         output_file.write(" "*leading_spaces + "\t"*leading_tabs + f"advance {field_name}@{level}\n")
         return output_file_path
 
+    def restore_l4_file(self):
+        base_path = self.base_path
+        output_file_path = \
+            f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
+        shutil.copyfile(f'{base_path}/{output_file_path}.backup', f'{base_path}/{output_file_path}')
+
+
     def generate_from_patched_l4_file(self):
         base_path = self.base_path
-        input_file_path = self.settings_path_generated + ".input"
+        input_file_path = self.settings_path_generated + ".backup"
         output_file_path = self.settings_path_generated
         shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{input_file_path}')
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
@@ -349,7 +357,9 @@ class ProgramGenerator:
                 for line in input_file:
                     if "l3file" not in line:
                         output_file.write(line)
-        return self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated, settings_path=self.settings_path_generated)
+        returncode = self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated, settings_path=self.settings_path_generated)
+        shutil.copyfile(f'{base_path}/{input_file_path}', f'{base_path}/{output_file_path}')
+        return returncode
 
     def run_exastencils_compiler(self, knowledge_path=None, settings_path=None):
         # print("Generate", flush=True)
@@ -505,6 +515,7 @@ class ProgramGenerator:
                 return infinity, infinity, infinity
             self.patch_l4_file()
             returncode = self.generate_from_patched_l4_file()
+            self.restore_l4_file()
             if returncode != 0:
                 print("Code generation failed", flush=True)
                 return infinity, infinity, infinity
