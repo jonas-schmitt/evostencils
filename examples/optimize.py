@@ -136,7 +136,7 @@ def main():
                                                                      gp_mu=128, gp_lambda=2,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=150, es_generations=150,
+                                                                     gp_generations=120, es_generations=150,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
