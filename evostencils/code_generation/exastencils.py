@@ -59,6 +59,7 @@ class ProgramGenerator:
         self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.settings'
         self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.exa3'
         self._output_path_generated = None
+        self._debug_l4_path_generated = None
 
         process_local_knowledge_path = knowledge_path.replace(".knowledge", f"_base_{mpi_rank}.knowledge")
         shutil.copyfile(f'{base_path}/{knowledge_path}', f'{base_path}/{process_local_knowledge_path}')
@@ -316,6 +317,41 @@ class ProgramGenerator:
 
         return program
 
+    def patch_l4_file(self):
+        base_path = self.base_path
+        input_file_path = self._debug_l4_path_generated
+        output_file_path = \
+            f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
+        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
+                for line in input_file:
+                    output_file.write(line)
+                    if "[next]" in line:
+                        leading_spaces = len(line) - len(line.lstrip(" "))
+                        leading_tabs = len(line) - len(line.lstrip('\t'))
+                        tokens = line.split(" ")
+                        field_access = tokens[-1]
+                        tokens = field_access.split("@")
+                        level = int(tokens[-1])
+                        field = tokens[0]
+                        tokens = field.split("[")
+                        field_name = tokens[0]
+                        output_file.write(" "*leading_spaces + "\t"*leading_tabs + f"advance {field_name}@{level}\n")
+        return output_file_path
+
+    def generate_from_patched_l4_file(self):
+        self.patch_l4_file()
+        base_path = self.base_path
+        input_file_path = self.settings_path_generated + ".backup"
+        output_file_path = self.settings_path_generated
+        shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{input_file_path}')
+        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
+                for line in input_file:
+                    if "l3file" not in line:
+                        output_file.write(line)
+        return self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated, settings_path=self.settings_path_generated)
+
     def run_exastencils_compiler(self, knowledge_path=None, settings_path=None):
         # print("Generate", flush=True)
         if knowledge_path is None:
@@ -398,6 +434,7 @@ class ProgramGenerator:
             parser.extract_settings_information(self.base_path, settings_path)
         self._output_path_generated = output_path_generated
         debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_base_', '_')
+        self._debug_l4_path_generated = self._debug_l3_path.replace('_base_', '_').replace("exa3", "exa4")
         l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
         shutil.copyfile(debug_l3_path, l3_path)
         return output_path_generated
@@ -464,6 +501,11 @@ class ProgramGenerator:
                                                        settings_path=self.settings_path_generated)
             end_time = time.time()
             elapsed_time = end_time - start_time
+            if returncode != 0:
+                print("Code generation failed", flush=True)
+                return infinity, infinity, infinity
+            self.patch_l4_file()
+            returncode = self.generate_from_patched_l4_file()
             if returncode != 0:
                 print("Code generation failed", flush=True)
                 return infinity, infinity, infinity
