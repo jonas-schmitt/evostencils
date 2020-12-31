@@ -340,7 +340,6 @@ class ProgramGenerator:
         return output_file_path
 
     def generate_from_patched_l4_file(self):
-        self.patch_l4_file()
         base_path = self.base_path
         input_file_path = self.settings_path_generated + ".backup"
         output_file_path = self.settings_path_generated
