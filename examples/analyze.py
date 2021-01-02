@@ -88,8 +88,8 @@ def main():
                           epsilon=epsilon, infinity=infinity)
     path = "../helmholtz-results/results_k05"
     # path = "../helmholtz-results/results_k1"
-    nexperiments = 5
-    plot_minimum_solving_time(optimizer, path, "minimum-solving-time.pdf", nexperiments)
+    nexperiments = 10
+    plot_average_solving_time(optimizer, path, "average-solving-time.pdf", nexperiments)
     plot_pareto_front(optimizer, path, nexperiments)
 
 
@@ -115,6 +115,7 @@ def plot_pareto_front(optimizer, base_path='./', number_of_experiments=1):
     sns.set_context("paper")
     sns.despine()
     fig, ax = plt.subplots()
+    # palette = sns.color_palette("colorblind", n_colors=number_of_experiments)
     sns.scatterplot(x=columns[0], y=columns[1], style=columns[2], hue=columns[2],
                     data=df1, markers=['o']*(number_of_experiments), legend=False, ax=ax)
     sns.lineplot(x=columns[0], y=columns[1], color='red',
@@ -176,17 +177,17 @@ def plot_minimum_runtime_per_iteration(optimizer, base_path='./', number_of_expe
     plt.tight_layout()
     plt.savefig("minimum-runtime-per-iteration.pdf", quality=100, dpi=300)
 
-def plot_minimum_solving_time(optimizer, base_path='./', file_name=None, number_of_experiments=10, min_generation=0, max_generation=150):
+def plot_average_solving_time(optimizer, base_path='./', file_name=None, number_of_experiments=10, min_generation=0, max_generation=150):
     data = []
     for i in range(number_of_experiments):
         log = optimizer.load_data_structure(f'{base_path}/data_{i}/log_0.p')
-        minimum_runtime = log.chapters["execution_time"].select("min")
-        minimum_runtime = minimum_runtime[min_generation:max_generation]
-        minimum_number_of_iterations = log.chapters["number_of_iterations"].select("min")
-        minimum_number_of_iterations = minimum_number_of_iterations[min_generation:max_generation]
-        stats = [(gen+1, tmp[0]*tmp[1]*1e-3, i+1) for gen, tmp in enumerate(zip(minimum_number_of_iterations, minimum_runtime)) if tmp[0] < 10000]
+        runtime = log.chapters["execution_time"].select("avg")
+        runtime = runtime[min_generation:max_generation]
+        number_of_iterations = log.chapters["number_of_iterations"].select("avg")
+        number_of_iterations = number_of_iterations[min_generation:max_generation]
+        stats = [(gen+1, tmp[0]*tmp[1]*1e-3, i+1) for gen, tmp in enumerate(zip(number_of_iterations, runtime)) if tmp[0] < 10000]
         data += stats
-    columns = ['Generation', 'Minimum Solving Time (s)', 'Experiment']
+    columns = ['Generation', 'Average Solving Time (s)', 'Experiment']
     df = pd.DataFrame(data, columns=columns)
     rc('text', usetex=True)
     plt.rcParams["font.family"] = "Times New Roman"
@@ -201,10 +202,10 @@ def plot_minimum_solving_time(optimizer, base_path='./', file_name=None, number_
 
     # sns.relplot(x=columns[0], y=columns[1], hue=columns[3], style=columns[2],
     #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
-    # plt.xlim(0, 35)
+    plt.xlim(0, 150)
     plt.tight_layout()
     if file_name is None:
-        file_name = "minimum-solving-time.pdf"
+        file_name = "average-solving-time.pdf"
     plt.savefig(file_name, quality=100, dpi=300)
 
 
