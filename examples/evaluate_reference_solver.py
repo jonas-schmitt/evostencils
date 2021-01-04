@@ -1,38 +1,47 @@
 import subprocess
 import shutil
 import numpy as np
-
+import os
 def main():
-    path_to_executable = "../exastencils/Examples/generated/2D_FD_Helmholtz_fromL3"
-    output_path = path_to_executable
-    path_to_file = f'{output_path}/Global/Global_declarations.cpp'
-    values = np.linspace(0.5, 1.5, 21)
-    for value in values:
-        shutil.copyfile(path_to_file, f'{path_to_file}.backup')
-        parameter = "omegaRelax"
-        print(f"omegaRelax = {value}")
-        with open(path_to_file, 'r') as file:
-            lines = file.readlines()
-            content = ''
-            for line in lines:
-                include_line = True
-                if parameter in line:
-                    tokens = line.split('=')
-                    tokens[-1] = ' ' + str(value) + ';\n'
-                    tmp = '='.join(tokens)
-                    content += tmp
-                    include_line = False
-                if include_line:
-                    content += line
-        with open(path_to_file, 'w') as file:
-            file.write(content)
-        subprocess.run(['make', '-j12', '-s', '-C', f'{path_to_executable}'],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        result = subprocess.run([f'./{path_to_executable}/exastencils'],
-                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    cwd = os.getcwd()
+    platform = "linux"
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    path_to_executable = f"{base_path}/generated/2D_FD_Helmholtz_fromL3"
+    nruns = 10
+    current_path = os.getcwd()
+    os.chdir(base_path)
+    subprocess.run(['java', '-cp',
+                    compiler_path, 'Main',
+                    f'{base_path}/{settings_path}',
+                    f'{base_path}/{knowledge_path}',
+                    f'{base_path}/lib/{platform}.platform'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.chdir(current_path)
+    subprocess.run(['make', '-j12', '-s', '-C', f'{path_to_executable}'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    total_execution_time = 0
+    total_iterations = 0
+    for _ in range(nruns):
+        result = subprocess.run([f'{path_to_executable}/exastencils'],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         output = result.stdout.decode('utf8')
-        print(output)
-        shutil.copyfile(f'{path_to_file}.backup', path_to_file)
+        tokens = output.split("\n")
+        tokens_first_line = tokens[0].split()
+        try:
+            iterations = float(tokens_first_line[2])
+        except:
+            iterations = 10000
+        total_iterations += iterations
+        tokens_last_line = tokens[-2].split()
+        execution_time = float(tokens_last_line[-1])
+        total_execution_time += execution_time
+
+    print(f"Average solving time: {total_execution_time / nruns}", flush=True)
+    print(f"Average number of iterations: {total_iterations / nruns}", flush=True)
 
 if __name__ == "__main__":
     main()
