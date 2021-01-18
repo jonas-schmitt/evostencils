@@ -405,7 +405,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS, types.Finished))
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
-    pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+    # pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     """
     if dimension == 2:
         pset.addTerminal(terminals.four_way_partitioning, types.Partitioning, f'four_way')

@@ -11,7 +11,7 @@ def main():
     settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
     knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     path_to_executable = f"{base_path}/generated/2D_FD_Helmholtz_fromL3"
-    nruns = 10
+    nruns = 1
     current_path = os.getcwd()
     os.chdir(base_path)
     subprocess.run(['java', '-cp',
