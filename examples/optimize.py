@@ -51,7 +51,7 @@ def main():
 
     settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
     knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "VCycle"
+    cycle_name = "mgCycle"
 
     # cycle_name= "gen_mgCycle"
 
@@ -67,12 +67,6 @@ def main():
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
                                          cycle_name=cycle_name)
 
-    # Evaluate baseline program
-    # program_generator.run_exastencils_compiler()
-    # program_generator.run_c_compiler()
-    # time, convergence_factor = program_generator.evaluate()
-    # print(f'Time: {time}, Convergence factor: {convergence_factor}')
-
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
     finest_grid = program_generator.finest_grid
@@ -83,16 +77,6 @@ def main():
     operators = program_generator.operators
     fields = program_generator.fields
 
-    # lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
-    # convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
-    bytes_per_word = 8
-    # Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz
-    peak_performance = 26633.33 * 1e6
-    peak_bandwidth = 26570.26 * 1e6
-    # Measured on the target platform
-    runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
-    performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
-                                                 runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
     epsilon = 1e-7
     problem_name = program_generator.problem_name
@@ -102,8 +86,7 @@ def main():
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=nprocs,
-                          # convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator, program_generator=program_generator,
+                          program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
     # restart_from_checkpoint = True
@@ -136,7 +119,7 @@ def main():
                                                                      gp_mu=128, gp_lambda=2,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=120, es_generations=150,
+                                                                     gp_generations=150,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,

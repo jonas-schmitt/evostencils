@@ -46,31 +46,19 @@ def main():
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_MPI_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_MPI_fromL3.knowledge'
-    cycle_name = "VCycle"
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    cycle_name = "mgCycle"
 
     # cycle_name= "gen_mgCycle"
 
     comm = None
     nprocs = 1
     mpi_rank = 0
-    if nprocs > 1:
-        tmp = "processes"
-    else:
-        tmp = "process"
-    if mpi_rank == 0:
-        print(f"Running {nprocs} MPI {tmp}")
+    print(f"Running without MPI")
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
                                          cycle_name=cycle_name)
 
-    # Evaluate baseline program
-    # program_generator.run_exastencils_compiler()
-    # program_generator.run_c_compiler()
-    # time, convergence_factor = program_generator.evaluate()
-    # print(f'Time: {time}, Convergence factor: {convergence_factor}')
-
-    # Obtain extracted information from program generator
     dimension = program_generator.dimension
     finest_grid = program_generator.finest_grid
     coarsening_factors = program_generator.coarsening_factor
@@ -80,18 +68,8 @@ def main():
     operators = program_generator.operators
     fields = program_generator.fields
 
-    # lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
-    # convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, lfa_grids)
-    bytes_per_word = 8
-    # Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz
-    peak_performance = 26633.33 * 1e6
-    peak_bandwidth = 26570.26 * 1e6
-    # Measured on the target platform
-    runtime_coarse_grid_solver = 2.833324499999999 * 1e-3
-    performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
-                                                 runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-6
+    epsilon = 1e-7
     problem_name = program_generator.problem_name
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
@@ -99,8 +77,7 @@ def main():
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=nprocs,
-                          # convergence_evaluator=convergence_evaluator,
-                          performance_evaluator=performance_evaluator, program_generator=program_generator,
+                          program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
     # restart_from_checkpoint = True
@@ -130,10 +107,10 @@ def main():
     parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=64, gp_lambda=64,
+                                                                     gp_mu=32, gp_lambda=16,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=100, es_generations=150,
+                                                                     gp_generations=50,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
@@ -141,21 +118,22 @@ def main():
                                                                      krylov_subspace_methods=krylov_subspace_methods,
                                                                      minimum_solver_iterations=minimum_solver_iterations,
                                                                      maximum_solver_iterations=maximum_solver_iterations)
-
     if mpi_rank == 0:
-        print(f'Grammar representation:\n{program}\n', flush=True)
+        print(f'\nGrammar representation:\n{program}\n', flush=True)
+        if not os.path.exists(f'./{problem_name}'):
+            os.makedirs(f'./{problem_name}')
         j = 0
-        log_dir_name = f'{problem_name}/data_{j}'
+        log_dir_name = f'./{problem_name}/data_{j}'
         while os.path.exists(log_dir_name):
             j += 1
-            log_dir_name = f'{problem_name}/data_{j}'
+            log_dir_name = f'./{problem_name}/data_{j}'
         os.makedirs(log_dir_name)
         for i, log in enumerate(stats):
             optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
         for i, pop in enumerate(pops):
             optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
         for i, hof in enumerate(hofs):
-            hof_dir =  f'{log_dir_name}/hof_{i}'
+            hof_dir = f'{log_dir_name}/hof_{i}'
             os.makedirs(hof_dir)
             for j, ind in enumerate(hof):
                 with open(f'{hof_dir}/individual_{j}.txt', 'w') as grammar_file:
