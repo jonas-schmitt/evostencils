@@ -81,53 +81,15 @@ def main():
     performance_evaluator = PerformanceEvaluator(peak_performance, peak_bandwidth, bytes_per_word,
                                                  runtime_coarse_grid_solver=runtime_coarse_grid_solver)
     infinity = 1e100
-    epsilon = 1e-7
+    epsilon = 1e-6
     problem_name = program_generator.problem_name
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators,
                           fields,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity)
     path = "../helmholtz-results/results"
-    # path = "../helmholtz-results/results_k1"
     nexperiments = 10
-    # plot_average_solving_time(optimizer, path, "average-solving-time.pdf", nexperiments)
-    # plot_minimum_solving_time(optimizer, path, "minimum-solving-time.pdf", nexperiments)
     plot_pareto_front(optimizer, path, nexperiments)
-
-    v01 = [(160.0, 6378.263999999999, "V(0, 1)"), (320.0, 35110.030000000006, "V(0, 1)")]
-    f01 = [(160.0, 8146.4039999999995, "F(0, 1)"), (320.0, 42870.44, "F(0, 1)")]
-    v11 = [(160.0, 7664.483, "V(1, 1)"), (320.0, 44274.6, "V(1, 1)")]
-    evo5 = [(160.0, 5012.040999999999, "EP-5"), (320.0, 28388.24, "EP-5"), (640.0, 227730.8, "EP-5")]
-    evo2 = [(160.0, 7862.6630000000005, "EP-2"), (320.0, 29893.72, "EP-2"), (640.0, 241726.4, "EP-2")]
-    evo10 = [(160.0, 6696.887999999999, "EP-10"), (320.0, 31385.890000000003, "EP-10"), (640.0, 246071.2, "EP-10")]
-    columns = ['k', r'Solving Time per Grid Point (\textmu s)', 'Preconditioner']
-    data = []
-    data += evo2
-    data += evo5
-    data += evo10
-    data += v01
-    data += v11
-    data += f01
-    data = [(x[0], x[1] / (2**7 * x[0]/80 - 1)**2*1e3 , x[2]) for x in data]
-
-    df = pd.DataFrame(data, columns=columns)
-    rc('text', usetex=True)
-    # rc('font', **{'family': 'serif', 'serif': ['Times']})
-    sns.set_context("paper")
-    sns.set_style('whitegrid', {'font.family': 'serif', 'font.serif': 'Times New Roman'})
-    palette = sns.color_palette("colorblind", n_colors=6)
-    tmp = sns.relplot(x=columns[0], y=columns[1], hue=columns[2], style=columns[2],
-                data=df, kind='line', dashes=False, markers=["s"]*6, palette=palette, legend=False)
-
-    tmp.ax.legend(labels=["EP-2", "EP-5", "EP-10", "V(0, 1)", "V(1, 1)", "F(0, 1)"], loc=2)
-    # plt.ylim(0, 10000)
-
-    # sns.relplot(x=columns[0], y=columns[1], hue=columns[3], style=columns[2],
-    #             data=df, kind='line', markers=['o', 'X', 's'], dashes=False, palette=palette)
-    # plt.xlim(0, 35)
-    plt.tight_layout()
-    plt.savefig("solving-time.pdf", quality=100, dpi=300)
-
 
 def plot_pareto_front(optimizer, base_path='./', number_of_experiments=1):
     hofs = []
