@@ -35,7 +35,7 @@ class Field:
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
             mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle",
-            evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120):
+            evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120, solver_iteration_limit=None):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0
@@ -44,6 +44,7 @@ class ProgramGenerator:
         self.timeout_evaluate = evaluation_timeout
         self.timeout_exastencils_compiler = code_generation_timeout
         self.timeout_c_compiler = c_compiler_timeout
+        self._solver_iteration_limit = solver_iteration_limit
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
         self._dimension, self._min_level, self._max_level = \
@@ -172,6 +173,9 @@ class ProgramGenerator:
     def settings_path_generated(self):
         return self._settings_path_generated
 
+    @property
+    def solver_iteration_limit(self):
+        return self._solver_iteration_limit
 
     def reinitialize(self, min_level, max_level, global_expressions):
         self.generate_level_adapted_knowledge_file(min_level, max_level)
@@ -415,7 +419,7 @@ class ProgramGenerator:
             if not result.returncode == 0:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
-            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
+            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity, self.solver_iteration_limit)
             if number_of_iterations >= infinity or convergence_factor > 1:
                 return time_to_solution, convergence_factor, number_of_iterations
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
@@ -551,7 +555,7 @@ class ProgramGenerator:
         return average_runtime, average_convergence_factor, average_number_of_iterations
 
     @staticmethod
-    def parse_output(output: str, infinity: float):
+    def parse_output(output: str, infinity: float, solver_iteration_limit=None):
         lines = output.splitlines()
         convergence_factors = []
         rho_inf = math.sqrt(infinity)
@@ -593,6 +597,8 @@ class ProgramGenerator:
         time_to_solution = float(tmp[-2])
         # number_of_iterations = len(lines) - 3
         if number_of_iterations == 0:
+            number_of_iterations = infinity
+        if solver_iteration_limit is not None and number_of_iterations >= solver_iteration_limit:
             number_of_iterations = infinity
         return time_to_solution, convergence_factor, number_of_iterations
 

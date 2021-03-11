@@ -43,17 +43,17 @@ def main():
     # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "mgCycle"
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    # cycle_name = "mgCycle"
 
-    # cycle_name= "gen_mgCycle"
+    cycle_name= "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -64,8 +64,9 @@ def main():
         tmp = "process"
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
+
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name)
+                                         cycle_name=cycle_name, solver_iteration_limit=128)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -78,7 +79,7 @@ def main():
     fields = program_generator.fields
 
     infinity = 1e100
-    epsilon = 1e-7
+    epsilon = 1e-9
     problem_name = program_generator.problem_name
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
@@ -112,14 +113,16 @@ def main():
     maximum_solver_iterations = 2**10
     # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
     krylov_subspace_methods = ()
-    values = [80.0 * 2.0**i for i in range(100)]
-    parameter_values = {'k' : values}
+    parameter_values = {}
+    # Optional: If needed supply additional parameters to the optimization
+    # values = [80.0 * 2.0**i for i in range(100)]
+    # parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=128, gp_lambda=2,
+                                                                     gp_mu=128, gp_lambda=4,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=150,
+                                                                     gp_generations=100,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
