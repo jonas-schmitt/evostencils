@@ -17,7 +17,13 @@ class CycleStorage:
     def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grids: List[base.Grid]):
         self.grid = grids
         self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
-        self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grids, equations)]
+        rhs = []
+        for field, grid in zip(fields, grids):
+            for eq_info in equations:
+                if eq_info.level == grid.level and eq_info.associated_field == field:
+                    rhs.append(Field(f'{eq_info.rhs_name}', grid.level, self))
+                    break
+        self.rhs = rhs
         self.residual = [Field(f'gen_residual_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
         self.correction = [Field(f'gen_error_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
 
