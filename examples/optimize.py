@@ -66,7 +66,7 @@ def main():
         print(f"Running {nprocs} MPI {tmp}")
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name, solver_iteration_limit=128)
+                                         cycle_name=cycle_name, solver_iteration_limit=256)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -79,7 +79,7 @@ def main():
     fields = program_generator.fields
 
     infinity = 1e100
-    epsilon = 1e-9
+    epsilon = 1e-12
     problem_name = program_generator.problem_name
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
@@ -122,7 +122,7 @@ def main():
                                                                      gp_mu=100, gp_lambda=5,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=100,
+                                                                     gp_generations=150,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,

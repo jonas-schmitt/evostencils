@@ -595,7 +595,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 150
+        optimization_interval = 200
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
@@ -872,7 +872,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 2 * gp_mu
+            initial_population_size = 4 * gp_mu
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
