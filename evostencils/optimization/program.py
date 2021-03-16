@@ -109,7 +109,7 @@ class Optimizer:
         self._total_evaluation_time = 0
         self._average_time_to_convergence = infinity
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=1,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
                                      parameter_values={}):
         self._average_time_to_convergence = self.infinity
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
@@ -277,10 +277,6 @@ class Optimizer:
     def is_root(self):
         return self.mpi_rank == 0
 
-    def reset_evaluation_counters(self):
-        self._failed_evaluations = 0
-        self._total_number_of_evaluations = 0
-
     @property
     def total_evaluation_time(self):
         return self._total_evaluation_time
@@ -386,7 +382,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=1, parameter_values={}):
+                                  number_of_samples=3, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -403,20 +399,21 @@ class Optimizer:
                 self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
+            start = time.time()
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program,
                                                               infinity=self.infinity, number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
+            end = time.time()
+            self._total_evaluation_time += end - start
             fitness = average_time_to_convergence,
             if average_number_of_iterations >= self.infinity:
                 fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5,
-            else:
-                self._total_evaluation_time += average_time_to_convergence
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=1, parameter_values={}):
+                                     number_of_samples=3, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -432,17 +429,20 @@ class Optimizer:
                 self.add_individual_to_cache(individual, fitness)
                 return fitness
             expression = expression1
+            start = time.time()
             average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
                                                               solver_program,
                                                               infinity=self.infinity,
                                                               number_of_samples=number_of_samples,
                                                               global_variable_values=parameter_values)
-            fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            end = time.time()
+            self._total_evaluation_time += end - start
+            # Use number of iteration
+            # fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
+            fitness = average_convergence_factor, average_time_to_convergence / average_number_of_iterations
             if average_number_of_iterations >= self.infinity:
-                fitness = average_convergence_factor**0.5 * average_number_of_iterations**0.5, self.infinity
-            else:
-                self._total_evaluation_time += average_time_to_convergence
+                fitness = average_convergence_factor, self.infinity
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
@@ -496,7 +496,6 @@ class Optimizer:
             logbooks.append(logbook)
 
         invalid_ind = [ind for ind in population]
-        self.reset_evaluation_counters()
         fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
@@ -573,15 +572,9 @@ class Optimizer:
 
 
         invalid_ind = [ind for ind in population]
-        self.reset_evaluation_counters()
         fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-        successful_evaluations = self._total_number_of_evaluations - self._failed_evaluations
-        if self.is_root():
-            print("Number of successful evaluations in initial population:",
-                  successful_evaluations, flush=True)
-        self.reset_evaluation_counters()
 
         population = self.allgather(population)
         population = self.toolbox.select(population, mu_)
@@ -597,10 +590,9 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 200
         evaluation_time_threshold = self.infinity # seconds
-        number_of_samples = 1
+        number_of_samples = 3
         for gen in range(min_generation + 1, max_generation + 1):
-            if count >= optimization_interval and \
-                    self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3) < evaluation_time_threshold:
+            if count >= optimization_interval:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
                 evaluation_max_level = max_level + level_offset
@@ -661,17 +653,17 @@ class Optimizer:
                     break
 
             # Evaluate the individuals with an invalid fitness
-            self._total_evaluation_time = 0
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             self._total_evaluation_time = self.allreduce(self.total_evaluation_time)
+            self._total_number_of_evaluations = self.allreduce(self._total_number_of_evaluations)
             offspring = self.allgather(offspring)
 
             hof.update(offspring)
             if self.is_root():
-                print("Average evaluation time:", self.total_evaluation_time / (lambda_ * self.number_of_mpi_processes * 1e3), flush=True)
+                print("Average evaluation time:", self.total_evaluation_time / self._total_number_of_evaluations, flush=True)
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
@@ -757,7 +749,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
         hof = tools.ParetoFront(similar=lambda a, b: str(a) == str(b))
 
@@ -788,7 +780,7 @@ class Optimizer:
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
         stats_size = tools.Statistics(len)
-        mstats = tools.MultiStatistics(number_of_iterations=stats_fit1, execution_time=stats_fit2, size=stats_size)
+        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, execution_time=stats_fit2, size=stats_size)
 
         hof = tools.ParetoFront(similar=lambda a, b: str(a) == str(b))
 
@@ -998,7 +990,7 @@ class Optimizer:
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
-                                                          number_of_samples=1)
+                                                          number_of_samples=5)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
