@@ -592,6 +592,8 @@ class Optimizer:
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 3
         for gen in range(min_generation + 1, max_generation + 1):
+            self._total_evaluation_time = 0.0
+            self._total_number_of_evaluations = 0.0
             if count >= optimization_interval:
                 level_offset += 1
                 evaluation_min_level = min_level + level_offset
@@ -873,14 +875,18 @@ class Optimizer:
             if optimization_method is None:
                 optimization_method = self.NSGAII
             self.clear_individual_cache()
+
+            def estimate_execution_time(convergence_factor, execution_time):
+                return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
+
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                     gp_crossover_probability, gp_mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
             if len(pop[0].fitness.values) == 2:
-                pop = sorted(pop, key=lambda ind: ind.fitness.values[0]*ind.fitness.values[1])
-                hof = sorted(hof, key=lambda ind: ind.fitness.values[0]*ind.fitness.values[1])
+                pop = sorted(pop, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
+                hof = sorted(hof, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
             else:
                 pop = sorted(pop, key=lambda ind: ind.fitness.values[0])
                 hof = sorted(hof, key=lambda ind: ind.fitness.values[0])
@@ -890,8 +896,9 @@ class Optimizer:
             if self.is_root():
                 for individual in hof:
                     if len(individual.fitness.values) == 2:
-                        print(f'\nExecution time until convergence: {individual.fitness.values[0] * individual.fitness.values[1]}, '
-                              f'Number of Iterations: {individual.fitness.values[0]}', flush=True)
+                        print(f'\nExecution time until convergence: '
+                              f'{estimate_execution_time(individual.fitness.values[0], individual.fitness.values[1])}, '
+                              f'Convergence Factor: {individual.fitness.values[0]}', flush=True)
                     else:
                         print(f'\nExecution time until convergence: {individual.fitness.values[0]}', flush=True)
                     print('Tree representation:', flush=True)
