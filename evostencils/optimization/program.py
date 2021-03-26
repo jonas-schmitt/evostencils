@@ -109,7 +109,7 @@ class Optimizer:
         self._total_evaluation_time = 0
         self._average_time_to_convergence = infinity
 
-    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
+    def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=1,
                                      parameter_values={}):
         self._average_time_to_convergence = self.infinity
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
@@ -382,7 +382,7 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=3, parameter_values={}):
+                                  number_of_samples=1, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
@@ -413,7 +413,7 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=3, parameter_values={}):
+                                     number_of_samples=1, parameter_values={}):
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -590,7 +590,7 @@ class Optimizer:
         level_offset = 0
         optimization_interval = 200
         evaluation_time_threshold = self.infinity # seconds
-        number_of_samples = 3
+        number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             self._total_evaluation_time = 0.0
             self._total_number_of_evaluations = 0.0
@@ -866,7 +866,7 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 4 * gp_mu
+            initial_population_size = 8 * gp_mu
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
@@ -997,7 +997,7 @@ class Optimizer:
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
-                                                          number_of_samples=5)
+                                                          number_of_samples=1)
 
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
@@ -1011,7 +1011,7 @@ class Optimizer:
             time_to_solution, convergence_factor, number_of_iterations = \
                 self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                               solver_program, infinity=self.infinity,
-                                                              number_of_samples=5)
+                                                              number_of_samples=1)
             print(f'Time: {time_to_solution}, '
                   f'Convergence factor: {convergence_factor}, '
                   f'Number of Iterations: {number_of_iterations}', flush=True)
