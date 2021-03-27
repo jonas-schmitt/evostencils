@@ -109,10 +109,6 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    minimum_solver_iterations = 2**3
-    maximum_solver_iterations = 2**10
-    # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
-    krylov_subspace_methods = ()
     parameter_values = {}
     # Optional: If needed supply additional parameters to the optimization
     # values = [80.0 * 2.0**i for i in range(100)]
@@ -126,10 +122,7 @@ def main():
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
-                                                                     restart_from_checkpoint=restart_from_checkpoint,
-                                                                     krylov_subspace_methods=krylov_subspace_methods,
-                                                                     minimum_solver_iterations=minimum_solver_iterations,
-                                                                     maximum_solver_iterations=maximum_solver_iterations)
+                                                                     restart_from_checkpoint=restart_from_checkpoint)
 
     if mpi_rank == 0:
         print(f'\nGrammar representation:\n{program}\n', flush=True)

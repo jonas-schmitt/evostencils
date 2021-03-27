@@ -1,5 +1,5 @@
 from deap import creator, tools, algorithms, cma
-from evostencils.expressions import base, system, krylov_subspace
+from evostencils.expressions import base
 import deap
 import numpy
 from math import log
@@ -23,9 +23,7 @@ def reset_status(expression: base.Expression):
 
 def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
     if isinstance(expression, base.Cycle):
-        if not expression.weight_set and \
-                not (isinstance(expression.correction, base.Multiplication) and
-                     isinstance(expression.correction.operand1, krylov_subspace.KrylovSubspaceMethod)):
+        if not expression.weight_set:
             head, *tail = weights
             expression._relaxation_factor = head
             expression.weight_set = True
@@ -48,9 +46,7 @@ def set_relaxation_factors(expression: base.Expression, weights: list) -> list:
 def obtain_relaxation_factors(expression: base.Expression) -> list:
     weights = []
     if isinstance(expression, base.Cycle):
-        if not expression.weight_obtained and \
-                not (isinstance(expression.correction, base.Multiplication) and
-                     isinstance(expression.correction.operand1, krylov_subspace.KrylovSubspaceMethod)):
+        if not expression.weight_obtained:
             weights.append(expression.relaxation_factor)
             expression.weight_obtained = True
         weights.extend(obtain_relaxation_factors(expression.correction))

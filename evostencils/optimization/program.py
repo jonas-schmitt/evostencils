@@ -795,11 +795,7 @@ class Optimizer:
                                   required_convergence=0.9,
                                   restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
                                   optimize_relaxation_factors=True,
-                                  parameter_values={},
-                                  krylov_subspace_methods=('ConjugateGradient', 'BiCGStab', 'MinRes',
-                                                           'ConjugateResidual'),
-                                  minimum_solver_iterations=8, maximum_solver_iterations=1024):
-        assert minimum_solver_iterations < maximum_solver_iterations, 'Invalid range of solver iterations'
+                                  parameter_values={}):
 
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
@@ -824,14 +820,6 @@ class Optimizer:
         logbooks = []
         hofs = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        residual_norm_functions = \
-            self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
-                                                                           krylov_subspace_methods,
-                                                                           minimum_solver_iterations,
-                                                                           maximum_solver_iterations)
-        for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
-            solver_program += residual_norm_function
-            solver_program += '\n'
         for i in range(0, levels, levels_per_run):
             min_level = self.max_level - (i + levels_per_run)
             max_level = self.max_level - i
@@ -858,10 +846,7 @@ class Optimizer:
                                                                 maximum_block_size=maximum_block_size,
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
-                                                                LevelNotFinishedType=self._NotFinishedType,
-                                                                krylov_subspace_methods=krylov_subspace_methods,
-                                                                minimum_solver_iterations=minimum_solver_iterations,
-                                                                maximum_solver_iterations=maximum_solver_iterations)
+                                                                LevelNotFinishedType=self._NotFinishedType)
             self._init_toolbox(pset)
             tmp = None
             if pass_checkpoint:
@@ -944,40 +929,12 @@ class Optimizer:
         return best_weights, time_to_solution
 
     def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size,
-                                                                  optimize_relaxation_factors=True,
-                                                                  krylov_subspace_methods=('ConjugateGradient',
-                                                                                           'BiCGStab', 'MinRes',
-                                                                                           'ConjugateResidual'),
-                                                                  minimum_solver_iterations=8,
-                                                                  maximum_solver_iterations=1024):
-        assert minimum_solver_iterations < maximum_solver_iterations, 'Invalid range of solver iterations'
+                                                                  optimize_relaxation_factors=True):
         solver_program = ''
 
         approximation = self.approximation
         rhs = self.rhs
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
-        solver_list = krylov_subspace_methods
-        iteration_list = (2**i for i in range(int(math.log2(minimum_solver_iterations)),
-                                              int(math.log2(maximum_solver_iterations))))
-        tmp = minimum_solver_iterations
-        minimum_solver_iterations = maximum_solver_iterations
-        maximum_solver_iterations = tmp
-
-        for i in iteration_list:
-            if str(i) in grammar_string:
-                if i < minimum_solver_iterations:
-                    minimum_solver_iterations = i
-                if i > maximum_solver_iterations:
-                    maximum_solver_iterations = i
-
-        residual_norm_functions = \
-            self.program_generator.generate_cached_krylov_subspace_solvers(self.min_level + 1, self.max_level,
-                                                                           solver_list,
-                                                                           minimum_solver_iterations,
-                                                                           maximum_solver_iterations)
-        for residual_norm_function in residual_norm_functions[:len(residual_norm_functions) - 1]:
-            solver_program += residual_norm_function
-            solver_program += '\n'
         levels = self.max_level - self.min_level
         pset, terminal_list = \
             multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
@@ -986,10 +943,7 @@ class Optimizer:
                                                             maximum_block_size=maximum_block_size,
                                                             depth=levels,
                                                             LevelFinishedType=self._FinishedType,
-                                                            LevelNotFinishedType=self._NotFinishedType,
-                                                            krylov_subspace_methods=krylov_subspace_methods,
-                                                            minimum_solver_iterations=minimum_solver_iterations,
-                                                            maximum_solver_iterations=maximum_solver_iterations)
+                                                            LevelNotFinishedType=self._NotFinishedType)
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
         expression, _ = eval(grammar_string, pset.context, {})
         # initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
