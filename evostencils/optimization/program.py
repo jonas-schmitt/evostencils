@@ -588,7 +588,7 @@ class Optimizer:
         evaluation_min_level = min_level
         evaluation_max_level = max_level
         level_offset = 0
-        optimization_interval = 200
+        optimization_interval = 500
         evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
