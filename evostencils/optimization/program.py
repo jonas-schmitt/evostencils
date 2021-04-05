@@ -579,6 +579,11 @@ class Optimizer:
         population = self.allgather(population)
         population = self.toolbox.select(population, mu_)
         hof.update(population)
+        if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
+            individual_caches = self.mpi_comm.allgather(self.individual_cache)
+            for i, cache in enumerate(individual_caches):
+                if i != self.mpi_rank:
+                    self.individual_cache.update(cache)
         record = mstats.compile(population) if mstats is not None else {}
         logbook.record(gen=min_generation, nevals=len(population), **record)
         if self.is_root():
@@ -589,7 +594,6 @@ class Optimizer:
         evaluation_max_level = max_level
         level_offset = 0
         optimization_interval = 500
-        evaluation_time_threshold = self.infinity # seconds
         number_of_samples = 1
         for gen in range(min_generation + 1, max_generation + 1):
             self._total_evaluation_time = 0.0
@@ -619,11 +623,7 @@ class Optimizer:
                     population[i].fitness.values = values
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
-            if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
-                individual_caches = self.mpi_comm.allgather(self.individual_cache)
-                for i, cache in enumerate(individual_caches):
-                    if i != self.mpi_rank:
-                        self.individual_cache.update(cache)
+
             number_of_parents = lambda_
             if number_of_parents % 2 == 1:
                 number_of_parents += 1
@@ -662,8 +662,12 @@ class Optimizer:
             self._total_evaluation_time = self.allreduce(self.total_evaluation_time)
             self._total_number_of_evaluations = self.allreduce(self._total_number_of_evaluations)
             offspring = self.allgather(offspring)
-
             hof.update(offspring)
+
+            if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
+                for ind in offspring:
+                    if not self.individual_in_cache(ind):
+                        self.add_individual_to_cache(ind, ind.fitness.values)
             if self.is_root():
                 print("Average evaluation time:", self.total_evaluation_time / self._total_number_of_evaluations, flush=True)
 
