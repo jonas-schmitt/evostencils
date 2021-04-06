@@ -403,7 +403,7 @@ class ProgramGenerator:
 
     def run_c_compiler(self, makefile_path):
         # print("Compile", flush=True)
-        result = subprocess.run(['make', '-j16', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        result = subprocess.run(['make', '-j10', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 

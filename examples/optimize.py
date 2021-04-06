@@ -66,7 +66,7 @@ def main():
         print(f"Running {nprocs} MPI {tmp}")
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name, solver_iteration_limit=128)
+                                         cycle_name=cycle_name, solver_iteration_limit=50)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -115,7 +115,7 @@ def main():
     # parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=256, gp_lambda=4,
+                                                                     gp_mu=256, gp_lambda=2,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=250,
