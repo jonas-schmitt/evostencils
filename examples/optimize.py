@@ -15,12 +15,12 @@ def main():
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils-meggie/Examples'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -43,8 +43,8 @@ def main():
     # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
@@ -115,10 +115,10 @@ def main():
     # parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=256, gp_lambda=2,
+                                                                     gp_mu=128, gp_lambda=4,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=250,
+                                                                     gp_generations=150,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
