@@ -227,6 +227,7 @@ class Types:
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
               coarsest=False):
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
+
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
@@ -310,15 +311,15 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 f"coarse_cycle_{level}")
 
     else:
-        def solve(cgs, interpolation, cycle, relaxation_factor_index):
+        def solve(cgs, interpolation, cycle):
             new_cycle = base.Cycle(cycle.approximation, cycle.rhs, base.mul(interpolation, base.mul(cgs, cycle.correction)),
                                    predecessor=cycle.predecessor)
-            return iterate(new_cycle, relaxation_factor_index)
+            return iterate(new_cycle, relaxation_factor_samples // 2)
 
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
 
