@@ -72,8 +72,15 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
                 equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y, index_center)
                 equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y, index_center)
                 if (fields[i], level, index_center) not in local_equations:
+                    field = fields[i]
+                    rhs_name = None
+                    for eq_info in equations:
+                        if eq_info.level == level and eq_info.associated_field == field:
+                            rhs_name = eq_info.rhs_name
+                    if rhs_name is None:
+                        raise RuntimeError("Local solve generation: Could not associate right-hand side with field")
                     local_equations[(fields[i], level, index_center)] = sympy.sympify(0), \
-                                                          sympy.Symbol(f'{equations[i].rhs_name}@{level}')
+                                                          sympy.Symbol(f'{rhs_name}@{level}')
                 value = local_equations[(fields[i], level, index_center)]
                 local_equations[(fields[i], level, index_center)] = value[0] + equation, value[1]
         else:
