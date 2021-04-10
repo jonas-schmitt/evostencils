@@ -15,12 +15,12 @@ def main():
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils/Examples'
+    compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils-meggie/Examples'
 
     # 2D Finite difference discretized Poisson
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -43,8 +43,8 @@ def main():
     # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
@@ -66,7 +66,7 @@ def main():
         print(f"Running {nprocs} MPI {tmp}")
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name, solver_iteration_limit=64)
+                                         cycle_name=cycle_name, solver_iteration_limit=100)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension

@@ -311,15 +311,15 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 f"coarse_cycle_{level}")
 
     else:
-        def solve(cgs, interpolation, cycle):
+        def solve(cgs, interpolation, cycle, relaxation_factor_index):
             new_cycle = base.Cycle(cycle.approximation, cycle.rhs, base.mul(interpolation, base.mul(cgs, cycle.correction)),
                                    predecessor=cycle.predecessor)
-            return iterate(new_cycle, relaxation_factor_samples // 2)
+            return iterate(new_cycle, relaxation_factor_index)
 
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
 
