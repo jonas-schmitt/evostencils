@@ -5,43 +5,15 @@ import os
 
 def main():
     # TODO adapt to actual path to exastencils project
-
+    dir_name = 'LinearElasticity'
+    problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils-meggie/Examples'
 
-    # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'{dir_name}/{problem_name}.settings'
+    knowledge_path = f'{dir_name}/{problem_name}.knowledge'
 
-    # 3D Finite difference discretized Poisson
-    # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
-
-    # 2D Finite volume discretized Poisson
-    # settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
-
-    # 3D Finite volume discretized Poisson
-    # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
-
-    # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
-
-    # 2D Finite volume discretized Stokes
-    # settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
-    # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
-
-    # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
-
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     cycle_name= "gen_mgCycle"
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name)
@@ -66,11 +38,14 @@ def main():
                           program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity)
     maximum_block_size = 8
-    with open('grammar_tree.txt', 'r') as file:
-        grammar_string = file.read()
-    optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size,
-                                                                        optimize_relaxation_factors=False)
-
+    for i in range(0, 10):
+        print(f"data_{i}")
+        for j in range(0, 10):
+            with open(f'../gpem-21-results/{problem_name}/data_{i}/hof_0/individual_{j}.txt', 'r') as file:
+                grammar_string = file.read()
+            print(f"Individual {j}")
+            optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size,
+                                                                                optimize_relaxation_factors=False)
 
 if __name__ == "__main__":
     main()
