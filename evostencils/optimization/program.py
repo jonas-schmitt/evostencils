@@ -936,8 +936,7 @@ class Optimizer:
             raise e
         return best_weights, time_to_solution
 
-    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size,
-                                                                  optimize_relaxation_factors=True):
+    def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
         solver_program = ''
 
         approximation = self.approximation
@@ -964,23 +963,7 @@ class Optimizer:
         print(f'Time: {time_to_solution}, '
               f'Convergence factor: {convergence_factor}, '
               f'Number of Iterations: {number_of_iterations}', flush=True)
-        if optimize_relaxation_factors:
-            relaxation_factors, _ = \
-                self.optimize_relaxation_factors(expression, 150, self.min_level, self.max_level, solver_program,
-                                                 storages, time_to_solution)
-            relaxation_factor_optimization.set_relaxation_factors(expression, relaxation_factors)
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
-            time_to_solution, convergence_factor, number_of_iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
-                                                              solver_program, infinity=self.infinity,
-                                                              number_of_samples=10)
-            print(f'Time: {time_to_solution}, '
-                  f'Convergence factor: {convergence_factor}, '
-                  f'Number of Iterations: {number_of_iterations}', flush=True)
-
-        cycle_function = self.program_generator.generate_cycle_function(expression, storages, self.min_level,
-                                                                        self.max_level, self.max_level)
-        return cycle_function
+        return time_to_solution, convergence_factor, number_of_iterations
 
     @staticmethod
     def visualize_tree(individual, filename):

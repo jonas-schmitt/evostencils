@@ -40,12 +40,18 @@ def main():
     maximum_block_size = 8
     for i in range(0, 10):
         print(f"data_{i}")
+        minimum_solving_time = infinity
+        minimum_index = 0
         for j in range(0, 10):
             with open(f'../gpem-21-results/{problem_name}/data_{i}/hof_0/individual_{j}.txt', 'r') as file:
                 grammar_string = file.read()
             print(f"Individual {j}")
-            optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size,
-                                                                                optimize_relaxation_factors=False)
+            solving_time, _, __ = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
+            if solving_time < minimum_solving_time:
+                minimum_solving_time = solving_time
+                minimum_index = j
+        print("Fastest solver: Individual ", minimum_index, " With solving time: ", minimum_solving_time)
+
 
 if __name__ == "__main__":
     main()
