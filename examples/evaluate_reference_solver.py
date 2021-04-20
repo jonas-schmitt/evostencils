@@ -4,25 +4,27 @@ import numpy as np
 import os
 def main():
 
+    dir_name = 'LinearElasticity'
+    problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
     platform = "linux"
     compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils-meggie/Examples'
-    settings_path = f'LinearElasticitiy/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
-    path_to_executable = f"{base_path}/generated/2D_FD_LinearElasticity_fromL2"
-    nruns = 10
+    settings_path = f'{dir_name}/{problem_name}.settings'
+    knowledge_path = f'{dir_name}/{problem_name}.knowledge'
+    path_to_executable = f"{base_path}/generated/{problem_name}"
+    nruns = 50
     current_path = os.getcwd()
     os.chdir(base_path)
-    subprocess.run(['java', '-cp',
-                    compiler_path, 'Main',
-                    f'{base_path}/{settings_path}',
-                    f'{base_path}/{knowledge_path}',
-                    f'{base_path}/lib/{platform}.platform'],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _ = subprocess.run(['java', '-cp',
+                        compiler_path, 'Main',
+                        f'{base_path}/{settings_path}',
+                        f'{base_path}/{knowledge_path}',
+                        f'{base_path}/lib/{platform}.platform'],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     os.chdir(current_path)
-    subprocess.run(['make', '-j10', '-s', '-C', f'{path_to_executable}'],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _ = subprocess.run(['make', '-j10', '-s', '-C', f'{path_to_executable}'],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     total_execution_time = 0
     total_iterations = 0
     for _ in range(nruns):

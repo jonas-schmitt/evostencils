@@ -958,11 +958,11 @@ class Optimizer:
         time_to_solution, convergence_factor, number_of_iterations = \
             self._program_generator.generate_and_evaluate(expression, storages, self.min_level, self.max_level,
                                                           solver_program, infinity=self.infinity,
-                                                          number_of_samples=10)
+                                                          number_of_samples=20)
 
-        print(f'Time: {time_to_solution}, '
-              f'Convergence factor: {convergence_factor}, '
-              f'Number of Iterations: {number_of_iterations}', flush=True)
+        # print(f'Time: {time_to_solution}, '
+        #       f'Convergence factor: {convergence_factor}, '
+        #       f'Number of Iterations: {number_of_iterations}', flush=True)
         return time_to_solution, convergence_factor, number_of_iterations
 
     @staticmethod

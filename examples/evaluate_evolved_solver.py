@@ -40,17 +40,24 @@ def main():
     maximum_block_size = 8
     for i in range(0, 10):
         print(f"data_{i}")
-        minimum_solving_time = infinity
-        minimum_index = 0
-        for j in range(0, 10):
+        best_solving_time = infinity
+        best_convergence_factor = infinity
+        best_number_of_iterations = infinity
+        best_index = 0
+        for j in range(0, 20):
             with open(f'../gpem-21-results/{problem_name}/data_{i}/hof_0/individual_{j}.txt', 'r') as file:
                 grammar_string = file.read()
-            print(f"Individual {j}")
-            solving_time, _, __ = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
-            if solving_time < minimum_solving_time:
-                minimum_solving_time = solving_time
-                minimum_index = j
-        print("Fastest solver: Individual ", minimum_index, " With solving time: ", minimum_solving_time)
+            # print(f"Individual {j}")
+            solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
+            if solving_time < best_solving_time:
+                best_solving_time = solving_time
+                best_convergence_factor = convergence_factor
+                best_number_of_iterations = number_of_iterations
+                best_index = j
+        print("Fastest solver: Individual ", best_index, flush=True)
+        print(f'Solving Time: {best_solving_time}, '
+              f'Convergence factor: {best_convergence_factor}, '
+              f'Number of Iterations: {best_number_of_iterations}', flush=True)
 
 
 if __name__ == "__main__":
