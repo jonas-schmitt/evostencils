@@ -44,7 +44,7 @@ def main():
         best_convergence_factor = infinity
         best_number_of_iterations = infinity
         best_index = 0
-        for j in range(0, 20):
+        for j in range(0, 50):
             with open(f'../gpem-21-results/{problem_name}/data_{i}/hof_0/individual_{j}.txt', 'r') as file:
                 grammar_string = file.read()
             # print(f"Individual {j}")

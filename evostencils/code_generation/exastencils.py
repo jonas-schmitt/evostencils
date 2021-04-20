@@ -475,7 +475,6 @@ class ProgramGenerator:
         except subprocess.TimeoutExpired:
             return infinity_result
 
-
     def generate_and_evaluate_list_of_expressions(self, list_of_expression: [base.Expression], storages: List[CycleStorage],
                                                   min_level: int, max_level: int, solver_program: str, infinity=1e100,
                                                   number_of_samples=1, global_variable_values={}):
