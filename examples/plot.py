@@ -13,44 +13,16 @@ import matplotlib.font_manager as font_manager
 def main():
 
     # TODO adapt to actual path to exastencils project
-
+    dir_name = 'Poisson'
+    problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
 
-    # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'{dir_name}/{problem_name}.settings'
+    knowledge_path = f'{dir_name}/{problem_name}.knowledge'
 
-    # 3D Finite difference discretized Poisson
-    # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
-
-    # 2D Finite volume discretized Poisson
-    # settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
-
-    # 3D Finite volume discretized Poisson
-    # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
-
-    # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
-
-    # 2D Finite volume discretized Stokes
-    # settings_path = f'Stokes/2D_FV_Stokes_fromL2.settings'
-    # knowledge_path = f'Stokes/2D_FV_Stokes_fromL2.knowledge'
-
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "VCycle"
-
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "VCycle"
-
-    # cycle_name= "gen_mgCycle"
+    cycle_name= "gen_mgCycle"
 
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name)
 
@@ -87,7 +59,7 @@ def main():
                           fields,
                           performance_evaluator=performance_evaluator, program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity)
-    path = "../helmholtz-results/results"
+    path = f"../gpem-21-results/{problem_name}"
     nexperiments = 10
     plot_pareto_front(optimizer, path, nexperiments)
 
@@ -104,7 +76,7 @@ def plot_pareto_front(optimizer, base_path='./', number_of_experiments=1):
         global_hof.update(pop)
 
     global_front = [(*ind.fitness.values, 'red') for ind in global_hof]
-    columns = ['Number of Iterations', 'Execution Time per Iteration (ms)', 'Experiment']
+    columns = ['Convergence Factor', 'Execution Time per Iteration (ms)', 'Experiment']
     df1 = pd.DataFrame(front, columns=columns)
     df2 = pd.DataFrame(global_front, columns=columns)
     rc('text', usetex=True)
@@ -113,8 +85,10 @@ def plot_pareto_front(optimizer, base_path='./', number_of_experiments=1):
     # sns.despine()
     fig, ax = plt.subplots()
     # palette = sns.color_palette("colorblind", n_colors=number_of_experiments)
+    # sns.scatterplot(x=columns[0], y=columns[1], style=columns[2], hue=columns[2],
+    #                 data=df1, markers=['o']*(number_of_experiments), legend=False, ax=ax)
     sns.scatterplot(x=columns[0], y=columns[1], style=columns[2], hue=columns[2],
-                    data=df1, markers=['o']*(number_of_experiments), legend=False, ax=ax)
+                    data=df1, legend=False, ax=ax)
     sns.lineplot(x=columns[0], y=columns[1], color='red',
                 data=df2, legend=False,
                 ax=ax)
