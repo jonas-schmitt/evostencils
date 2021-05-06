@@ -32,3 +32,47 @@ class RedBlack:
 
     def __repr__(self):
         return 'RedBlack()'
+
+class FourWay:
+    @staticmethod
+    def generate(stencil, grid):
+        if stencil is None:
+            return [None]
+        else:
+            raise RuntimeError("Stencil generation for 4-way partitioning not implemented")
+
+    def __repr__(self):
+        return 'FourWay()'
+
+class NineWay:
+    @staticmethod
+    def generate(stencil, grid):
+        if stencil is None:
+            return [None]
+        else:
+            raise RuntimeError("Stencil generation for 9-way partitioning not implemented")
+
+    def __repr__(self):
+        return 'NineWay()'
+
+class EightWay:
+    @staticmethod
+    def generate(stencil, grid):
+        if stencil is None:
+            return [None]
+        else:
+            raise RuntimeError("Stencil generation for 8-way partitioning not implemented")
+
+    def __repr__(self):
+        return 'EightWay()'
+
+class TwentySevenWay:
+    @staticmethod
+    def generate(stencil, grid):
+        if stencil is None:
+            return [None]
+        else:
+            raise RuntimeError("Stencil generation for 27-way partitioning not implemented")
+
+    def __repr__(self):
+        return 'TwentySevenWay()'

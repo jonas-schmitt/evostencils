@@ -108,7 +108,7 @@ def optimize(iterations, program_generator: ProgramGenerator, max_level,
 
     cycle_function += program
 
-    program_generator.generate_l3_file(max_level-1, max_level, weight_initialization + cycle_function,
+    program_generator.generate_l3_file(max_level - 1, max_level, weight_initialization + cycle_function,
                                        include_restriction=False, include_prolongation=False)
 
     def evaluate(weights):

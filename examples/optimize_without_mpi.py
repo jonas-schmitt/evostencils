@@ -5,18 +5,14 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 # import lfa_lab
 import sys
-# import dill
-from mpi4py import MPI
-# MPI.pickle.__init__(dill.dumps, dill.loads)
-
 
 def main():
 
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils-meggie/Examples'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
     # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
@@ -43,32 +39,26 @@ def main():
     # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
 
     # 2D Finite difference discretized linear elasticity
-    settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
+    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
+    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
 
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    # cycle_name = "mgCycle"
 
-    cycle_name= "gen_mgCycle"
+    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    cycle_name = "mgCycle"
 
-    comm = MPI.COMM_WORLD
-    nprocs = comm.Get_size()
-    mpi_rank = comm.Get_rank()
-    if nprocs > 1:
-        tmp = "processes"
-    else:
-        tmp = "process"
-    if mpi_rank == 0:
-        print(f"Running {nprocs} MPI {tmp}")
+    # cycle_name= "gen_mgCycle"
 
+    comm = None
+    nprocs = 1
+    mpi_rank = 0
+    print(f"Running without MPI")
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name, solver_iteration_limit=100)
+                                         cycle_name=cycle_name)
 
-    # Obtain extracted information from program generator
     dimension = program_generator.dimension
     finest_grid = program_generator.finest_grid
     coarsening_factors = program_generator.coarsening_factor
@@ -79,7 +69,7 @@ def main():
     fields = program_generator.fields
 
     infinity = 1e100
-    epsilon = 1e-12
+    epsilon = 1e-7
     problem_name = program_generator.problem_name
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
@@ -109,21 +99,25 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    parameter_values = {}
-    # Optional: If needed supply additional parameters to the optimization
-    # values = [80.0 * 2.0**i for i in range(100)]
-    # parameter_values = {'k' : values}
+    minimum_solver_iterations = 2**3
+    maximum_solver_iterations = 2**10
+    # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
+    krylov_subspace_methods = ()
+    values = [80.0 * 2.0**i for i in range(100)]
+    parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=256, gp_lambda=4,
+                                                                     gp_mu=32, gp_lambda=16,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=250,
+                                                                     gp_generations=50,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
-                                                                     restart_from_checkpoint=restart_from_checkpoint)
-
+                                                                     restart_from_checkpoint=restart_from_checkpoint,
+                                                                     krylov_subspace_methods=krylov_subspace_methods,
+                                                                     minimum_solver_iterations=minimum_solver_iterations,
+                                                                     maximum_solver_iterations=maximum_solver_iterations)
     if mpi_rank == 0:
         print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
@@ -139,7 +133,7 @@ def main():
         for i, pop in enumerate(pops):
             optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
         for i, hof in enumerate(hofs):
-            hof_dir =  f'{log_dir_name}/hof_{i}'
+            hof_dir = f'{log_dir_name}/hof_{i}'
             os.makedirs(hof_dir)
             for j, ind in enumerate(hof):
                 with open(f'{hof_dir}/individual_{j}.txt', 'w') as grammar_file:

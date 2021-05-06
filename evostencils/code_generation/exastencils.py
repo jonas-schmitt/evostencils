@@ -9,6 +9,7 @@ import math
 import sympy
 import time
 from typing import List
+import shutil # TODO replace 'cp' calls with subprocess with shutil.copyfile
 # from scipy.optimize import minimize_scalar
 
 
@@ -16,7 +17,13 @@ class CycleStorage:
     def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grids: List[base.Grid]):
         self.grid = grids
         self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
-        self.rhs = [Field(f'{eq_info.rhs_name}', g.level, self) for g, eq_info in zip(grids, equations)]
+        rhs = []
+        for field, grid in zip(fields, grids):
+            for eq_info in equations:
+                if eq_info.level == grid.level and eq_info.associated_field == field:
+                    rhs.append(Field(f'{eq_info.rhs_name}', grid.level, self))
+                    break
+        self.rhs = rhs
         self.residual = [Field(f'gen_residual_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
         self.correction = [Field(f'gen_error_{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
 
@@ -34,7 +41,7 @@ class Field:
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
             mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle",
-            evaluation_timeout=100, code_generation_timeout=300, c_compiler_timeout=60):
+            evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120, solver_iteration_limit=None):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0
@@ -43,22 +50,42 @@ class ProgramGenerator:
         self.timeout_evaluate = evaluation_timeout
         self.timeout_exastencils_compiler = code_generation_timeout
         self.timeout_c_compiler = c_compiler_timeout
+        self._solver_iteration_limit = solver_iteration_limit
         self._absolute_compiler_path = absolute_compiler_path
         self._base_path = base_path
-        self._knowledge_path = knowledge_path
-        self._settings_path = settings_path
         self._dimension, self._min_level, self._max_level = \
             parser.extract_knowledge_information(base_path, knowledge_path)
-        self._base_path_prefix, self._problem_name, self._debug_l3_path, self._output_path = \
+        self._original_min_level = self.min_level
+        self._original_max_level = self.max_level
+        self._base_path_prefix, self._problem_name, self._debug_l3_path, _ = \
             parser.extract_settings_information(base_path, settings_path)
         self._mpi_rank = mpi_rank
         self._platform = platform
         self._cycle_name = cycle_name
-        self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.knowledge'
-        self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.settings'
-        self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
+        self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.knowledge'
+        self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.settings'
+        self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.exa3'
         self._output_path_generated = None
+        self._debug_l4_path_generated = None
+
+        process_local_knowledge_path = knowledge_path.replace(".knowledge", f"_base_{mpi_rank}.knowledge")
+        shutil.copyfile(f'{base_path}/{knowledge_path}', f'{base_path}/{process_local_knowledge_path}')
+        process_local_settings_path = settings_path.replace(".settings", f"_base_{mpi_rank}.settings")
+        config_name = f'{self.problem_name}_base_{self.mpi_rank}'
+        self.generate_adapted_settings_file(config_name=config_name, input_file_path=settings_path,
+                                            output_file_path=process_local_settings_path, l2file_required=True)
+        for i in range(1, 5):
+            src = f'{base_path}/{self._base_path_prefix}/{self.problem_name}.exa{i}'
+            dest = f'{base_path}/{self._base_path_prefix}/{config_name}.exa{i}'
+            if os.path.exists(src):
+                shutil.copyfile(src, dest)
+
+        self._settings_path = process_local_settings_path
+        self._knowledge_path = process_local_knowledge_path
+        self._debug_l3_path = self._debug_l3_path.replace(self.problem_name, config_name)
+
         self.run_exastencils_compiler()
+        self._solution_equations = solution_equations
         self._equations, self._operators, self._fields = \
             parser.extract_l2_information(f'{base_path}/{self._debug_l3_path}', self.dimension, solution_equations)
         size = 2 ** self._max_level
@@ -101,10 +128,6 @@ class ProgramGenerator:
         return self._base_path
 
     @property
-    def output_path(self):
-        return self._output_path
-
-    @property
     def platform(self):
         return self._platform
 
@@ -141,6 +164,10 @@ class ProgramGenerator:
         return self._max_level
 
     @property
+    def solution_equations(self):
+        return self._solution_equations
+
+    @property
     def mpi_rank(self):
         return self._mpi_rank
 
@@ -151,6 +178,55 @@ class ProgramGenerator:
     @property
     def settings_path_generated(self):
         return self._settings_path_generated
+
+    @property
+    def solver_iteration_limit(self):
+        return self._solver_iteration_limit
+
+    def reinitialize(self, min_level, max_level, global_expressions):
+        self.generate_level_adapted_knowledge_file(min_level, max_level)
+        self._dimension, self._min_level, self._max_level = \
+            parser.extract_knowledge_information(self.base_path, self.knowledge_path_generated)
+        original_file = f'{self.base_path}/{self.knowledge_path}'
+        generated_file = f'{self.base_path}/{self.knowledge_path_generated}'
+        shutil.copyfile(original_file, f'{original_file}.backup')
+        shutil.copyfile(generated_file, original_file)
+        self.generate_initial_l3_file(global_expressions)
+        self.run_exastencils_compiler()
+        self._equations, self._operators, self._fields = \
+            parser.extract_l2_information(f'{self.base_path}/{self._debug_l3_path}', self.dimension, self.solution_equations)
+        size = 2 ** self._max_level
+        grid_size = tuple([size] * self.dimension)
+        h = 1 / (2 ** self._max_level)
+        step_size = tuple([h] * self.dimension)
+        tmp = tuple([2] * self.dimension)
+        self._coarsening_factor = [tmp for _ in range(len(self.fields))]
+        self._finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
+        shutil.copyfile(f'{original_file}.backup', original_file)
+
+    def generate_initial_l3_file(self, global_expressions):
+        input_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3.backup'
+        output_file_path = \
+            f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+        shutil.copyfile(output_file_path, input_file_path)
+        with open(f'{input_file_path}', 'r') as input_file:
+            with open(f'{output_file_path}', 'w') as output_file:
+                line = input_file.readline()
+                while line:
+                    if 'Globals' in line:
+                        output_file.write(line)
+                        line = input_file.readline()
+                        while line and '}' not in line:
+                            tokens = line.split('=')
+                            lhs_tokens = tokens[0].split()
+                            if len(tokens) == 2 and lhs_tokens[0] == 'Expr' and lhs_tokens[1] in global_expressions:
+                                tmp = tokens[0] + ' = ' + str(global_expressions[lhs_tokens[1]]) + '\n'
+                                output_file.write(tmp)
+                            else:
+                                output_file.write(line)
+                            line = input_file.readline()
+                    output_file.write(line)
+                    line = input_file.readline()
 
     @staticmethod
     def generate_global_weights(n: int, name='omega'):
@@ -165,8 +241,7 @@ class ProgramGenerator:
         # Hack to change the weights after generation
         weights = reversed(weights)
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
-        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(path_to_file, f'{path_to_file}.backup')
         with open(path_to_file, 'r') as file:
             lines = file.readlines()
             last_line = lines[-1]
@@ -185,8 +260,7 @@ class ProgramGenerator:
     def adapt_generated_parameters(self, mapping: dict):
         output_path = self._output_path_generated
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_declarations.cpp'
-        subprocess.run(['cp', path_to_file, f'{path_to_file}.backup'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(path_to_file, f'{path_to_file}.backup')
         with open(path_to_file, 'r') as file:
             lines = file.readlines()
         content = ''
@@ -208,8 +282,7 @@ class ProgramGenerator:
     def restore_global_initializations(self, output_path):
         # Hack to change the weights after generation
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_initGlobals.cpp'
-        subprocess.run(['cp', f'{path_to_file}.backup', path_to_file],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
+        shutil.copyfile(f'{path_to_file}.backup', path_to_file)
 
     @staticmethod
     def get_solution_field(storages: List[CycleStorage], index: int, level: int, max_level: int):
@@ -254,7 +327,52 @@ class ProgramGenerator:
 
         return program
 
+    def patch_l4_file(self):
+        base_path = self.base_path
+        input_file_path = self._debug_l4_path_generated
+        output_file_path = \
+            f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
+        shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{output_file_path}.backup')
+        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
+                for line in input_file:
+                    output_file.write(line)
+                    if "[next]" in line:
+                        leading_spaces = len(line) - len(line.lstrip(" "))
+                        leading_tabs = len(line) - len(line.lstrip('\t'))
+                        tokens = line.split(" ")
+                        field_access = tokens[-1]
+                        tokens = field_access.split("@")
+                        level = tokens[-1]
+                        field = tokens[0]
+                        tokens = field.split("[")
+                        field_name = tokens[0]
+                        output_file.write(" "*leading_spaces + "\t"*leading_tabs + f"advance {field_name}@{level}\n")
+        return output_file_path
+
+    def restore_l4_file(self):
+        base_path = self.base_path
+        output_file_path = \
+            f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
+        shutil.copyfile(f'{base_path}/{output_file_path}.backup', f'{base_path}/{output_file_path}')
+
+
+    def generate_from_patched_l4_file(self):
+        base_path = self.base_path
+        input_file_path = self.settings_path_generated + ".backup"
+        output_file_path = self.settings_path_generated
+        shutil.copyfile(f'{base_path}/{output_file_path}', f'{base_path}/{input_file_path}')
+        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
+            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
+                for line in input_file:
+                    if "l3file" not in line:
+                        output_file.write(line)
+        returncode = self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated, settings_path=self.settings_path_generated)
+        shutil.copyfile(f'{base_path}/{input_file_path}', f'{base_path}/{output_file_path}')
+        return returncode
+
     def run_exastencils_compiler(self, knowledge_path=None, settings_path=None):
+        # print("Generate", flush=True)
         if knowledge_path is None:
             knowledge_path = self.knowledge_path
         if settings_path is None:
@@ -284,39 +402,42 @@ class ProgramGenerator:
         return result.returncode
 
     def run_c_compiler(self, makefile_path):
-        result = subprocess.run(['make', '-j', '-s', '-C', f'{self.base_path}/{makefile_path}'],
+        # print("Compile", flush=True)
+        result = subprocess.run(['make', '-j10', '-s', '-C', f'{self.base_path}/{makefile_path}'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
-    def evaluate(self, executable_path, infinity=1e100, number_of_samples=1):
+    def evaluate(self, executable_path, infinity=1e100, number_of_samples=3, with_mpi=False):
+        # print("Evaluate", flush=True)
         total_time = 0
         sum_of_convergence_factors = 0
-        number_of_iterations = None
-        count = 0
+        total_number_of_iterations = 0
         for i in range(number_of_samples):
             try:
-                result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
+                if with_mpi:
+                    result = subprocess.run(["mpiexec", "--map-by", "ppr:1:core", "--bind-to", "core", f'{self.base_path}/{executable_path}/exastencils'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=self.timeout_evaluate)
+                else:
+                    result = subprocess.run([f'{self.base_path}/{executable_path}/exastencils'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=self.timeout_evaluate)
             except subprocess.TimeoutExpired as _:
                 return infinity, infinity, infinity
             if not result.returncode == 0:
                 return infinity, infinity, infinity
             output = result.stdout.decode('utf8')
-            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity)
+            time_to_solution, convergence_factor, number_of_iterations = self.parse_output(output, infinity, self.solver_iteration_limit)
             if number_of_iterations >= infinity or convergence_factor > 1:
                 return time_to_solution, convergence_factor, number_of_iterations
             if math.isinf(convergence_factor) or math.isnan(convergence_factor):
                 return infinity, infinity, infinity
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
-            count += 1
-            if total_time > 5000:
-                break
-        return total_time / count, sum_of_convergence_factors / count, number_of_iterations
+            total_number_of_iterations += number_of_iterations
+        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, total_number_of_iterations / number_of_samples
 
-    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=128):
+    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
-        self.generate_adapted_layer_files(iteration_limit)
+        self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         if self._counter == 0:
             start_time = time.time()
@@ -331,12 +452,13 @@ class ProgramGenerator:
         _, __, ___, output_path_generated = \
             parser.extract_settings_information(self.base_path, settings_path)
         self._output_path_generated = output_path_generated
-        debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')
-        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
-        subprocess.run(['cp', debug_l3_path, l3_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        debug_l3_path = f'{self.base_path}/{self._debug_l3_path}'.replace('_base_', '_')
+        self._debug_l4_path_generated = self._debug_l3_path.replace('_base_', '_').replace("exa3", "exa4")
+        l3_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
+        shutil.copyfile(debug_l3_path, l3_path)
         return output_path_generated
 
-    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=1):
+    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=3):
         infinity_result = infinity, infinity, infinity
         try:
             if mapping is not None:
@@ -353,17 +475,56 @@ class ProgramGenerator:
         except subprocess.TimeoutExpired:
             return infinity_result
 
+    def generate_and_evaluate_list_of_expressions(self, list_of_expression: [base.Expression], storages: List[CycleStorage],
+                                                  min_level: int, max_level: int, solver_program: str, infinity=1e100,
+                                                  number_of_samples=1, global_variable_values={}):
+        # print("Generate and evaluate", flush=True)
+        n = len(list_of_expression)
+        for i, expression in enumerate(list_of_expression):
+            j = i+1
+            for k in range(1, 5):
+                src = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa{k}'
+                dest = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa{k}'
+                if os.path.exists(src):
+                    shutil.copyfile(src, dest)
+
+            cycle_function = self.generate_cycle_function(expression[0], storages, min_level, max_level, self.max_level)
+            self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
+            shutil.copyfile(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3',
+                            f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa3')
+            shutil.copyfile(f'{self.base_path}/{self.knowledge_path_generated}', f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.knowledge')
+            self.generate_adapted_settings_file(f'{self.problem_name}_{j}', output_file_path=f'{self._base_path_prefix}/{self.problem_name}_{j}.settings')
+
+        cwd = os.getcwd()
+        subprocess.run(['mpiexec', '--map-by', 'ppr:1:core', '--bind-to', 'core', 'python',
+                        f'{cwd}/evostencils/code_generation/generate_and_compile.py',
+                        str(n), self.absolute_compiler_path, self.base_path,
+                        self._base_path_prefix, self.problem_name, self.platform],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        results = []
+        for i in range(1, n + 1):
+            path_to_executable = f'generated/{self.problem_name}_{i}'
+            result = self.evaluate(path_to_executable, infinity, number_of_samples, with_mpi=True)
+            results.append(result)
+        return results
+
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=1):
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values={}):
         # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
-        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function)
+        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
         try:
             start_time = time.time()
             returncode = self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated,
                                                        settings_path=self.settings_path_generated)
             end_time = time.time()
             elapsed_time = end_time - start_time
+            if returncode != 0:
+                print("Code generation failed", flush=True)
+                return infinity, infinity, infinity
+            self.patch_l4_file()
+            returncode = self.generate_from_patched_l4_file()
+            self.restore_l4_file()
             if returncode != 0:
                 print("Code generation failed", flush=True)
                 return infinity, infinity, infinity
@@ -374,13 +535,32 @@ class ProgramGenerator:
         self._average_generation_time += (elapsed_time - self._average_generation_time) / self._counter
         if self._output_path_generated is None:
             raise RuntimeError('Output path not set')
-        runtime, convergence_factor, number_of_iterations = \
-            self.compile_and_run(number_of_samples=number_of_samples, infinity=infinity)
+        average_runtime = 0
+        average_convergence_factor = 0
+        average_number_of_iterations = 0
+        mapping = global_variable_values.copy()
+        n = 3
+        if 'k' not in mapping:
+            n = 1
+
+        for i in range(n):
+            runtime, convergence_factor, number_of_iterations = \
+                self.compile_and_run(mapping=mapping, number_of_samples=number_of_samples, infinity=infinity)
+            average_runtime += runtime
+            average_convergence_factor += convergence_factor
+            average_number_of_iterations += number_of_iterations
+            if number_of_iterations >= infinity or convergence_factor > 1:
+                return average_runtime, average_convergence_factor, average_number_of_iterations
+            if n > 1:
+                mapping['k'] *= 2
+        average_runtime /= n
+        average_convergence_factor /= n
+        average_number_of_iterations /= n
         # print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
-        return runtime, convergence_factor, number_of_iterations
+        return average_runtime, average_convergence_factor, average_number_of_iterations
 
     @staticmethod
-    def parse_output(output: str, infinity: float):
+    def parse_output(output: str, infinity: float, solver_iteration_limit=None):
         lines = output.splitlines()
         convergence_factors = []
         rho_inf = math.sqrt(infinity)
@@ -422,6 +602,8 @@ class ProgramGenerator:
         time_to_solution = float(tmp[-2])
         # number_of_iterations = len(lines) - 3
         if number_of_iterations == 0:
+            number_of_iterations = infinity
+        if solver_iteration_limit is not None and number_of_iterations >= solver_iteration_limit:
             number_of_iterations = infinity
         return time_to_solution, convergence_factor, number_of_iterations
 
@@ -497,6 +679,31 @@ class ProgramGenerator:
                 # return sympy.Symbol(f'{expression.name}@{level}')
         else:
             raise RuntimeError("Invalid expression")
+
+    def generate_coloring(self, partitioning, indentation):
+        program = ''
+        if partitioning == part.RedBlack:
+            program += f'{indentation}\t(('
+            for i in range(self.dimension):
+                program += f'i{i}'
+                if i < self.dimension - 1:
+                    program += ' + '
+            program += ') % 2),\n'
+        elif partitioning == part.FourWay:
+            program += f'{indentation}\t(i0 % 2),\n'
+            program += f'{indentation}\t(i1 % 2),\n'
+        elif partitioning == part.NineWay:
+            program += f'{indentation}\t(i0 % 3),\n'
+            program += f'{indentation}\t(i1 % 3),\n'
+        elif partitioning == part.EightWay:
+            program += f'{indentation}\t(i0 % 2),\n'
+            program += f'{indentation}\t(i1 % 2),\n'
+            program += f'{indentation}\t(i2 % 2),\n'
+        elif partitioning == part.TwentySevenWay:
+            program += f'{indentation}\t(i0 % 3),\n'
+            program += f'{indentation}\t(i1 % 3),\n'
+            program += f'{indentation}\t(i2 % 3),\n'
+        return program
 
     def generate_multigrid(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
                            max_level: int, use_global_weights=False):
@@ -594,42 +801,38 @@ class ProgramGenerator:
                             independent_equations.clear()
                         for key, value in independent_equations:
                             coloring = False
+                            jacobi_prefix = "with jacobi "
                             indentation = ''
-                            if expression.partitioning == part.RedBlack:
+                            if expression.partitioning != part.Single:
                                 coloring = True
-                                program += '\tcolor with {\n\t\t(('
-                                for i in range(self.dimension):
-                                    program += f'i{i}'
-                                    if i < self.dimension - 1:
-                                        program += ' + '
-                                program += ') % 2),\n'
+                                jacobi_prefix = ""
                                 indentation += '\t'
+                                program += f'{indentation}color with {{\n'
+                                program += self.generate_coloring(expression.partitioning, indentation)
                             if key[1] < max_level:
-                                program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at gen_error_{key[0]}@{key[1]} {jacobi_prefix}relax {weight} {{\n'
                             else:
-                                program += f'\t{indentation}solve locally at {key[0]}@{key[1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at {key[0]}@{key[1]} {jacobi_prefix}relax {weight} {{\n'
                             program += self.generate_solve_locally(key, value, indentation, max_level)
                             program += f'\t{indentation}}}\n'
                             if coloring:
                                 program += '\t}\n'
 
                         coloring = False
+                        jacobi_prefix = "with jacobi "
                         indentation = ''
                         if len(dependent_equations) > 0:
-                            if expression.partitioning == part.RedBlack:
+                            if expression.partitioning != part.Single:
                                 coloring = True
-                                program += '\tcolor with {\n\t\t(('
-                                for i in range(self.dimension):
-                                    program += f'i{i}'
-                                    if i < self.dimension - 1:
-                                        program += ' + '
-                                program += ') % 2),\n'
+                                jacobi_prefix = ""
                                 indentation += '\t'
+                                program += f'{indentation}color with {{\n'
+                                program += self.generate_coloring(expression.partitioning, indentation)
                             level = dependent_equations[0][0][1]
                             if level < max_level:
-                                program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at gen_error_{dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} {jacobi_prefix}relax {weight} {{\n'
                             else:
-                                program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} relax {weight} {{\n'
+                                program += f'\t{indentation}solve locally at {dependent_equations[0][0][0]}@{dependent_equations[0][0][1]} {jacobi_prefix}relax {weight} {{\n'
                             for key, value in dependent_equations:
                                 program += self.generate_solve_locally(key, value, indentation, max_level)
                             program += f'\t{indentation}}}\n'
@@ -730,9 +933,10 @@ class ProgramGenerator:
             raise RuntimeError("Not implemented")
         return program
 
-    def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True):
+    def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True,
+                         global_variable_values={}):
         # TODO fix hacky solution
-        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}.exa3'
+        input_file_path = f'{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
         with open(f'{self.base_path}/{input_file_path}', 'r') as input_file:
@@ -747,9 +951,22 @@ class ProgramGenerator:
                             or 'Function InitFields' in line or \
                             (not include_restriction and 'gen_restriction' in line) or \
                             (not include_prolongation and 'gen_prolongation' in line):
-                        while line and line[0] is not '}':
+                        while line and not line[0] == '}':
                             line = input_file.readline()
                         line = input_file.readline()
+                    if 'Globals' in line:
+                        output_file.write(line)
+                        line = input_file.readline()
+                        while line and '}' not in line:
+                            tokens = line.split('=')
+                            tmp = tokens[0].split(':')
+                            lhs_tokens = tmp[0].split()
+                            if len(tokens) == 2 and lhs_tokens[0] == 'Var' and lhs_tokens[1] in global_variable_values:
+                                tmp = tokens[0] + ' = ' + str(global_variable_values[lhs_tokens[1]]) + '\n'
+                                output_file.write(tmp)
+                            else:
+                                output_file.write(line)
+                            line = input_file.readline()
                     if 'Field' not in line or line not in self._field_declaration_cache:
                         output_file.write(line)
                     line = input_file.readline()
@@ -758,17 +975,22 @@ class ProgramGenerator:
 
                 output_file.write(program)
 
-    def generate_adapted_settings_file(self, l2file_required=False):
+
+    def generate_adapted_settings_file(self, config_name=None, input_file_path=None, output_file_path=None, l2file_required=False):
         base_path = self.base_path
-        input_file_path = self.settings_path
-        output_file_path = self.settings_path_generated
+        if input_file_path is None:
+            input_file_path = self.settings_path
+        if output_file_path is None:
+            output_file_path = self.settings_path_generated
         with open(f'{base_path}/{input_file_path}', 'r') as input_file:
             with open(f'{base_path}/{output_file_path}', 'w') as output_file:
                 for line in input_file:
                     tokens = line.split('=')
                     lhs = tokens[0].strip(' \n\t')
                     if lhs == 'configName':
-                        output_file.write(f'  {lhs}\t = "{self.problem_name}_{self.mpi_rank}"\n')
+                        if config_name is None:
+                            config_name = f'{self.problem_name}_{self.mpi_rank}'
+                        output_file.write(f'  {lhs}\t = "{config_name}"\n')
                     elif l2file_required:
                         output_file.write(line)
                     elif not lhs == 'l2file':
@@ -801,32 +1023,13 @@ class ProgramGenerator:
                         output_file.write(line)
         return output_file_path
 
-    def generate_adapted_layer_files(self, iteration_limit, coarse_grid_solver_type=None, number_of_cgs_iterations=None):
+    def copy_layer_files(self):
         base_path = self.base_path
-        input_file_path = f'{self._base_path_prefix}/{self.problem_name}.exa3'
-        output_file_path = f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3'
-        tmp = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}'
-        subprocess.run(['cp', f'{tmp}.exa1', f'{tmp}_{self.mpi_rank}.exa1'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-        subprocess.run(['cp', f'{tmp}.exa2', f'{tmp}_{self.mpi_rank}.exa2'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-        subprocess.run(['cp', f'{tmp}.exa4', f'{tmp}_{self.mpi_rank}.exa4'],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_copy_file)
-
-        with open(f'{base_path}/{input_file_path}', 'r') as input_file:
-            with open(f'{base_path}/{output_file_path}', 'w') as output_file:
-                for line in input_file:
-                    tokens = line.split('=')
-                    lhs = tokens[0].strip(' \n\t')
-                    if lhs == 'solver_maxNumIts':
-                        output_file.write(f'  {lhs}\t= {iteration_limit}\n')
-                    elif coarse_grid_solver_type is not None and lhs == 'solver_cgs':
-                        output_file.write(f'  {lhs}\t= "{coarse_grid_solver_type}"\n')
-                    elif number_of_cgs_iterations is not None and lhs == 'solver_cgs_maxNumIts':
-                        output_file.write(f'  {lhs}\t= {number_of_cgs_iterations}\n')
-                    else:
-                        output_file.write(line)
-        return output_file_path
+        input_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}'
+        output_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}'
+        for i in [1, 2, 3, 4]:
+            if os.path.exists(f'{input_file_path}.exa{i}'):
+                shutil.copyfile(f'{input_file_path}.exa{i}', f'{output_file_path}.exa{i}')
 
     def extract_krylov_subspace_method_from_layer3_file(self, layer3_file_path, level):
         krylov_solver_function = ''
@@ -880,9 +1083,9 @@ class ProgramGenerator:
     def generate_krylov_subspace_method(self, level: int, max_level: int, solver_type: str,
                                         number_of_solver_iterations: int):
         min_level = level
-        iteration_limit = 1
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, min(min_level + 1, max_level))
-        self.generate_adapted_layer_files(iteration_limit, solver_type, number_of_solver_iterations)
+        #TODO either fix or remove krylov subspace method generation
+        self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
         layer3_file_path = f'{self._debug_l3_path}'.replace('_debug.exa3', f'_{self.mpi_rank}_debug.exa3')

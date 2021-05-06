@@ -2,7 +2,6 @@ from evostencils.expressions import base
 from evostencils.expressions import system
 from evostencils.expressions import partitioning as part
 from evostencils.expressions import smoother
-from evostencils.expressions import krylov_subspace
 from evostencils.expressions.base import ConstantStencilGenerator
 from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
@@ -11,6 +10,7 @@ from evostencils.types import partitioning, level_control
 from evostencils.types.wrapper import TypeWrapper
 from evostencils.genetic_programming import PrimitiveSetTyped
 from deap import gp
+import numpy as np
 import sympy
 from sympy.parsing.sympy_parser import parse_expr
 import itertools
@@ -194,6 +194,10 @@ class Terminals:
         self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
+        self.four_way_partitioning = part.FourWay
+        self.nine_way_partitioning = part.NineWay
+        self.eight_way_partitioning = part.EightWay
+        self.twenty_seven_way_partitioning = part.TwentySevenWay
 
 
 class Types:
@@ -220,14 +224,19 @@ class Types:
         self.NotFinished = NotFinishedType
 
 
-def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, krylov_subspace_methods=(),
+def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
               coarsest=False):
+    relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
+
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
     pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
     GridType = types.Grid
+    scalar_equation = False
+    if len(terminals.grid) == 1:
+        scalar_equation = True
     CorrectionType = types.Correction
 
     def coarse_cycle(coarse_grid, cycle):
@@ -244,98 +253,53 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     def restrict(operator, cycle):
         return base.Cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), predecessor=cycle.predecessor)
 
-    def coarse_grid_correction(interpolation, args, relaxation_factor):
+    def coarse_grid_correction(interpolation, args, relaxation_factor_index):
         cycle = args[0]
         cycle.predecessor._correction = base.mul(interpolation, cycle)
-        return iterate(cycle.predecessor, relaxation_factor)
+        return iterate(cycle.predecessor, relaxation_factor_index)
 
-    def iterate(cycle, relaxation_factor):
+    def iterate(cycle, relaxation_factor_index):
         rhs = cycle.rhs
+        relaxation_factor = relaxation_factor_interval[relaxation_factor_index]
         approximation = base.Cycle(cycle.approximation, cycle.rhs, cycle.correction, cycle.partitioning,
                                    relaxation_factor, cycle.predecessor)
         return approximation, rhs
 
-    def smoothing(generate_smoother, cycle, partitioning, relaxation_factor):
+    def smoothing(generate_smoother, cycle, partitioning, relaxation_factor_index):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production'
         approximation = cycle.approximation
         rhs = cycle.rhs
         smoothing_operator = generate_smoother(cycle.correction.operator)
         correction = base.Multiplication(base.Inverse(smoothing_operator), cycle.correction)
         return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning,
-                                  predecessor=cycle.predecessor), relaxation_factor)
+                                  predecessor=cycle.predecessor), relaxation_factor_index)
 
-    def decoupled_jacobi(cycle, partitioning, relaxation_factor):
-        return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor)
+    def decoupled_jacobi(cycle, partitioning, relaxation_factor_index):
+        return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor_index)
 
-    def collective_jacobi(cycle, partitioning, relaxation_factor):
-        return smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor)
+    def collective_jacobi(cycle, partitioning, relaxation_factor_index):
+        return smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor_index)
 
-    def collective_block_jacobi(cycle, partitioning, relaxation_factor, block_size):
+    def collective_block_jacobi(cycle, relaxation_factor_index, block_size):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_size)
-        return smoothing(generate_collective_block_jacobi_fixed, cycle, partitioning, relaxation_factor)
-
-    # pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"iterate_{level}")
-    # pset.addPrimitive(iterate, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"iterate_{level}")
+        return smoothing(generate_collective_block_jacobi_fixed, cycle, part.Single, relaxation_factor_index)
 
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
 
-    pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
-    pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
+    if not scalar_equation:
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
+    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
+    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
 
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(float), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
-
-    def krylov_subspace_iteration(generate_krylov_subspace_method, cycle, number_of_krylov_iterations):
-        assert isinstance(cycle.correction, base.Residual), 'Invalid production'
-        approximation = cycle.approximation
-        rhs = cycle.rhs
-        krylov_subspace_operator = generate_krylov_subspace_method(cycle.correction.operator, number_of_krylov_iterations)
-        correction = base.Multiplication(krylov_subspace_operator, cycle.correction)
-        return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning,
-                                  predecessor=cycle.predecessor), 1.0)
-
-    def conjugate_gradient(cycle, number_of_iterations):
-        return krylov_subspace_iteration(krylov_subspace.generate_conjugate_gradient, cycle, number_of_iterations)
-
-    def bicgstab(cycle, number_of_iterations):
-        return krylov_subspace_iteration(krylov_subspace.generate_bicgstab, cycle, number_of_iterations)
-
-    def minres(cycle, number_of_iterations):
-        return krylov_subspace_iteration(krylov_subspace.generate_minres, cycle, number_of_iterations)
-
-    def conjugate_residual(cycle, number_of_iterations):
-        return krylov_subspace_iteration(krylov_subspace.generate_conjugate_residual, cycle, number_of_iterations)
-
-    if 'ConjugateGradient' in krylov_subspace_methods or 'CG' in krylov_subspace_methods:
-        pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_gradient_{level}")
-        pset.addPrimitive(conjugate_gradient, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_gradient_{level}")
-    if 'BiCGStab' in krylov_subspace_methods:
-        pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"bicgstab_{level}")
-        pset.addPrimitive(bicgstab, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"bicgstab_{level}")
-
-    if 'MinRes' in krylov_subspace_methods:
-        pset.addPrimitive(minres, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"minres_{level}")
-        pset.addPrimitive(minres, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"minres_{level}")
-
-    if 'ConjugateResidual' in krylov_subspace_methods:
-        pset.addPrimitive(conjugate_residual, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"conjugate_residual_{level}")
-        pset.addPrimitive(conjugate_residual, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"conjugate_residual_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
 
     if not coarsest:
-        pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(float)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
+        pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
                 [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
@@ -347,15 +311,15 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 f"coarse_cycle_{level}")
 
     else:
-        def solve(cgs, interpolation, cycle):
+        def solve(cgs, interpolation, cycle, relaxation_factor_index):
             new_cycle = base.Cycle(cycle.approximation, cycle.rhs, base.mul(interpolation, base.mul(cgs, cycle.correction)),
                                    predecessor=cycle.predecessor)
-            return iterate(new_cycle, 1)
+            return iterate(new_cycle, relaxation_factor_index)
 
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
-        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
+        pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                           f'solve_{level}')
 
@@ -371,10 +335,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
-                           maximum_block_size=2,
-                           coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None,
-                           krylov_subspace_methods=(),
-                           minimum_solver_iterations=8, maximum_solver_iterations=1024):
+                           maximum_block_size=2, relaxation_factor_samples=37,
+                           coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
@@ -398,22 +360,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
-    # Relaxation Factors
-    pset.addTerminal(1.0, TypeWrapper(float))
-    omega_min = 1.0/3.0
-    omega_max = 5.0/3.0
-    # omega_min = 0.0
-    # omega_max = 2.0
-    number_of_steps = 100
-    step_size = (omega_max - omega_min) / number_of_steps
-    for i in range(1, number_of_steps + 1):
-        pset.addTerminal(omega_min + i * step_size, TypeWrapper(float))
-    # number of Krylov subspace method iterations
-    if len(krylov_subspace_methods) > 0:
-        i = minimum_solver_iterations
-        while i <= maximum_solver_iterations:
-            pset.addTerminal(i, TypeWrapper(int))
-            i *= 2
+    for i in range(0, relaxation_factor_samples):
+        pset.addTerminal(i, TypeWrapper(int))
+
 
     # Block sizes
     block_sizes = []
@@ -428,14 +377,14 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
         generate_block_size((), maximum_block_size, dimension)
-    maximum_number_of_generatable_terms = 7
+    maximum_number_of_generatable_terms = 6
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-        if number_of_terms <= maximum_number_of_generatable_terms:
+        if len(approximation.grid) < number_of_terms <= maximum_number_of_generatable_terms:
             pset.addTerminal(block_size_permutation, types.BlockSize)
-    add_cycle(pset, terminals, types, 0, krylov_subspace_methods, coarsest)
+    add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)
 
     terminal_list = [terminals]
     for i in range(1, depth):
@@ -461,7 +410,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction,
                               prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
-        add_cycle(pset, terminals, types, i, krylov_subspace_methods, coarsest)
+        add_cycle(pset, terminals, types, i, relaxation_factor_samples, coarsest)
         terminal_list.append(terminals)
 
     return pset, terminal_list
