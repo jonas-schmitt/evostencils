@@ -1,5 +1,5 @@
 # EvoStencils
-Constructing efficient multigrid solvers through evolutionary computation
+Evolving efficient and generalizable multigrid methods with genetic programming
 ## Requirements
 Python >= 3.6, sbt (for ExaStencils), MPI
 ## Setup
