@@ -15,8 +15,8 @@ def main():
     base_path = f'{cwd}/../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
-    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
 
     # 3D Finite difference discretized Poisson
     # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
@@ -46,11 +46,11 @@ def main():
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
 
 
-    settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    cycle_name = "mgCycle"
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
+    # cycle_name = "mgCycle"
 
-    # cycle_name= "gen_mgCycle"
+    cycle_name= "gen_mgCycle"
 
     comm = None
     nprocs = 1
@@ -99,25 +99,15 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    minimum_solver_iterations = 2**3
-    maximum_solver_iterations = 2**10
-    # krylov_subspace_methods = ('ConjugateGradient', 'BiCGStab', 'MinRes', 'ConjugateResidual')
-    krylov_subspace_methods = ()
-    values = [80.0 * 2.0**i for i in range(100)]
-    parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=32, gp_lambda=16,
+                                                                     gp_mu=8, gp_lambda=8,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=50,
+                                                                     gp_generations=5,
                                                                      maximum_block_size=maximum_block_size,
-                                                                     parameter_values=parameter_values,
                                                                      required_convergence=required_convergence,
-                                                                     restart_from_checkpoint=restart_from_checkpoint,
-                                                                     krylov_subspace_methods=krylov_subspace_methods,
-                                                                     minimum_solver_iterations=minimum_solver_iterations,
-                                                                     maximum_solver_iterations=maximum_solver_iterations)
+                                                                     restart_from_checkpoint=restart_from_checkpoint)
     if mpi_rank == 0:
         print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
