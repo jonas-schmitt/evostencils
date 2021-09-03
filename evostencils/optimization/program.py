@@ -21,6 +21,7 @@ import sys
 def flatten(l: list):
     return [item for sublist in l for item in sublist]
 
+
 class do_nothing(object):
     def __init__(self):
         pass
@@ -297,7 +298,6 @@ class Optimizer:
             else:
                 return tmp
 
-
     def allreduce(self, variable):
         if self.mpi_comm is None:
             return variable
@@ -305,17 +305,15 @@ class Optimizer:
             from mpi4py import MPI
             return self.mpi_comm.allreduce(variable, op=MPI.SUM)
 
-
-
     def barrier(self):
         if self.mpi_comm is not None:
             self.mpi_comm.barrier()
 
-
     def generate_individual(self):
         return self._toolbox.individual()
 
-    def compile_individual(self, individual, pset):
+    @staticmethod
+    def compile_individual(individual, pset):
         return gp.compile(individual, pset)
 
     def estimate_single_objective(self, individual, pset):
@@ -855,7 +853,8 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = 8 * gp_mu
+            initialization_factor = 1
+            initial_population_size = initialization_factor * gp_mu
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
@@ -866,7 +865,10 @@ class Optimizer:
             self.clear_individual_cache()
 
             def estimate_execution_time(convergence_factor, execution_time):
-                return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
+                if convergence_factor < 1:
+                    return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
+                else:
+                    return convergence_factor * math.sqrt(self.infinity) * execution_time
 
             # def estimate_execution_time(number_of_iterations, execution_time):
             #     return number_of_iterations * execution_time
@@ -890,51 +892,16 @@ class Optimizer:
                     if len(individual.fitness.values) == 2:
                         print(f'\nExecution time until convergence: '
                               f'{estimate_execution_time(individual.fitness.values[0], individual.fitness.values[1])}, '
-                              f'Number of iterations: {individual.fitness.values[0]}', flush=True)
-                              # f'Convergence Factor: {individual.fitness.values[0]}', flush=True)
+                              # f'Number of iterations: {individual.fitness.values[0]}', flush=True)
+                              f'Convergence Factor: {individual.fitness.values[0]}', flush=True)
                     else:
                         print(f'\nExecution time until convergence: {individual.fitness.values[0]}', flush=True)
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
             self.barrier()
 
-            #TODO fix relaxation factor optimization
-            """
-            if optimize_relaxation_factors and es_generations > 0:
-                relaxation_factors, improved_convergence_factor = \
-                    self.optimize_relaxation_factors(best_expression, es_generations, evaluation_min_level, evaluation_max_level,
-                                                 solver_program, storages, best_time)
-                relaxation_factor_optimization.set_relaxation_factors(best_expression, relaxation_factors)
-                self.program_generator.initialize_code_generation(self.min_level, self.max_level)
-                best_time, convergence_factor, number_of_iterations = \
-                    self._program_generator.generate_and_evaluate(best_expression, storages, evaluation_min_level, evaluation_max_level,
-                                                              solver_program, infinity=self.infinity,
-                                                              number_of_samples=10)
-                best_expression.runtime = best_time / number_of_iterations * 1e-3
-                self.mpi_barrier()
-                print(f"Rank {self.mpi_rank} - Improved time: {best_time}, Number of Iterations: {number_of_iterations}",
-                      flush=True)
-            """
         self.barrier()
         return str(best_individual), pops, logbooks, hofs
-
-    def optimize_relaxation_factors(self, expression, generations, min_level, max_level, base_program, storages, evaluation_time):
-        initial_weights = relaxation_factor_optimization.obtain_relaxation_factors(expression)
-        relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
-        relaxation_factor_optimization.reset_status(expression)
-        n = len(initial_weights)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=64)
-        try:
-            tmp = base_program + self.program_generator.generate_global_weights(n)
-            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
-                                                                            self.max_level, use_global_weights=True)
-            self.program_generator.generate_l3_file(min_level, self.max_level, tmp + cycle_function)
-            best_individual = self._weight_optimizer.optimize(expression, n, generations, storages, evaluation_time)
-            best_weights = list(best_individual)
-            time_to_solution, = best_individual.fitness.values
-        except (KeyboardInterrupt, Exception) as e:
-            raise e
-        return best_weights, time_to_solution
 
     def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
         solver_program = ''

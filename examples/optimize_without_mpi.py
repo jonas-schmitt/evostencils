@@ -80,8 +80,8 @@ def main():
                           program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
+    restart_from_checkpoint = True
+    # restart_from_checkpoint = False
     levels_per_run = max_level - min_level
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     required_convergence = 0.5
@@ -101,10 +101,10 @@ def main():
     mutation_probability = 1.0 - crossover_probability
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=8, gp_lambda=8,
+                                                                     gp_mu=4, gp_lambda=4,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=5,
+                                                                     gp_generations=3,
                                                                      maximum_block_size=maximum_block_size,
                                                                      required_convergence=required_convergence,
                                                                      restart_from_checkpoint=restart_from_checkpoint)
