@@ -870,7 +870,6 @@ class Optimizer:
 
             # def estimate_execution_time(number_of_iterations, execution_time):
             #     return number_of_iterations * execution_time
-
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                     gp_crossover_probability, gp_mutation_probability,

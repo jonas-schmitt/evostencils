@@ -11,8 +11,8 @@ def main():
     # TODO adapt to actual path to exastencils project
 
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils/Examples'
+    compiler_path = f'{cwd}/../../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../../exastencils/Examples'
 
     # 2D Finite difference discretized Poisson
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
@@ -101,10 +101,10 @@ def main():
     mutation_probability = 1.0 - crossover_probability
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=8, gp_lambda=8,
+                                                                     gp_mu=4, gp_lambda=4,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=5,
+                                                                     gp_generations=1,
                                                                      maximum_block_size=maximum_block_size,
                                                                      required_convergence=required_convergence,
                                                                      restart_from_checkpoint=restart_from_checkpoint)

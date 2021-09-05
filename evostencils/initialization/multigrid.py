@@ -151,7 +151,7 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     system_operators = []
     for op_info in operators_on_level:
         if op_info.operator_type == base.Restriction:
-            #TODO hacky solution for now
+            # TODO hacky solution for now
             if not "gen_restrictionForSol" in op_info.name:
                 restriction_operators.append(op_info)
         elif op_info.operator_type == base.Prolongation:
@@ -225,11 +225,11 @@ class Types:
 
 
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
-              coarsest=False):
+              coarsest=False, FAS=True):
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
 
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
-    pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level+1}')
+    pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level + 1}')
     pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
@@ -251,11 +251,21 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return base.Cycle(args[0], args[1], base.Residual(terminals.operator, args[0], args[1]), predecessor=args[0].predecessor)
 
     def restrict(operator, cycle):
-        return base.Cycle(cycle.approximation, cycle.rhs, base.mul(operator, cycle.correction), predecessor=cycle.predecessor)
+        residual_c = base.mul(operator, cycle.correction)
+        if FAS:
+            residual_FAS = base.mul(terminals.coarse_operator, base.Multiplication(operator, cycle.approximation))  # Add this term for FAS
+            residual_c = base.add(residual_c, residual_FAS)
+        return base.Cycle(cycle.approximation, cycle.rhs, residual_c, predecessor=cycle.predecessor)
 
-    def coarse_grid_correction(interpolation, args, relaxation_factor_index):
+    def coarse_grid_correction(interpolation, args, relaxation_factor_index, restriction=None):
         cycle = args[0]
-        cycle.predecessor._correction = base.mul(interpolation, cycle)
+        correction = base.mul(interpolation, cycle)
+        if FAS:
+            correction_FAS = base.mul(restriction, cycle.predecessor.approximation)  # Subract this term for FAS
+            correction_c = base.sub(cycle.approximation, correction_FAS)
+            correction = base.mul(interpolation, correction_c)
+
+        cycle.predecessor._correction = correction
         return iterate(cycle.predecessor, relaxation_factor_index)
 
     def iterate(cycle, relaxation_factor_index):
@@ -283,32 +293,41 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     def collective_block_jacobi(cycle, relaxation_factor_index, block_size):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_size)
+
         return smoothing(generate_collective_block_jacobi_fixed, cycle, part.Single, relaxation_factor_index)
 
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
 
     if not scalar_equation:
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
+    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
+    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
 
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
-    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize], multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
+    pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize],
+                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
 
     if not coarsest:
-        pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(int)], multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
+        # TODO: add if statement to check for FAS
+        pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(int), types.Restriction],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
-                [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
-                multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
-                f"coarse_cycle_{level}")
+                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
+                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
+                          f"coarse_cycle_{level}")
         pset.addPrimitive(coarse_cycle,
-                [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
-                multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
-                f"coarse_cycle_{level}")
+                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
+                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
+                          f"coarse_cycle_{level}")
 
     else:
         def solve(cgs, interpolation, cycle, relaxation_factor_index):
@@ -348,7 +367,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     operator, restriction, prolongation, = \
         generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
     coarse_operator, coarse_restriction, coarse_prolongation, = \
-        generate_operators_from_l2_information(equations, operators, fields, max_level-1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
+        generate_operators_from_l2_information(equations, operators, fields, max_level - 1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
     terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction, prolongation, cgs_expression)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
@@ -363,8 +382,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     for i in range(0, relaxation_factor_samples):
         pset.addTerminal(i, TypeWrapper(int))
 
-
     # Block sizes
+    # TODO: not need for FAS
     block_sizes = []
     for i in range(len(fields)):
         block_sizes.append([])
@@ -376,6 +395,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
             else:
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size + (k,), block_size_max, dimension - 1)
+
         generate_block_size((), maximum_block_size, dimension)
     maximum_number_of_generatable_terms = 6
     for block_size_permutation in itertools.product(*block_sizes):
@@ -384,6 +404,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
             number_of_terms += reduce(lambda x, y: x * y, block_size)
         if len(approximation.grid) < number_of_terms <= maximum_number_of_generatable_terms:
             pset.addTerminal(block_size_permutation, types.BlockSize)
+    #TODO: not need for FAS
     add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)
 
     terminal_list = [terminals]

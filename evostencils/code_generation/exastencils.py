@@ -929,6 +929,15 @@ class ProgramGenerator:
                         program += f'\t{target_field.to_exa()} = {solution_field.to_exa()}\n'
             else:
                 raise RuntimeError("Not implemented")
+        elif isinstance(expression, base.Addition) or isinstance(expression, base.Subtraction):
+            operator = ""
+            if isinstance(expression, base.Addition):
+                operator = "+"
+            elif isinstance(expression, base.Subtraction):
+                operator = "-"
+            program += f"{self.generate_multigrid(expression.operand1, storages, min_level, max_level, use_global_weights)}" \
+                       f"{operator}" \
+                       f"{self.generate_multigrid(expression.operand2, storages, min_level, max_level, use_global_weights)}"
         else:
             raise RuntimeError("Not implemented")
         return program
