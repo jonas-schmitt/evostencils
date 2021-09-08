@@ -1,6 +1,6 @@
 from evostencils.optimization.program import Optimizer
 # from evostencils.evaluation.convergence import ConvergenceEvaluator
-from evostencils.evaluation.performance import PerformanceEvaluator
+# from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 # import lfa_lab
@@ -80,11 +80,10 @@ def main():
                           program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    restart_from_checkpoint = True
-    # restart_from_checkpoint = False
+    # restart_from_checkpoint = True
+    restart_from_checkpoint = False
     levels_per_run = max_level - min_level
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
-    required_convergence = 0.5
     maximum_block_size = 8
     optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
@@ -106,7 +105,6 @@ def main():
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=3,
                                                                      maximum_block_size=maximum_block_size,
-                                                                     required_convergence=required_convergence,
                                                                      restart_from_checkpoint=restart_from_checkpoint)
     if mpi_rank == 0:
         print(f'\nGrammar representation:\n{program}\n', flush=True)
@@ -132,4 +130,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

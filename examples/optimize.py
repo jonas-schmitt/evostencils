@@ -1,6 +1,6 @@
 from evostencils.optimization.program import Optimizer
 # from evostencils.evaluation.convergence import ConvergenceEvaluator
-from evostencils.evaluation.performance import PerformanceEvaluator
+# from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 # import lfa_lab
@@ -53,7 +53,7 @@ def main():
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     # cycle_name = "mgCycle"
 
-    cycle_name= "gen_mgCycle"
+    cycle_name = "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -90,11 +90,10 @@ def main():
                           program_generator=program_generator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    restart_from_checkpoint = True
-    # restart_from_checkpoint = False
+    # restart_from_checkpoint = True
+    restart_from_checkpoint = False
     levels_per_run = max_level - min_level
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
-    required_convergence = 0.5
     maximum_block_size = 8
     optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
@@ -115,13 +114,12 @@ def main():
     # parameter_values = {'k' : values}
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=4, gp_lambda=4,
+                                                                     gp_mu=32, gp_lambda=32,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=3,
+                                                                     gp_generations=50,
                                                                      maximum_block_size=maximum_block_size,
                                                                      parameter_values=parameter_values,
-                                                                     required_convergence=required_convergence,
                                                                      restart_from_checkpoint=restart_from_checkpoint)
 
     if mpi_rank == 0:
@@ -139,7 +137,7 @@ def main():
         for i, pop in enumerate(pops):
             optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
         for i, hof in enumerate(hofs):
-            hof_dir =  f'{log_dir_name}/hof_{i}'
+            hof_dir = f'{log_dir_name}/hof_{i}'
             os.makedirs(hof_dir)
             for j, ind in enumerate(hof):
                 with open(f'{hof_dir}/individual_{j}.txt', 'w') as grammar_file:
@@ -148,4 +146,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,4 +1,4 @@
-from evostencils.expressions import base, system, smoother, partitioning as part
+from evostencils.expressions import base, system
 from evostencils.code_generation.exastencils import ProgramGenerator
 from deap import creator, tools, algorithms, cma
 import deap
@@ -28,41 +28,41 @@ def optimize(iterations, program_generator: ProgramGenerator, max_level,
     for n, m in zip(number_of_restriction_weights, number_of_prolongation_weights):
         problem_size += n + m
 
-    def generate_prolongation_and_restriction(weights, default_restriction: system.Restriction, default_prolongation: system.Prolongation):
+    def generate_prolongation_and_restriction(weights_, default_restriction_: system.Restriction, default_prolongation_: system.Prolongation):
         offset = 0
         restriction_operators = []
         prolongation_operators = []
-        default_restriction_entries = default_restriction.entries
-        default_prolongation_entries = default_prolongation.entries
-        for k, n in enumerate(number_of_restriction_weights):
-            restriction_weights = weights[offset:n]
-            offset += n
+        default_restriction_entries = default_restriction_.entries
+        default_prolongation_entries = default_prolongation_.entries
+        for kk, nn in enumerate(number_of_restriction_weights):
+            restriction_weights = weights_[offset:nn]
+            offset += nn
             entries = []
             index = 0
-            for i in range(-operator_range, operator_range + 1):
-                for j in range(-operator_range, operator_range + 1):
-                    entries.append(((i, j), restriction_weights[index]))
+            for ii in range(-operator_range, operator_range + 1):
+                for jj in range(-operator_range, operator_range + 1):
+                    entries.append(((ii, jj), restriction_weights[index]))
                     index += 1
             stencil = constant.Stencil(entries)
             stencil_generator = base.ConstantStencilGenerator(stencil)
-            restriction = base.Restriction(default_restriction_entries[k][k].name, grid[k], coarse_grid[k], stencil_generator)
-            restriction_operators.append(restriction)
-        for k, n in enumerate(number_of_prolongation_weights):
-            prolongation_weights = weights[offset:(n + offset)]
-            offset += n
+            restriction_ = base.Restriction(default_restriction_entries[kk][kk].name, grid[kk], coarse_grid[kk], stencil_generator)
+            restriction_operators.append(restriction_)
+        for kk, nn in enumerate(number_of_prolongation_weights):
+            prolongation_weights = weights_[offset:(nn + offset)]
+            offset += nn
             entries = []
             index = 0
-            for i in range(-operator_range, operator_range + 1):
-                for j in range(-operator_range, operator_range + 1):
-                    entries.append(((i, j), prolongation_weights[index]))
+            for ii in range(-operator_range, operator_range + 1):
+                for jj in range(-operator_range, operator_range + 1):
+                    entries.append(((ii, jj), prolongation_weights[index]))
                     index += 1
             stencil = constant.Stencil(entries)
             stencil_generator = base.ConstantStencilGenerator(stencil)
-            prolongation = base.Prolongation(default_prolongation_entries[k][k].name, grid[k], coarse_grid[k], stencil_generator)
+            prolongation = base.Prolongation(default_prolongation_entries[kk][kk].name, grid[kk], coarse_grid[kk], stencil_generator)
             prolongation_operators.append(prolongation)
-        restriction = system.Restriction(default_restriction.name, restriction_operators)
-        prolongation = system.Prolongation(default_prolongation.name, prolongation_operators)
-        return restriction, prolongation
+        restriction_ = system.Restriction(default_restriction_.name, restriction_operators)
+        prolongation = system.Prolongation(default_prolongation_.name, prolongation_operators)
+        return restriction_, prolongation
 
     def generate_coarse_grid_correction(restriction, prolongation, omega=1):
         # residual = base.Residual(operator, approximation, rhs)
@@ -86,7 +86,7 @@ def optimize(iterations, program_generator: ProgramGenerator, max_level,
     expression = generate_coarse_grid_correction(restriction, prolongation)
 
     storages = program_generator.generate_storage(max_level - 1, max_level, grid)
-    program_generator.initialize_code_generation(max_level - 1, max_level, iteration_limit=16)
+    program_generator.initialize_code_generation(max_level - 1, max_level)
     weight_initialization = program_generator.generate_global_weights(problem_size, 'stencil_weight')
     cycle_function = program_generator.generate_cycle_function(expression, storages, max_level-1, max_level,
                                                                max_level, use_global_weights=True)

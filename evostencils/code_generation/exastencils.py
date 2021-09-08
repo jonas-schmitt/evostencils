@@ -2,14 +2,13 @@ from evostencils.expressions import base, partitioning as part, system, transfor
 from evostencils.expressions import krylov_subspace
 from evostencils.initialization import multigrid
 from evostencils.code_generation import parser
-import numpy as np
 import os
 import subprocess
 import math
 import sympy
 import time
 from typing import List
-import shutil # TODO replace 'cp' calls with subprocess with shutil.copyfile
+import shutil  # TODO replace 'cp' calls with subprocess with shutil.copyfile
 # from scipy.optimize import minimize_scalar
 
 
@@ -256,7 +255,6 @@ class ProgramGenerator:
         with open(path_to_file, 'w') as file:
             file.write(content)
 
-
     def adapt_generated_parameters(self, mapping: dict):
         output_path = self._output_path_generated
         path_to_file = f'{self.base_path}/{output_path}/Global/Global_declarations.cpp'
@@ -277,7 +275,6 @@ class ProgramGenerator:
                 content += line
         with open(path_to_file, 'w') as file:
             file.write(content)
-
 
     def restore_global_initializations(self, output_path):
         # Hack to change the weights after generation
@@ -355,7 +352,6 @@ class ProgramGenerator:
         output_file_path = \
             f'{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa4'
         shutil.copyfile(f'{base_path}/{output_file_path}.backup', f'{base_path}/{output_file_path}')
-
 
     def generate_from_patched_l4_file(self):
         base_path = self.base_path
@@ -435,7 +431,7 @@ class ProgramGenerator:
             total_number_of_iterations += number_of_iterations
         return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, total_number_of_iterations / number_of_samples
 
-    def initialize_code_generation(self, min_level: int, max_level: int, iteration_limit=10000):
+    def initialize_code_generation(self, min_level: int, max_level: int):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
         self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
@@ -477,7 +473,9 @@ class ProgramGenerator:
 
     def generate_and_evaluate_list_of_expressions(self, list_of_expression: [base.Expression], storages: List[CycleStorage],
                                                   min_level: int, max_level: int, solver_program: str, infinity=1e100,
-                                                  number_of_samples=1, global_variable_values={}):
+                                                  number_of_samples=1, global_variable_values=None):
+        if global_variable_values is None:
+            global_variable_values = {}
         # print("Generate and evaluate", flush=True)
         n = len(list_of_expression)
         for i, expression in enumerate(list_of_expression):
@@ -509,7 +507,7 @@ class ProgramGenerator:
         return results
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values={}):
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values=None):
         # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
         self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
@@ -588,7 +586,6 @@ class ProgramGenerator:
                 except ValueError as _:
                     # print(tmp[-2], flush=True)
                     number_of_iterations = infinity
-
 
         convergence_factor = 1
         if count > 0:
@@ -934,7 +931,9 @@ class ProgramGenerator:
         return program
 
     def generate_l3_file(self, min_level, max_level, program: str, include_restriction=True, include_prolongation=True,
-                         global_variable_values={}):
+                         global_variable_values=None):
+        if global_variable_values is None:
+            global_variable_values = {}
         # TODO fix hacky solution
         input_file_path = f'{self._base_path_prefix}/{self.problem_name}_template_{self.mpi_rank}.exa3'
         output_file_path = \
@@ -974,7 +973,6 @@ class ProgramGenerator:
                         line = input_file.readline()
 
                 output_file.write(program)
-
 
     def generate_adapted_settings_file(self, config_name=None, input_file_path=None, output_file_path=None, l2file_required=False):
         base_path = self.base_path
@@ -1024,7 +1022,6 @@ class ProgramGenerator:
         return output_file_path
 
     def copy_layer_files(self):
-        base_path = self.base_path
         input_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_base_{self.mpi_rank}'
         output_file_path = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}'
         for i in [1, 2, 3, 4]:
@@ -1084,7 +1081,7 @@ class ProgramGenerator:
                                         number_of_solver_iterations: int):
         min_level = level
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, min(min_level + 1, max_level))
-        #TODO either fix or remove krylov subspace method generation
+        # TODO either fix or remove krylov subspace method generation
         self.copy_layer_files()
         settings_path = self.generate_adapted_settings_file(l2file_required=True)
         self.run_exastencils_compiler(knowledge_path=knowledge_path, settings_path=settings_path)
@@ -1115,7 +1112,7 @@ class ProgramGenerator:
         program += f'Operator {prolongation.name}@{level} from Stencil {{\n'
         stencil = prolongation.generate_stencil()
 
-        def generate_stencil_entry(offset, value, k):
+        def generate_stencil_entry(offset, value, k_):
             string = '['
             for i, _ in enumerate(offset):
                 string += f'i{i}, '
@@ -1123,7 +1120,7 @@ class ProgramGenerator:
             for i, o, in enumerate(offset):
                 string += f'0.5 * (i{i} + ({o})), '
             if parametrize:
-                string = string[:-2] + f'] with stencil_weight_{start_index + k}'
+                string = string[:-2] + f'] with stencil_weight_{start_index + k_}'
             else:
                 string = string[:-2] + f'] with {value}'
             return string
@@ -1138,7 +1135,7 @@ class ProgramGenerator:
         program += f'Operator {restriction.name}@{level} from Stencil {{\n'
         stencil = restriction.generate_stencil()
 
-        def generate_stencil_entry(offset, value, k):
+        def generate_stencil_entry(offset, value, k_):
             string = '['
             for i, _ in enumerate(offset):
                 string += f'i{i}, '
@@ -1146,7 +1143,7 @@ class ProgramGenerator:
             for i, o, in enumerate(offset):
                 string += f'2 * (i{i}) + ({o}), '
             if parametrize:
-                string = string[:-2] + f'] with stencil_weight_{start_index + k}'
+                string = string[:-2] + f'] with stencil_weight_{start_index + k_}'
             else:
                 string = string[:-2] + f'] with {value}'
             return string
@@ -1154,8 +1151,3 @@ class ProgramGenerator:
             program += '\t' + generate_stencil_entry(*entry, k) + '\n'
         program += '}\n'
         return program
-
-
-
-
-

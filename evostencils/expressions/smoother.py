@@ -1,5 +1,5 @@
-from evostencils.expressions import base, system, partitioning as part
-from evostencils.stencils import constant, periodic
+from evostencils.expressions import base, system
+from evostencils.stencils import periodic
 
 
 def generate_decoupled_jacobi(operator: system.Operator):

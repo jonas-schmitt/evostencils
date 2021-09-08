@@ -18,7 +18,7 @@ def main():
     for i in range(1, n+1):
         j = i - 1
         if j % nprocs == mpi_rank:
-            tmp = subprocess.run(['java', '-cp', absolute_compiler_path, 'Main',
+            subprocess.run(['java', '-cp', absolute_compiler_path, 'main',
                             f'{base_path}/{base_path_prefix}/{problem_name}_{i}.settings',
                             f'{base_path}/{base_path_prefix}/{problem_name}_{i}.knowledge',
                             f'{base_path}/lib/{platform}.platform'],
@@ -32,6 +32,7 @@ def main():
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # output = tmp.stderr.decode('utf8')
             # print(output)
+
 
 if __name__ == "__main__":
     main()

@@ -4,22 +4,18 @@ import random
 import pickle
 import os.path
 from evostencils.initialization import multigrid as multigrid_initialization
-from evostencils.expressions import base, transformations, system, reference_cycles
+from evostencils.expressions import base, transformations, system
 from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
-import evostencils.optimization.relaxation_factors as relaxation_factor_optimization
 from evostencils.types import level_control
-import math, numpy
+import math
 import numpy as np
 import time
-import itertools
 import os
-import subprocess
 # from mpi4py import MPI
-import sys
 
 
-def flatten(l: list):
-    return [item for sublist in l for item in sublist]
+def flatten(lst: list):
+    return [item for sublist in lst for item in sublist]
 
 
 class do_nothing(object):
@@ -96,7 +92,6 @@ class Optimizer:
         self._FinishedType = level_control.generate_finished_type()
         self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
-        self._weight_optimizer = relaxation_factor_optimization.Optimizer(self)
         self._total_number_of_evaluations = 0
         self._failed_evaluations = 0
         self._mpi_comm = mpi_comm
@@ -111,7 +106,9 @@ class Optimizer:
         self._average_time_to_convergence = infinity
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, number_of_samples=3,
-                                     parameter_values={}):
+                                     parameter_values=None):
+        if parameter_values is None:
+            parameter_values = {}
         self._average_time_to_convergence = self.infinity
         self.program_generator.reinitialize(min_level, max_level, parameter_values)
         program_generator = self.program_generator
@@ -157,22 +154,22 @@ class Optimizer:
         self._toolbox.register("expression", genGrow, pset=pset, min_height=0, max_height=50)
         self._toolbox.register("mate", gp.cxOnePoint)
 
-        def mutate(individual, pset):
+        def mutate(individual, pset_):
             # Use two different mutation operators
             operator_choice = random.random()
             if operator_choice < 2.0/3.0:
-                return mutInsert(individual, 0, 10, pset)
+                return mutInsert(individual, 0, 10, pset_)
             else:
-                return mutNodeReplacement(individual, pset)
+                return mutNodeReplacement(individual, pset_)
 
-        self._toolbox.register("mutate", mutate, pset=pset)
+        self._toolbox.register("mutate", mutate, pset_=pset)
 
-    def _init_multi_objective_toolbox(self, pset):
+    def _init_multi_objective_toolbox(self):
         self._toolbox.register("individual", tools.initIterate, creator.MultiObjectiveIndividual,
                                self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
 
-    def _init_single_objective_toolbox(self, pset):
+    def _init_single_objective_toolbox(self):
         self._toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual,
                                self._toolbox.expression)
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
@@ -334,7 +331,7 @@ class Optimizer:
             spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
-                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
+                or math.isinf(spectral_radius) or np.isinf(spectral_radius) or np.isnan(spectral_radius):
             values = self.infinity,
             self.add_individual_to_cache(individual, values)
             return values
@@ -354,7 +351,7 @@ class Optimizer:
             return self.get_cached_fitness(individual)
         self._total_number_of_evaluations += 1
         with suppress_output():
-        # with do_nothing():
+            # with do_nothing():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
@@ -368,7 +365,7 @@ class Optimizer:
             spectral_radius = self.convergence_evaluator.compute_spectral_radius(expression)
 
         if spectral_radius == 0.0 or math.isnan(spectral_radius) \
-                or math.isinf(spectral_radius) or numpy.isinf(spectral_radius) or numpy.isnan(spectral_radius):
+                or math.isinf(spectral_radius) or np.isinf(spectral_radius) or np.isnan(spectral_radius):
             self._failed_evaluations += 1
             values = self.infinity, self.infinity
             self.add_individual_to_cache(individual, values)
@@ -380,14 +377,16 @@ class Optimizer:
             return values
 
     def evaluate_single_objective(self, individual, pset, storages, min_level, max_level, solver_program,
-                                  number_of_samples=3, parameter_values={}):
+                                  number_of_samples=3, parameter_values=None):
+        if parameter_values is None:
+            parameter_values = {}
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
         if self.individual_in_cache(individual):
             return self.get_cached_fitness(individual)
         with suppress_output():
-        # with do_nothing():
+            # with do_nothing():
             try:
                 expression1, expression2 = self.compile_individual(individual, pset)
             except MemoryError:
@@ -411,7 +410,9 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     number_of_samples=3, parameter_values={}):
+                                     number_of_samples=3, parameter_values=None):
+        if parameter_values is None:
+            parameter_values = {}
         self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
@@ -568,7 +569,6 @@ class Optimizer:
             logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
             logbooks.append(logbook)
 
-
         invalid_ind = [ind for ind in population]
         fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
@@ -705,10 +705,12 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
+             program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+        if parameter_values is None:
+            parameter_values = {}
         if self.is_root():
             print("Running Single-Objective Genetic Programming", flush=True)
-        self._init_single_objective_toolbox(pset)
+        self._init_single_objective_toolbox()
         self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
         # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
@@ -730,10 +732,12 @@ class Optimizer:
 
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
+               program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+        if parameter_values is None:
+            parameter_values = {}
         if self.is_root():
             print("Running NSGA-II Genetic Programming", flush=True)
-        self._init_multi_objective_toolbox(pset)
+        self._init_multi_objective_toolbox()
         self._toolbox.register("select", tools.selNSGA2)
 
         def select_for_mating(individuals, k):
@@ -763,10 +767,12 @@ class Optimizer:
 
     def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_,
                 crossover_probability, mutation_probability, min_level, max_level,
-                program, storages, solver, logbooks, parameter_values={}, checkpoint_frequency=2, checkpoint=None):
+                program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+        if parameter_values is None:
+            parameter_values = {}
         if self.is_root():
             print("Running NSGA-III Genetic Programming", flush=True)
-        self._init_multi_objective_toolbox(pset)
+        self._init_multi_objective_toolbox()
         H = mu_
         reference_points = tools.uniform_reference_points(2, H)
         if H % 4 > 0:
@@ -793,12 +799,11 @@ class Optimizer:
                                       program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
-                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, es_generations=200,
-                                  required_convergence=0.9,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5,
                                   restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
-                                  optimize_relaxation_factors=True,
-                                  parameter_values={}):
-
+                                  parameter_values=None):
+        if parameter_values is None:
+            parameter_values = {}
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
@@ -859,7 +864,7 @@ class Optimizer:
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
 
-            self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
+            self.program_generator.initialize_code_generation(self.min_level, self.max_level)
             if optimization_method is None:
                 optimization_method = self.NSGAII
             self.clear_individual_cache()

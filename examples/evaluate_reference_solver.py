@@ -1,9 +1,8 @@
 import subprocess
-import shutil
-import numpy as np
 import os
-def main():
 
+
+def main():
     dir_name = 'LinearElasticity'
     problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
