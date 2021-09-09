@@ -666,8 +666,8 @@ class Optimizer:
                 for ind in offspring:
                     if not self.individual_in_cache(ind):
                         self.add_individual_to_cache(ind, ind.fitness.values)
-            if self.is_root():
-                print("Average evaluation time:", self.total_evaluation_time / self._total_number_of_evaluations, flush=True)
+            # if self.is_root():
+            #     print("Average evaluation time:", self.total_evaluation_time / self._total_number_of_evaluations, flush=True)
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
@@ -705,21 +705,29 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+             program, storages, solver, logbooks, model_based_estimation=False, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if parameter_values is None:
             parameter_values = {}
+        elif model_based_estimation and self.is_root():
+            print("Warning: Parametrization not supported in model-based estimation")
         if self.is_root():
-            print("Running Single-Objective Genetic Programming", flush=True)
+            msg = "Running Single-Objective Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with model-based estimation")
+            else:
+                print(msg, "with code generation-based evaluation")
         self._init_single_objective_toolbox()
         self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
-        # self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
-        initial_parameter_values = {}
-        for key, values in parameter_values.items():
-            initial_parameter_values[key] = values[0]
-        self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level, solver_program=program,
-                               parameter_values=initial_parameter_values)
+        if model_based_estimation:
+            self._toolbox.register('evaluate', self.estimate_single_objective, pset=pset)
+        else:
+            initial_parameter_values = {}
+            for key, values in parameter_values.items():
+                initial_parameter_values[key] = values[0]
+            self._toolbox.register('evaluate', self.evaluate_single_objective, pset=pset,
+                                   storages=storages, min_level=min_level, max_level=max_level, solver_program=program,
+                                   parameter_values=initial_parameter_values)
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_size = tools.Statistics(len)
@@ -732,11 +740,18 @@ class Optimizer:
 
     def NSGAII(self, pset, initial_population_size, generations, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+               program, storages, solver, logbooks, model_based_estimation=False, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+
         if parameter_values is None:
             parameter_values = {}
+        elif model_based_estimation and self.is_root():
+            print("Warning: Parametrization not supported in model-based estimation")
         if self.is_root():
-            print("Running NSGA-II Genetic Programming", flush=True)
+            msg = "Running NSGA-II Multi-Objective Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with model-based estimation")
+            else:
+                print(msg, "with code generation-based evaluation")
         self._init_multi_objective_toolbox()
         self._toolbox.register("select", tools.selNSGA2)
 
@@ -746,13 +761,15 @@ class Optimizer:
             return tools.selTournamentDCD(individuals, k)
 
         self._toolbox.register("select_for_mating", select_for_mating)
-        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
-        initial_parameter_values = {}
-        for key, values in parameter_values.items():
-            initial_parameter_values[key] = values[0]
-        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program, parameter_values=initial_parameter_values)
+        if model_based_estimation:
+            self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        else:
+            initial_parameter_values = {}
+            for key, values in parameter_values.items():
+                initial_parameter_values[key] = values[0]
+            self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
+                                   storages=storages, min_level=min_level, max_level=max_level,
+                                   solver_program=program, parameter_values=initial_parameter_values)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -767,11 +784,19 @@ class Optimizer:
 
     def NSGAIII(self, pset, initial_population_size, generations, mu_, lambda_,
                 crossover_probability, mutation_probability, min_level, max_level,
-                program, storages, solver, logbooks, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+                program, storages, solver, logbooks, model_based_estimation=False, parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if parameter_values is None:
             parameter_values = {}
+        elif model_based_estimation and self.is_root():
+            print("Warning: Parametrization not supported in model-based estimation")
+
         if self.is_root():
-            print("Running NSGA-III Genetic Programming", flush=True)
+            msg = "Running NSGA-III Multi-Objective Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with model-based estimation")
+            else:
+                print(msg, "with code generation-based evaluation")
+
         self._init_multi_objective_toolbox()
         H = mu_
         reference_points = tools.uniform_reference_points(2, H)
@@ -779,13 +804,15 @@ class Optimizer:
             mu_ = H + (4 - H % 4)
         self._toolbox.register("select", tools.selNSGA3, ref_points=reference_points)
         self._toolbox.register("select_for_mating", tools.selRandom)
-        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
-        initial_parameter_values = {}
-        for key, values in parameter_values.items():
-            initial_parameter_values[key] = values[0]
-        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program, parameter_values=initial_parameter_values)
+        if model_based_estimation:
+            self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
+        else:
+            initial_parameter_values = {}
+            for key, values in parameter_values.items():
+                initial_parameter_values[key] = values[0]
+            self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
+                                   storages=storages, min_level=min_level, max_level=max_level,
+                                   solver_program=program, parameter_values=initial_parameter_values)
 
         stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
@@ -799,11 +826,9 @@ class Optimizer:
                                       program, solver, logbooks, parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
     def evolutionary_optimization(self, levels_per_run=2, gp_mu=100, gp_lambda=100, gp_generations=100,
-                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5,
+                                  gp_crossover_probability=0.5, gp_mutation_probability=0.5, initialization_factor=1,
                                   restart_from_checkpoint=False, maximum_block_size=8, optimization_method=None,
-                                  parameter_values=None):
-        if parameter_values is None:
-            parameter_values = {}
+                                  model_based_estimation=False, parameter_values=None):
         levels = self.max_level - self.min_level
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
@@ -840,16 +865,21 @@ class Optimizer:
                     continue
             approximation = approximations[i]
 
-            if self.convergence_evaluator is not None:
+            if model_based_estimation:
                 self.convergence_evaluator.reinitialize_lfa_grids(approximation.grid)
-            if i > 0 and self.performance_evaluator is not None:
+            if model_based_estimation and i > 0 and self.performance_evaluator is not None:
                 self.performance_evaluator.set_runtime_of_coarse_grid_solver(0.0)
 
             rhs = right_hand_sides[i]
+            enable_partitioning = True
+            if model_based_estimation:
+                print("Warning: Smoother partitioning not supported with model-based estimation")
+                enable_partitioning = False
             pset, terminal_list = \
                 multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
                                                                 self.coarsening_factors, max_level, self.equations,
                                                                 self.operators, self.fields,
+                                                                enable_partitioning=enable_partitioning,
                                                                 maximum_block_size=maximum_block_size,
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
@@ -858,7 +888,6 @@ class Optimizer:
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initialization_factor = 1
             initial_population_size = initialization_factor * gp_mu
 
             self.program_generator._counter = 0
@@ -875,13 +904,11 @@ class Optimizer:
                 else:
                     return convergence_factor * math.sqrt(self.infinity) * execution_time
 
-            # def estimate_execution_time(number_of_iterations, execution_time):
-            #     return number_of_iterations * execution_time
-
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
                 optimization_method(pset, initial_population_size, gp_generations, gp_mu, gp_lambda,
                                     gp_crossover_probability, gp_mutation_probability,
-                                    min_level, max_level, solver_program, storages, best_expression, logbooks, parameter_values=parameter_values,
+                                    min_level, max_level, solver_program, storages, best_expression, logbooks,
+                                    model_based_estimation=model_based_estimation, parameter_values=parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)
             if len(pop[0].fitness.values) == 2:
                 pop = sorted(pop, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))

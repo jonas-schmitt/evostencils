@@ -336,7 +336,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
                            maximum_block_size=2, relaxation_factor_samples=37,
-                           coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
+                           coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
@@ -358,7 +358,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS, types.Finished))
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
-    pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+    if enable_partitioning:
+        pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
 
     for i in range(0, relaxation_factor_samples):
         pset.addTerminal(i, TypeWrapper(int))

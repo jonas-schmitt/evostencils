@@ -1,6 +1,6 @@
 from evostencils.optimization.program import Optimizer
-# from evostencils.evaluation.convergence import ConvergenceEvaluator
-# from evostencils.evaluation.performance import PerformanceEvaluator
+from evostencils.evaluation.convergence import ConvergenceEvaluator
+from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 # import lfa_lab
@@ -81,13 +81,19 @@ def main():
     infinity = 1e100
     epsilon = 1e-12
     problem_name = program_generator.problem_name
-
+    convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
+    peak_flops = 16 * 6 * 2.6 * 1e9
+    peak_bandwidth = 45.8 * 1e9
+    bytes_per_word = 8
+    performance_evaluator = PerformanceEvaluator(peak_flops, peak_bandwidth, bytes_per_word)
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
         os.makedirs(f'{cwd}/{problem_name}')
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
     optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
                           mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=nprocs,
                           program_generator=program_generator,
+                          convergence_evaluator=convergence_evaluator,
+                          performance_evaluator=performance_evaluator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
     # restart_from_checkpoint = True
@@ -108,17 +114,20 @@ def main():
 
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    parameter_values = {}
+    parameter_values = None
     # Optional: If needed supply additional parameters to the optimization
     # values = [80.0 * 2.0**i for i in range(100)]
     # parameter_values = {'k' : values}
+    # Use model based estimation instead of code generation and evaluation
+    model_based_estimation = True
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=32, gp_lambda=32,
+                                                                     gp_mu=16, gp_lambda=16,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
                                                                      gp_generations=50,
                                                                      maximum_block_size=maximum_block_size,
+                                                                     model_based_estimation=model_based_estimation,
                                                                      parameter_values=parameter_values,
                                                                      restart_from_checkpoint=restart_from_checkpoint)
 
