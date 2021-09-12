@@ -1,7 +1,7 @@
 import os
 
 from evostencils.expressions import base, system
-from evostencils.expressions.reference_cycles import generate_v_22_cycle_two_grid, generate_FAS_v_22_cycle_two_grid
+from evostencils.expressions.reference_cycles import generate_v_22_cycle_three_grid, generate_FAS_v_22_cycle_two_grid, generate_v_22_cycle_two_grid, generate_FAS_v_22_cycle_three_grid
 from evostencils.initialization.multigrid import Terminals, generate_primitive_set
 from evostencils.expressions.base import Grid, sub
 from evostencils.expressions.base import Operator as baseOperator
@@ -11,44 +11,52 @@ from evostencils.expressions.base import RightHandSide as baseRHS
 from evostencils.expressions.system import RightHandSide, ZeroApproximation, Operator, Restriction, Prolongation, get_coarse_grid, get_coarse_operator
 from evostencils.stencils.gallery import Poisson2D
 from evostencils.types import level_control
-from examples.plot_computational_graph import viz, save
+from examples.plot_computational_graph import create_graph, save_graph
 from evostencils.code_generation.exastencils import ProgramGenerator
+from plot_computational_graph import get_sub, get_super
 
-
-
-generate = "PrimitiveSet"
+generate = "GraphRepresentation"
 
 if generate == "GraphRepresentation":
     fg = [Grid([8, 8], [1.0 / 8, 1.0 / 8], 3)]
+    coarsening_factor = [(2, 2)]
+    cg = get_coarse_grid(fg, coarsening_factor)
+    ccg = get_coarse_grid(cg, coarsening_factor)
     approximation = ZeroApproximation(fg, 'u')
+    approximation_c = ZeroApproximation(cg, 'u')
+
     entries = [[baseOperator('A', g, Poisson2D()) for g in fg] for _ in fg]
     operator = Operator('A', entries)
     dimension = 2
-    coarsening_factor = [(2, 2)]
-    cg = get_coarse_grid(fg, coarsening_factor)
     coarse_operator = get_coarse_operator(operator, cg)
+    cc_operator = get_coarse_operator(operator, ccg)
     list_restriction_operators = [baseRestriction('I_h_2h', g, gc, baseOperator('A', g, Poisson2D()).stencil_generator)  # Omit stencil generator for now
                                   for g, gc in zip(fg, cg)]
     list_prolongation_operators = [baseProlongation('I_2h_h', g, gc, baseOperator('A', g, Poisson2D()).stencil_generator)
                                    for g, gc in zip(fg, cg)]
-    restriction = Restriction('I_h_2h', list_restriction_operators)
-    prolongation = Prolongation('I_2h_h', list_prolongation_operators)
+    restriction = Restriction(f'I{get_sub("a")}{get_super("2a")}', list_restriction_operators)
+    prolongation = Prolongation(f'I{get_sub("2a")}{get_super("a")}', list_prolongation_operators)
+    list_restriction_operators_c = [baseRestriction('I_2h_4h', g, gc, baseOperator('A', g, Poisson2D()).stencil_generator)  # Omit stencil generator for now
+                                    for g, gc in zip(cg, ccg)]
+    list_prolongation_operators_c = [baseProlongation('I_4h_2h', g, gc, baseOperator('A', g, Poisson2D()).stencil_generator)
+                                     for g, gc in zip(cg, ccg)]
+    restriction_c = Restriction(f'I{get_sub("2a")}{get_super("4a")}', list_restriction_operators_c)
+    prolongation_c = Prolongation(f'I{get_sub("4a")}{get_super("2a")}', list_prolongation_operators_c)
     terminals_fine_level = Terminals(approximation, dimension, coarsening_factor, operator, coarse_operator, restriction, prolongation)
+    terminals_coarse = Terminals(approximation_c, dimension, coarsening_factor, coarse_operator, cc_operator, restriction_c, prolongation_c)
     rhs = RightHandSide('f', [baseRHS('f', g) for g in fg])
 
-    U1 = generate_v_22_cycle_two_grid(terminals_fine_level, rhs)
+    U1 = generate_FAS_v_22_cycle_three_grid(terminals_fine_level, terminals_coarse, rhs)  # terminals_coarse, rhs)
     U2 = generate_FAS_v_22_cycle_two_grid(terminals_fine_level, rhs)
-
     print(U1)
     print(U1.correction)
     print(U1.approximation)
-    node = 0
-    # viz(node, U1)
-    save()
+    create_graph(U1)
+    save_graph()
 elif generate == "PrimitiveSet":
 
     # ExaStencils configuration
-    #dir_name = 'Helmholtz'
+    # dir_name = 'Helmholtz'
     dir_name = 'LinearElasticity'
     problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
@@ -82,4 +90,4 @@ elif generate == "PrimitiveSet":
                                                  LevelFinishedType=level_control.generate_finished_type(),
                                                  LevelNotFinishedType=level_control.generate_not_finished_type())
 
-    print("completed")
+print("completed")
