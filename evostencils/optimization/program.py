@@ -336,7 +336,11 @@ class Optimizer:
             self.add_individual_to_cache(individual, values)
             return values
         else:
-            if spectral_radius < 1:
+            if self.performance_evaluator is None:
+                values = spectral_radius,
+                self.add_individual_to_cache(individual, values)
+                return values
+            elif spectral_radius < 1:
                 runtime = self.performance_evaluator.estimate_runtime(expression) * 1e3
                 values = math.log(self.epsilon) / math.log(spectral_radius) * runtime,
                 self.add_individual_to_cache(individual, values)
@@ -930,6 +934,16 @@ class Optimizer:
                         print(f'\nExecution time until convergence: {individual.fitness.values[0]}', flush=True)
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
+
+            expression, _ = self.compile_individual(best_individual, pset)
+            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
+                                                                            self.max_level)
+            if self.is_root() and min_level == self.min_level:
+                average_runtime, average_convergence_factor, average_number_of_iterations = \
+                    self.program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program)
+                print(f'\nMeasurements for best individual - solving time: {average_runtime}, convergence factor: {average_convergence_factor}, '
+                      f'number of iterations: {average_number_of_iterations}')
+            solver_program += cycle_function
             self.barrier()
 
         self.barrier()

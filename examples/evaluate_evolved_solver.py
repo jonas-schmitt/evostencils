@@ -5,11 +5,11 @@ import os
 
 def main():
     # TODO adapt to actual path to exastencils project
-    dir_name = 'LinearElasticity'
+    dir_name = 'Poisson'
     problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
-    compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils-meggie/Examples'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
 
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'

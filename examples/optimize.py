@@ -65,8 +65,18 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
+
+    model_based_estimation = False
+    use_jacobi_prefix = True
+    # Experimental and not recommended:
+    # Use model based estimation instead of code generation and evaluation
+    # model_based_estimation = True
+    if model_based_estimation:
+        # LFA based estimation inaccurate with jacobi prefix
+        use_jacobi_prefix = False
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
-                                         cycle_name=cycle_name, solver_iteration_limit=100)
+                                         cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
+                                         solver_iteration_limit=100)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -99,6 +109,7 @@ def main():
     # restart_from_checkpoint = True
     restart_from_checkpoint = False
     levels_per_run = max_level - min_level
+    # levels_per_run = 1
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     maximum_block_size = 8
     optimization_method = optimizer.NSGAII
@@ -118,14 +129,12 @@ def main():
     # Optional: If needed supply additional parameters to the optimization
     # values = [80.0 * 2.0**i for i in range(100)]
     # parameter_values = {'k' : values}
-    # Use model based estimation instead of code generation and evaluation
-    model_based_estimation = True
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      levels_per_run=levels_per_run,
-                                                                     gp_mu=16, gp_lambda=16,
+                                                                     gp_mu=8, gp_lambda=8,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=50,
+                                                                     gp_generations=10,
                                                                      maximum_block_size=maximum_block_size,
                                                                      model_based_estimation=model_based_estimation,
                                                                      parameter_values=parameter_values,

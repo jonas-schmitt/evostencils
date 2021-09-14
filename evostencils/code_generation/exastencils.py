@@ -39,7 +39,7 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
-            mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle",
+            mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle", use_jacobi_prefix=True,
             evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120, solver_iteration_limit=None):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
@@ -61,6 +61,7 @@ class ProgramGenerator:
         self._mpi_rank = mpi_rank
         self._platform = platform
         self._cycle_name = cycle_name
+        self._use_jacobi_prefix = use_jacobi_prefix
         self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.knowledge'
         self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.settings'
         self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.exa3'
@@ -471,46 +472,14 @@ class ProgramGenerator:
         except subprocess.TimeoutExpired:
             return infinity_result
 
-    def generate_and_evaluate_list_of_expressions(self, list_of_expression: [base.Expression], storages: List[CycleStorage],
-                                                  min_level: int, max_level: int, solver_program: str, infinity=1e100,
-                                                  number_of_samples=1, global_variable_values=None):
+    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values=None):
         if global_variable_values is None:
             global_variable_values = {}
         # print("Generate and evaluate", flush=True)
-        n = len(list_of_expression)
-        for i, expression in enumerate(list_of_expression):
-            j = i+1
-            for k in range(1, 5):
-                src = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}.exa{k}'
-                dest = f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa{k}'
-                if os.path.exists(src):
-                    shutil.copyfile(src, dest)
-
-            cycle_function = self.generate_cycle_function(expression[0], storages, min_level, max_level, self.max_level)
-            self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
-            shutil.copyfile(f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{self.mpi_rank}.exa3',
-                            f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.exa3')
-            shutil.copyfile(f'{self.base_path}/{self.knowledge_path_generated}', f'{self.base_path}/{self._base_path_prefix}/{self.problem_name}_{j}.knowledge')
-            self.generate_adapted_settings_file(f'{self.problem_name}_{j}', output_file_path=f'{self._base_path_prefix}/{self.problem_name}_{j}.settings')
-
-        cwd = os.getcwd()
-        subprocess.run(['mpiexec', '--map-by', 'ppr:1:core', '--bind-to', 'core', 'python',
-                        f'{cwd}/evostencils/code_generation/generate_and_compile.py',
-                        str(n), self.absolute_compiler_path, self.base_path,
-                        self._base_path_prefix, self.problem_name, self.platform],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        results = []
-        for i in range(1, n + 1):
-            path_to_executable = f'generated/{self.problem_name}_{i}'
-            result = self.evaluate(path_to_executable, infinity, number_of_samples, with_mpi=True)
-            results.append(result)
-        return results
-
-    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values=None):
-        # print("Generate and evaluate", flush=True)
         cycle_function = self.generate_cycle_function(expression, storages, min_level, max_level, self.max_level)
-        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function, global_variable_values=global_variable_values)
+        self.generate_l3_file(min_level, self.max_level, solver_program + cycle_function,
+                              global_variable_values=global_variable_values)
         try:
             start_time = time.time()
             returncode = self.run_exastencils_compiler(knowledge_path=self.knowledge_path_generated,
@@ -798,7 +767,10 @@ class ProgramGenerator:
                             independent_equations.clear()
                         for key, value in independent_equations:
                             coloring = False
-                            jacobi_prefix = "with jacobi "
+                            if self._use_jacobi_prefix:
+                                jacobi_prefix = "with jacobi "
+                            else:
+                                jacobi_prefix = ""
                             indentation = ''
                             if expression.partitioning != part.Single:
                                 coloring = True
@@ -816,7 +788,10 @@ class ProgramGenerator:
                                 program += '\t}\n'
 
                         coloring = False
-                        jacobi_prefix = "with jacobi "
+                        if self._use_jacobi_prefix:
+                            jacobi_prefix = "with jacobi "
+                        else:
+                            jacobi_prefix = ""
                         indentation = ''
                         if len(dependent_equations) > 0:
                             if expression.partitioning != part.Single:
