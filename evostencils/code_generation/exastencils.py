@@ -404,12 +404,12 @@ class ProgramGenerator:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=self.timeout_c_compiler)
         return result.returncode
 
-    def evaluate(self, executable_path, infinity=1e100, number_of_samples=3, with_mpi=False):
+    def evaluate(self, executable_path, infinity=1e100, evaluation_samples=3, with_mpi=False):
         # print("Evaluate", flush=True)
         total_time = 0
         sum_of_convergence_factors = 0
         total_number_of_iterations = 0
-        for i in range(number_of_samples):
+        for i in range(evaluation_samples):
             try:
                 if with_mpi:
                     result = subprocess.run(["mpiexec", "--map-by", "ppr:1:core", "--bind-to", "core", f'{self.base_path}/{executable_path}/exastencils'],
@@ -430,7 +430,7 @@ class ProgramGenerator:
             total_time += time_to_solution
             sum_of_convergence_factors += convergence_factor
             total_number_of_iterations += number_of_iterations
-        return total_time / number_of_samples, sum_of_convergence_factors / number_of_samples, total_number_of_iterations / number_of_samples
+        return total_time / evaluation_samples, sum_of_convergence_factors / evaluation_samples, total_number_of_iterations / evaluation_samples
 
     def initialize_code_generation(self, min_level: int, max_level: int):
         knowledge_path = self.generate_level_adapted_knowledge_file(min_level, max_level)
@@ -455,7 +455,7 @@ class ProgramGenerator:
         shutil.copyfile(debug_l3_path, l3_path)
         return output_path_generated
 
-    def compile_and_run(self, mapping=None, infinity=1e100, number_of_samples=3):
+    def compile_and_run(self, mapping=None, infinity=1e100, evaluation_samples=3):
         infinity_result = infinity, infinity, infinity
         try:
             if mapping is not None:
@@ -467,13 +467,13 @@ class ProgramGenerator:
             return infinity_result
         try:
             runtime, convergence_factor, number_of_iterations = self.evaluate(self._output_path_generated, infinity,
-                                                                              number_of_samples)
+                                                                              evaluation_samples)
             return runtime, convergence_factor, number_of_iterations
         except subprocess.TimeoutExpired:
             return infinity_result
 
     def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
-                              max_level: int, solver_program: str, infinity=1e100, number_of_samples=3, global_variable_values=None):
+                              max_level: int, solver_program: str, infinity=1e100, evaluation_samples=3, global_variable_values=None):
         if global_variable_values is None:
             global_variable_values = {}
         # print("Generate and evaluate", flush=True)
@@ -512,7 +512,7 @@ class ProgramGenerator:
 
         for i in range(n):
             runtime, convergence_factor, number_of_iterations = \
-                self.compile_and_run(mapping=mapping, number_of_samples=number_of_samples, infinity=infinity)
+                self.compile_and_run(mapping=mapping, evaluation_samples=evaluation_samples, infinity=infinity)
             average_runtime += runtime
             average_convergence_factor += convergence_factor
             average_number_of_iterations += number_of_iterations

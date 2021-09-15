@@ -1,14 +1,8 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.evaluation.convergence import ConvergenceEvaluator
-from evostencils.evaluation.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-# import lfa_lab
 import sys
-# import dill
 from mpi4py import MPI
-# MPI.pickle.__init__(dill.dumps, dill.loads)
-
 
 def main():
 
@@ -17,43 +11,21 @@ def main():
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/example_problems'
-
-    # 2D Finite difference discretized Poisson
+    # Example problem from L2
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    cycle_name = "gen_mgCycle"
+    pde_parameter_values = None
+    solver_iteration_limit = 500
 
-    # 3D Finite difference discretized Poisson
-    # settings_path = f'Poisson/3D_FD_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FD_Poisson_fromL2.knowledge'
-
-    # 2D Finite volume discretized Poisson
-    # settings_path = f'Poisson/2D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/2D_FV_Poisson_fromL2.knowledge'
-
-    # 3D Finite volume discretized Poisson
-    # settings_path = f'Poisson/3D_FV_Poisson_fromL2.settings'
-    # knowledge_path = f'Poisson/3D_FV_Poisson_fromL2.knowledge'
-
-    # 2D Finite difference discretized Bi-Harmonic Equation
-    # settings_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.settings'
-    # knowledge_path = f'BiHarmonic/2D_FD_BiHarmonic_fromL2.knowledge'
-
-    # 2D Finite volume discretized Stokes
-    # settings_path = f'Stokes/2D_FD_Stokes_fromL2.settings'
-    # knowledge_path = f'Stokes/2D_FD_Stokes_fromL2.knowledge'
-
-    # 2D Finite difference discretized linear elasticity
-    # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
-    # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
-
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL2.knowledge'
-
+    # Example problem from L3
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     # cycle_name = "mgCycle"
+    # values = [80.0 * 2.0**i for i in range(100)]
+    # pde_parameter_values = {'k': values}
+    # solver_iteration_limit = 10000
 
-    cycle_name = "gen_mgCycle"
 
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
@@ -76,7 +48,7 @@ def main():
         use_jacobi_prefix = False
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, mpi_rank,
                                          cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
-                                         solver_iteration_limit=100)
+                                         solver_iteration_limit=solver_iteration_limit)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -87,15 +59,19 @@ def main():
     equations = program_generator.equations
     operators = program_generator.operators
     fields = program_generator.fields
-
     infinity = 1e100
     epsilon = 1e-12
     problem_name = program_generator.problem_name
-    convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
-    peak_flops = 16 * 6 * 2.6 * 1e9
-    peak_bandwidth = 45.8 * 1e9
-    bytes_per_word = 8
-    performance_evaluator = PerformanceEvaluator(peak_flops, peak_bandwidth, bytes_per_word)
+    convergence_evaluator = None
+    performance_evaluator = None
+    if model_based_estimation:
+        from evostencils.evaluation.convergence import ConvergenceEvaluator
+        from evostencils.evaluation.performance import PerformanceEvaluator
+        convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
+        peak_flops = 16 * 6 * 2.6 * 1e9
+        peak_bandwidth = 45.8 * 1e9
+        bytes_per_word = 8
+        performance_evaluator = PerformanceEvaluator(peak_flops, peak_bandwidth, bytes_per_word)
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
         os.makedirs(f'{cwd}/{problem_name}')
     checkpoint_directory_path = f'{cwd}/{problem_name}/checkpoints_{mpi_rank}'
@@ -106,10 +82,9 @@ def main():
                           performance_evaluator=performance_evaluator,
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
 
-    # restart_from_checkpoint = True
-    restart_from_checkpoint = False
     levels_per_run = max_level - min_level
-    # levels_per_run = 1
+    if model_based_estimation:
+        levels_per_run = 1
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     maximum_block_size = 8
     optimization_method = optimizer.NSGAII
@@ -123,21 +98,28 @@ def main():
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
 
+
+    gp_mu = 16
+    gp_lambda = 16
+    gp_generations = 50
+    population_initialization_factor = 1
+    generalization_interval = 50
     crossover_probability = 2.0/3.0
     mutation_probability = 1.0 - crossover_probability
-    parameter_values = None
-    # Optional: If needed supply additional parameters to the optimization
-    # values = [80.0 * 2.0**i for i in range(100)]
-    # parameter_values = {'k' : values}
+    evaluation_samples = 3
+    restart_from_checkpoint = False
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
-                                                                     levels_per_run=levels_per_run,
-                                                                     gp_mu=8, gp_lambda=8,
+                                                                     gp_mu=gp_mu, gp_lambda=gp_lambda,
+                                                                     population_initialization_factor=population_initialization_factor,
+                                                                     gp_generations=gp_generations,
+                                                                     generalization_interval=generalization_interval,
                                                                      gp_crossover_probability=crossover_probability,
                                                                      gp_mutation_probability=mutation_probability,
-                                                                     gp_generations=10,
+                                                                     levels_per_run=levels_per_run,
+                                                                     evaluation_samples=evaluation_samples,
                                                                      maximum_block_size=maximum_block_size,
                                                                      model_based_estimation=model_based_estimation,
-                                                                     parameter_values=parameter_values,
+                                                                     pde_parameter_values=pde_parameter_values,
                                                                      restart_from_checkpoint=restart_from_checkpoint)
 
     if mpi_rank == 0:

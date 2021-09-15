@@ -11,7 +11,8 @@ def stencil_to_lfa(stencil: periodic.Stencil, grid: base.Grid):
     def recursive_descent(array, dimension):
         if dimension == 1:
             # TODO fix this
-            return [lfa_lab.SparseStencil(element.entries) for element in array]
+            return [lfa_lab.SparseStencil([(offset, complex(value)) for offset, value in element.entries])
+                    for element in array]
         else:
             return [recursive_descent(element, dimension - 1) for element in array]
 

@@ -21,9 +21,22 @@ pip install deap sympy mpi4py
 source ./setup.sh
 ```
 ## Running
-An example script for running an optimization can be found in the examples folder.
+An example script for running an optimization can be found in the scripts folder.
 
 ## Publications
+```
+@Article{evostencils2021,
+  author={Schmitt, Jonas and Kuckuk, Sebastian and K{\"o}stler, Harald},
+  title={EvoStencils: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
+  journal={Genetic Programming and Evolvable Machines},
+  year={2021},
+  month={Sep},
+  day={03},
+  issn={1573-7632},
+  doi={10.1007/s10710-021-09412-w},
+  url={https://doi.org/10.1007/s10710-021-09412-w}
+}
+```
 ```
 @inproceedings{evostencils2020,
   author = {Schmitt, Jonas and Kuckuk, Sebastian and K\"{o}stler, Harald},
