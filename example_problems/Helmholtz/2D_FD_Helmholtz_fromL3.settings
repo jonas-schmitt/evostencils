@@ -1,0 +1,21 @@
+user                = "Guest"
+
+configName          = "2D_FD_Helmholtz_fromL3"
+
+basePathPrefix      = "./Helmholtz/"
+
+l3file              = "$configName$.exa3"
+l4file              = "$configName$.exa4"
+
+debugL1File         = "../Debug/$configName$_debug.exa1"
+debugL2File         = "../Debug/$configName$_debug.exa2"
+debugL3File         = "../Debug/$configName$_debug.exa3"
+debugL4File         = "../Debug/$configName$_debug.exa4"
+
+htmlLogFile         = "../Debug/$configName$_log.html"
+outputPath          = "../generated/$configName$/"
+
+produceHtmlLog      = true
+timeStrategies      = true
+
+buildfileGenerators = { "MakefileGenerator" }

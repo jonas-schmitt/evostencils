@@ -16,7 +16,7 @@ def main():
 
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils/Examples'
+    base_path = f'{cwd}/example_problems'
 
     # 2D Finite difference discretized Poisson
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'

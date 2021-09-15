@@ -1,0 +1,24 @@
+
+Domain global< [ 0, 0, 0 ] to [ 1, 1, 1 ] >
+
+Field u with Real on Node of global = 0.0
+
+Field u@finest on boundary = vf_boundaryCoord_x * vf_boundaryCoord_x - 0.5 * vf_boundaryCoord_y * vf_boundaryCoord_y - 0.5 * vf_boundaryCoord_z * vf_boundaryCoord_z
+Field u@(all but finest) on boundary = 0.0
+
+Field RHS_u with Real on Node of global = 0.0
+
+Operator Laplace from Stencil {
+  [ 0,  0,  0] =>  2.0 / ( vf_gridWidth_x ** 2 ) + 2.0 / ( vf_gridWidth_y ** 2 ) + 2.0 / ( vf_gridWidth_z ** 2 )
+  [-1,  0,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 1,  0,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 0, -1,  0] => -1.0 / ( vf_gridWidth_y ** 2 )
+  [ 0,  1,  0] => -1.0 / ( vf_gridWidth_y ** 2 )
+  [ 0,  0, -1] => -1.0 / ( vf_gridWidth_z ** 2 )
+  [ 0,  0,  1] => -1.0 / ( vf_gridWidth_z ** 2 )
+}
+
+Equation solEq {
+  Laplace * u == RHS_u
+}
+

@@ -1,0 +1,55 @@
+
+global< [ 0, 0 ] to [ 1, 1 ] >
+
+u with Real on Node of global = 0.0
+u on boundary = 0.0
+v with Real on Node of global = 0.0
+v on boundary = 4e-1 * sin ( PI * vf_boundaryPos_x ) * ( 1.0 - vf_boundaryPos_x ) * vf_boundaryPos_x * vf_boundaryPos_y
+RHS_u with Real on Node of global = 0.0
+RHS_v with Real on Node of global = 0.0
+
+dxx from Stencil {
+  [ 0,  0] => -2.0 / ( ( vf_gridWidth_x ) ** 2 )
+  [-1,  0] =>  1.0 / ( ( vf_gridWidth_x ) ** 2 )
+  [ 1,  0] =>  1.0 / ( ( vf_gridWidth_x ) ** 2 )
+}
+
+dyy from Stencil {
+  [ 0,  0] => -2.0 / ( ( vf_gridWidth_y ) ** 2 )
+  [ 0, -1] =>  1.0 / ( ( vf_gridWidth_y ) ** 2 )
+  [ 0,  1] =>  1.0 / ( ( vf_gridWidth_y ) ** 2 )
+}
+
+Laplace from Stencil {
+  [ 0,  0] => -2.0 / ( ( vf_gridWidth_x ) ** 2 ) - 2.0 / ( ( vf_gridWidth_y  ) ** 2 )
+  [-1,  0] =>  1.0 / ( ( vf_gridWidth_x ) ** 2 )
+  [ 1,  0] =>  1.0 / ( ( vf_gridWidth_x ) ** 2 )
+  [ 0, -1] =>  1.0 / ( ( vf_gridWidth_y ) ** 2 )
+  [ 0,  1] =>  1.0 / ( ( vf_gridWidth_y ) ** 2 )
+}
+
+dxy from Stencil {
+  [-1,  1] => -1.0 / ( 4 * ( vf_gridWidth_x ) * ( vf_gridWidth_y ) )
+  [ 1,  1] =>  1.0 / ( 4 * ( vf_gridWidth_x ) * ( vf_gridWidth_y ) )
+  [-1, -1] =>  1.0 / ( 4 * ( vf_gridWidth_x ) * ( vf_gridWidth_y ) )
+  [ 1, -1] => -1.0 / ( 4 * ( vf_gridWidth_x ) * ( vf_gridWidth_y ) )
+}
+
+/*dxy from Stencil {
+  [ 0,  1] => -1.0 / ( ( vf_nodePos_x@[1, 0] - vf_nodePos_x@[0, 0] ) * ( vf_nodePos_y@[0, 1] - vf_nodePos_y@[0, 0] ) )
+  [ 1,  1] =>  1.0 / ( ( vf_nodePos_x@[1, 0] - vf_nodePos_x@[0, 0] ) * ( vf_nodePos_y@[0, 1] - vf_nodePos_y@[0, 0] ) )
+  [ 0,  0] =>  1.0 / ( ( vf_nodePos_x@[1, 0] - vf_nodePos_x@[0, 0] ) * ( vf_nodePos_y@[0, 1] - vf_nodePos_y@[0, 0] ) )
+  [ 1,  0] => -1.0 / ( ( vf_nodePos_x@[1, 0] - vf_nodePos_x@[0, 0] ) * ( vf_nodePos_y@[0, 1] - vf_nodePos_y@[0, 0] ) )
+}*/
+
+uEq {
+  ( lambda + mu ) * ( dxx * u + dxy * v ) + lambda * Laplace * u == RHS_u
+}
+vEq {
+  ( lambda + mu ) * ( dxy * u + dyy * v ) + lambda * Laplace * v == RHS_v
+}
+
+Globals {
+  Expr lambda = 195.0
+  Expr mu     = 130.0
+}
