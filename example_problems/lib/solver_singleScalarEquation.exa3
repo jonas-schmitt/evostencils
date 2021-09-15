@@ -1,0 +1,15 @@
+
+generate solver for Solution in solEq with {
+  solver_targetResReduction     = 1e-6
+  solver_maxNumIts              = 100
+  
+  solver_smoother_jacobiType    = false
+  solver_smoother_numPre        = 3
+  solver_smoother_numPost       = 3
+  solver_smoother_damping       = 0.8
+  solver_smoother_coloring      = "red-black"
+  
+  solver_cgs                    = "CG"
+  solver_cgs_maxNumIts          = 128
+  solver_cgs_targetResReduction = 1e-3
+}
