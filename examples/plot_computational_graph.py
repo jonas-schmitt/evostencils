@@ -32,7 +32,7 @@ def getoperatorsymbol(name: str):
 def getapproxsymbol(approximation):
     lvl = str(approximation.grid[0].level)
     itr = 0
-    while type(approximation).__name__ != "ZeroApproximation":
+    while "Approximation" not in type(approximation).__name__:
         approximation = approximation.approximation
         itr += 1
 
