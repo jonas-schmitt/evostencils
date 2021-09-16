@@ -42,7 +42,7 @@ def main():
     use_jacobi_prefix = True
     # Experimental and not recommended:
     # Use model based estimation instead of code generation and evaluation
-    # model_based_estimation = True
+    model_based_estimation = True
     if model_based_estimation:
         # LFA based estimation inaccurate with jacobi prefix
         use_jacobi_prefix = False
@@ -94,7 +94,7 @@ def main():
             optimization_method = optimizer.NSGAIII
         elif sys.argv[1].upper() == "SOGP":
             optimization_method = optimizer.SOGP
-    random_search = True
+    use_random_search = True
     mu_ = 16
     lambda_ = 16
     generations = 50
@@ -104,10 +104,10 @@ def main():
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1
     evaluation_samples = 3
-    maximum_block_size = 8
+    maximum_block_size = 4
     restart_from_checkpoint = False
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
-                                                                     random_search=random_search,
+                                                                     use_random_search=use_random_search,
                                                                      mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
                                                                      generations=generations,
