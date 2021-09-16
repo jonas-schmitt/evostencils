@@ -94,9 +94,7 @@ def main():
             optimization_method = optimizer.NSGAIII
         elif sys.argv[1].upper() == "SOGP":
             optimization_method = optimizer.SOGP
-        elif sys.argv[1].upper() == "RANDOM":
-            optimization_method = optimizer.multi_objective_random_search
-
+    use_random_search = False
     mu_ = 16
     lambda_ = 16
     generations = 50
@@ -106,9 +104,10 @@ def main():
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1
     evaluation_samples = 3
-    maximum_block_size = 8
+    maximum_block_size = 4
     restart_from_checkpoint = False
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
+                                                                     use_random_search=use_random_search,
                                                                      mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
                                                                      generations=generations,

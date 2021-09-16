@@ -449,99 +449,10 @@ class Optimizer:
             self.add_individual_to_cache(individual, fitness)
             return fitness
 
-    def multi_objective_random_search(self, pset, initial_population_size, generations, mu_, lambda_,
-                                      _, __, min_level, max_level,
-                                      program, storages, solver, logbooks, checkpoint_frequency=2, checkpoint=None):
-
-        if self.is_root():
-            print("Running Multi-Objective Random Search Genetic Programming", flush=True)
-        self._init_multi_objective_toolbox(pset)
-        self._toolbox.register("select", tools.selNSGA2, nd='standard')
-        # self._toolbox.register('evaluate', self.estimate_multiple_objectives, pset=pset)
-        self._toolbox.register('evaluate', self.evaluate_multiple_objectives, pset=pset,
-                               storages=storages, min_level=min_level, max_level=max_level,
-                               solver_program=program)
-
-        stats_fit1 = tools.Statistics(lambda ind: ind.fitness.values[0])
-        stats_fit2 = tools.Statistics(lambda ind: ind.fitness.values[1])
-        stats_size = tools.Statistics(len)
-
-        mstats = tools.MultiStatistics(convergence_factor=stats_fit1, runtime=stats_fit2, size=stats_size)
-
-        mstats.register("avg", np.mean)
-        mstats.register("std", np.std)
-        mstats.register("min", np.min)
-        mstats.register("max", np.max)
-
-        hof = tools.ParetoFront(similar=lambda a, b: a.fitness == b.fitness)
-
-        random.seed()
-        use_checkpoint = False
-        if checkpoint is not None:
-            if mu_ == len(checkpoint.population):
-                use_checkpoint = True
-            else:
-                print(f'Could not restart from checkpoint. Checkpoint population size is {len(checkpoint.population)} '
-                      f'but the required size is {mu_}.', flush=True)
-        if use_checkpoint:
-            population = checkpoint.population
-            min_generation = checkpoint.generation
-        else:
-            population = self.toolbox.population(n=initial_population_size)
-            min_generation = 0
-        max_generation = generations
-
-        if use_checkpoint:
-            logbook = logbooks[-1]
-        else:
-            logbook = tools.Logbook()
-            logbook.header = ['gen', 'nevals'] + (mstats.fields if mstats else [])
-            logbooks.append(logbook)
-
-        invalid_ind = [ind for ind in population]
-        fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
-        hof.update(population)
-        population = self.toolbox.select(population, len(population))
-        record = mstats.compile(population) if mstats is not None else {}
-        logbook.record(gen=min_generation, nevals=len(invalid_ind), **record)
-
-        if self.is_root():
-            print(logbook.stream, flush=True)
-        # Begin the generational process
-        for gen in range(min_generation + 1, max_generation + 1):
-            # Vary the population
-            offspring = self._toolbox.population(n=lambda_)
-            # Evaluate the individuals with an invalid fitness
-            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
-            for ind, fit in zip(invalid_ind, fitnesses):
-                ind.fitness.values = fit
-            hof.update(offspring)
-            if gen % checkpoint_frequency == 0:
-                if solver is not None:
-                    transformations.invalidate_expression(solver)
-                logbooks[-1] = logbook
-                checkpoint = CheckPoint(min_level, max_level, gen, program, solver, population, logbooks)
-                try:
-                    checkpoint.dump_to_file(f'{self._checkpoint_directory_path}/checkpoint.p')
-                except (pickle.PickleError, TypeError) as e:
-                    print(e, flush=True)
-                    print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
-            # Select the next generation population
-            population[:] = self.toolbox.select(population + offspring, mu_)
-            record = mstats.compile(population)
-            # Update the statistics with the new population
-            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-            if self.is_root():
-                print(logbook.stream, flush=True)
-
-        return population, logbook, hof
-
     def ea_mu_plus_lambda(self, initial_population_size, generations, generalization_interval, mu_, lambda_,
                           crossover_probability, mutation_probability, min_level, max_level,
-                          program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency, checkpoint, mstats, hof):
+                          program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency,
+                          checkpoint, mstats, hof, use_random_search):
 
         mstats.register("avg", np.mean)
         mstats.register("std", np.std)
@@ -624,35 +535,38 @@ class Optimizer:
                 population = self.toolbox.select(population, mu_)
                 hof.update(population)
 
-            number_of_parents = lambda_
-            if number_of_parents % 2 == 1:
-                number_of_parents += 1
-            selected = self.toolbox.select_for_mating(population, number_of_parents)
-            parents = [self.toolbox.clone(ind) for ind in selected]
-            offspring = []
-            for ind1, ind2 in zip(parents[::2], parents[1::2]):
-                child1 = None
-                child2 = None
-                tries = 0
-                while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
-                                      child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
-                    operator_choice = random.random()
-                    if operator_choice < crossover_probability:
-                        child1, child2 = self.toolbox.mate(ind1, ind2)
-                    elif operator_choice < crossover_probability + mutation_probability + self.epsilon:
-                        child1, = self.toolbox.mutate(ind1)
-                        child2, = self.toolbox.mutate(ind2)
-                    else:
-                        child1 = ind1
-                        child2 = ind2
-                    tries += 1
-                del child1.fitness.values, child2.fitness.values
-                offspring.append(child1)
-                if len(offspring) == lambda_:
-                    break
-                offspring.append(child2)
-                if len(offspring) == lambda_:
-                    break
+            if use_random_search:
+                offspring = self.toolbox.population(n=lambda_)
+            else:
+                number_of_parents = lambda_
+                if number_of_parents % 2 == 1:
+                    number_of_parents += 1
+                selected = self.toolbox.select_for_mating(population, number_of_parents)
+                parents = [self.toolbox.clone(ind) for ind in selected]
+                offspring = []
+                for ind1, ind2 in zip(parents[::2], parents[1::2]):
+                    child1 = None
+                    child2 = None
+                    tries = 0
+                    while tries < 10 and (child1 is None or len(child1) > 150 or self.individual_in_cache(child1) or
+                                          child2 is None or len(child2) > 150 or self.individual_in_cache(child2)):
+                        operator_choice = random.random()
+                        if operator_choice < crossover_probability:
+                            child1, child2 = self.toolbox.mate(ind1, ind2)
+                        elif operator_choice < crossover_probability + mutation_probability + self.epsilon:
+                            child1, = self.toolbox.mutate(ind1)
+                            child2, = self.toolbox.mutate(ind2)
+                        else:
+                            child1 = ind1
+                            child2 = ind2
+                        tries += 1
+                    del child1.fitness.values, child2.fitness.values
+                    offspring.append(child1)
+                    if len(offspring) == lambda_:
+                        break
+                    offspring.append(child2)
+                    if len(offspring) == lambda_:
+                        break
 
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -705,18 +619,22 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
-             pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+             program, storages, solver, evaluation_samples, logbooks, use_random_search=False,
+             model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
         elif model_based_estimation and self.is_root():
             print("Warning: Parametrization not supported in model-based estimation")
         if self.is_root():
-            msg = "Running Single-Objective Genetic Programming"
-            if model_based_estimation:
-                print(msg, "with model-based estimation")
+            msg = "Running Single-Objective"
+            if use_random_search:
+                msg += " Random Search"
             else:
-                print(msg, "with code generation-based evaluation")
+                msg += " Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with Model-Based Estimation")
+            else:
+                print(msg, "with Code Generation-Based Evaluation")
         self._init_single_objective_toolbox()
         self._toolbox.register("select", select_unique_best)
         self._toolbox.register("select_for_mating", tools.selTournament, tournsize=2)
@@ -739,23 +657,27 @@ class Optimizer:
         return self.ea_mu_plus_lambda(initial_population_size, generations, generalization_interval, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, evaluation_samples, logbooks, pde_parameter_values,
-                                      checkpoint_frequency, checkpoint, mstats, hof)
+                                      checkpoint_frequency, checkpoint, mstats, hof, use_random_search)
 
     def NSGAII(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
-               pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+               program, storages, solver, evaluation_samples, logbooks, use_random_search=False,
+               model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
 
         if pde_parameter_values is None:
             pde_parameter_values = {}
         elif model_based_estimation and self.is_root():
             print("Warning: Parametrization not supported in model-based estimation")
         if self.is_root():
-            msg = "Running NSGA-II Multi-Objective Genetic Programming"
-            if model_based_estimation:
-                print(msg, "with model-based estimation")
+            msg = "Running NSGA-II Multi-Objective"
+            if use_random_search:
+                msg += " Random Search"
             else:
-                print(msg, "with code generation-based evaluation")
+                msg += " Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with Model-Based Estimation")
+            else:
+                print(msg, "with Code Generation-Based Evaluation")
         self._init_multi_objective_toolbox()
         self._toolbox.register("select", tools.selNSGA2)
 
@@ -786,23 +708,27 @@ class Optimizer:
         return self.ea_mu_plus_lambda(initial_population_size, generations, generalization_interval, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, evaluation_samples, logbooks, pde_parameter_values,
-                                      checkpoint_frequency, checkpoint, mstats, hof)
+                                      checkpoint_frequency, checkpoint, mstats, hof, use_random_search)
 
     def NSGAIII(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                 crossover_probability, mutation_probability, min_level, max_level,
-                program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
-                pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+                program, storages, solver, evaluation_samples, logbooks, use_random_search=False,
+                model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
         elif model_based_estimation and self.is_root():
             print("Warning: Parametrization not supported in model-based estimation")
 
         if self.is_root():
-            msg = "Running NSGA-III Multi-Objective Genetic Programming"
-            if model_based_estimation:
-                print(msg, "with model-based estimation")
+            msg = "Running NSGA-III Multi-Objective"
+            if use_random_search:
+                msg += " Random Search"
             else:
-                print(msg, "with code generation-based evaluation")
+                msg += " Genetic Programming"
+            if model_based_estimation:
+                print(msg, "with Model-Based Estimation")
+            else:
+                print(msg, "with Code Generation-Based Evaluation")
 
         self._init_multi_objective_toolbox()
         H = mu_
@@ -831,13 +757,14 @@ class Optimizer:
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, generalization_interval, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, evaluation_samples, logbooks, pde_parameter_values,
+                                      checkpoint_frequency, checkpoint, mstats, hof, use_random_search)
 
-    def evolutionary_optimization(self, mu_=128, lambda_=128, population_initialization_factor=1, generations=150,
-                                  generalization_interval=50, crossover_probability=0.5, mutation_probability=0.5,
-                                  node_replacement_probability=1.0/3.0, optimization_method=None, levels_per_run=None,
-                                  evaluation_samples=3, restart_from_checkpoint=False, maximum_block_size=8,
-                                  model_based_estimation=False, pde_parameter_values=None):
+    def evolutionary_optimization(self, mu_=128, lambda_=128, population_initialization_factor=4, generations=150,
+                                  generalization_interval=50, crossover_probability=0.7, mutation_probability=0.3,
+                                  node_replacement_probability=0.1, optimization_method=None, use_random_search=False,
+                                  levels_per_run=None, evaluation_samples=3, restart_from_checkpoint=False,
+                                  maximum_block_size=8, model_based_estimation=False, pde_parameter_values=None):
         levels = self.max_level - self.min_level
         if levels_per_run is None:
             levels_per_run = levels
@@ -924,7 +851,7 @@ class Optimizer:
                                     crossover_probability, mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, evaluation_samples, logbooks,
                                     model_based_estimation=model_based_estimation, pde_parameter_values=pde_parameter_values,
-                                    checkpoint_frequency=2, checkpoint=tmp)
+                                    checkpoint_frequency=2, checkpoint=tmp, use_random_search=use_random_search)
             if len(pop[0].fitness.values) == 2:
                 pop = sorted(pop, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
                 hof = sorted(hof, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
