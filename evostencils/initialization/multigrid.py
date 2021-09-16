@@ -348,7 +348,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 correction = base.mul(interpolation, base.mul(cgs, cycle.correction))
             new_cycle = base.Cycle(cycle.approximation, cycle.rhs, correction, predecessor=cycle.predecessor)
             return iterate(new_cycle, relaxation_factor_index)
-        
+
         if FAS:
             pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int),types.Restriction],
                               multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
