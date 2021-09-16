@@ -14,8 +14,35 @@ from evostencils.types import level_control
 from examples.plot_computational_graph import create_graph, save_graph
 from evostencils.code_generation.exastencils import ProgramGenerator
 from plot_computational_graph import get_sub, get_super
+from deap import creator, gp, tools
+from deap import base as deap_base
+from evostencils.genetic_programming import genGrow
 
-generate = "GraphRepresentation"
+generate = "PrimitiveSet"
+
+
+def visualize_tree(expression, filename):
+    import pygraphviz as pgv
+    nodes, edges, labels = gp.graph(expression)
+    g = pgv.AGraph()
+    g.add_nodes_from(nodes)
+    g.add_edges_from(edges)
+    g.layout(prog="dot")
+    for i in nodes:
+        n = g.get_node(i)
+        n.attr["label"] = labels[i]
+    g.draw(f"{filename}.png", "png")
+
+
+def init_toolbox(ipset):
+    creator.create("SingleObjectiveFitness", deap_base.Fitness, weights=(-1.0,))
+    creator.create("SingleObjectiveIndividual", gp.PrimitiveTree, fitness=creator.SingleObjectiveFitness)
+    toolbox = deap_base.Toolbox()
+    toolbox.register("expression", genGrow, pset=ipset, min_height=0, max_height=15)
+    toolbox.register("mate", gp.cxOnePoint)
+    toolbox.register("individual", tools.initIterate, creator.SingleObjectiveIndividual, toolbox.expression)
+    return toolbox
+
 
 if generate == "GraphRepresentation":
     fg = [Grid([8, 8], [1.0 / 8, 1.0 / 8], 3)]
@@ -89,5 +116,11 @@ elif generate == "PrimitiveSet":
                                                  depth=levels_per_run,
                                                  LevelFinishedType=level_control.generate_finished_type(),
                                                  LevelNotFinishedType=level_control.generate_not_finished_type())
+    toolbox = init_toolbox(pset)
+    expr = toolbox.individual()
 
+    obj = gp.compile(expr, pset)
+    create_graph(obj[0])
+    save_graph()
+    # visualize_tree(expr, "graph")
 print("completed")
