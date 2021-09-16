@@ -8,8 +8,7 @@ import math
 import sympy
 import time
 from typing import List
-import shutil  # TODO replace 'cp' calls with subprocess with shutil.copyfile
-# from scipy.optimize import minimize_scalar
+import shutil
 
 
 class CycleStorage:
@@ -39,8 +38,9 @@ class Field:
 
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
-            mpi_rank=0, platform='linux', solution_equations=None, cycle_name="gen_mgCycle", use_jacobi_prefix=True,
-            evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120, solver_iteration_limit=None):
+                 platform_path: str, mpi_rank=0, solution_equations=None, cycle_name="gen_mgCycle",
+                 use_jacobi_prefix=True, evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120,
+                 solver_iteration_limit=None):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
         self._average_generation_time = 0
@@ -59,7 +59,7 @@ class ProgramGenerator:
         self._base_path_prefix, self._problem_name, self._debug_l3_path, _ = \
             parser.extract_settings_information(base_path, settings_path)
         self._mpi_rank = mpi_rank
-        self._platform = platform
+        self._platform_path = platform_path
         self._cycle_name = cycle_name
         self._use_jacobi_prefix = use_jacobi_prefix
         self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.knowledge'
@@ -128,8 +128,8 @@ class ProgramGenerator:
         return self._base_path
 
     @property
-    def platform(self):
-        return self._platform
+    def platform_path(self):
+        return self._platform_path
 
     @property
     def dimension(self):
@@ -388,7 +388,7 @@ class ProgramGenerator:
                                      self.absolute_compiler_path, 'Main',
                                      f'{self.base_path}/{settings_path}',
                                      f'{self.base_path}/{knowledge_path}',
-                                     f'{self.base_path}/lib/{self.platform}.platform'],
+                                     f'{self.base_path}/{self.platform_path}'],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     timeout=timeout)
         except subprocess.TimeoutExpired as e:

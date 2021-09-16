@@ -131,7 +131,7 @@ class Optimizer:
             multigrid_initialization.generate_primitive_set(approximation, rhs, dimension,
                                                             coarsening_factor, max_level, equations,
                                                             operators, fields,
-                                                            maximum_block_size=maximum_block_size,
+                                                            maximum_local_system_size=maximum_block_size,
                                                             depth=levels_per_run,
                                                             LevelFinishedType=self._FinishedType,
                                                             LevelNotFinishedType=self._NotFinishedType)
@@ -763,8 +763,8 @@ class Optimizer:
     def evolutionary_optimization(self, mu_=128, lambda_=128, population_initialization_factor=4, generations=150,
                                   generalization_interval=50, crossover_probability=0.7, mutation_probability=0.3,
                                   node_replacement_probability=0.1, optimization_method=None, use_random_search=False,
-                                  levels_per_run=None, evaluation_samples=3, restart_from_checkpoint=False,
-                                  maximum_block_size=8, model_based_estimation=False, pde_parameter_values=None):
+                                  levels_per_run=None, evaluation_samples=3, continue_from_checkpoint=False,
+                                  maximum_local_system_size=8, model_based_estimation=False, pde_parameter_values=None):
         levels = self.max_level - self.min_level
         if levels_per_run is None:
             levels_per_run = levels
@@ -782,14 +782,14 @@ class Optimizer:
         checkpoint = None
         checkpoint_file_path = f'{self._checkpoint_directory_path}/checkpoint.p'
         solver_program = ""
-        if restart_from_checkpoint and os.path.isfile(checkpoint_file_path):
+        if continue_from_checkpoint and os.path.isfile(checkpoint_file_path):
             try:
                 checkpoint = load_checkpoint_from_file(checkpoint_file_path)
                 solver_program = checkpoint.program
             except pickle.PickleError as _:
-                restart_from_checkpoint = False
+                continue_from_checkpoint = False
         else:
-            restart_from_checkpoint = False
+            continue_from_checkpoint = False
         pops = []
         logbooks = []
         hofs = []
@@ -798,7 +798,7 @@ class Optimizer:
             min_level = self.max_level - (i + levels_per_run)
             max_level = self.max_level - i
             pass_checkpoint = False
-            if restart_from_checkpoint:
+            if continue_from_checkpoint:
                 if min_level == checkpoint.min_level and max_level == checkpoint.max_level:
                     best_expression = checkpoint.solver
                     pass_checkpoint = True
@@ -822,7 +822,7 @@ class Optimizer:
                                                                 self.coarsening_factors, max_level, self.equations,
                                                                 self.operators, self.fields,
                                                                 enable_partitioning=enable_partitioning,
-                                                                maximum_block_size=maximum_block_size,
+                                                                maximum_local_system_size=maximum_local_system_size,
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
                                                                 LevelNotFinishedType=self._NotFinishedType)
@@ -898,7 +898,7 @@ class Optimizer:
             multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
                                                             self.coarsening_factors, self.max_level, self.equations,
                                                             self.operators, self.fields,
-                                                            maximum_block_size=maximum_block_size,
+                                                            maximum_local_system_size=maximum_block_size,
                                                             depth=levels,
                                                             LevelFinishedType=self._FinishedType,
                                                             LevelNotFinishedType=self._NotFinishedType)
