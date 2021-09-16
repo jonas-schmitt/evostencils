@@ -335,7 +335,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
-                           maximum_block_size=2, relaxation_factor_samples=37,
+                           maximum_block_size=8, relaxation_factor_samples=37,
                            coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
@@ -377,12 +377,11 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 for k in range(1, block_size_max + 1):
                     generate_block_size(block_size_ + (k,), block_size_max, dimension_ - 1)
         generate_block_size((), maximum_block_size, dimension)
-    maximum_number_of_generatable_terms = 6
     for block_size_permutation in itertools.product(*block_sizes):
         number_of_terms = 0
         for block_size in block_size_permutation:
             number_of_terms += reduce(lambda x, y: x * y, block_size)
-        if len(approximation.grid) < number_of_terms <= maximum_number_of_generatable_terms:
+        if len(approximation.grid) < number_of_terms <= maximum_block_size:
             pset.addTerminal(block_size_permutation, types.BlockSize)
     add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)
 

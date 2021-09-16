@@ -149,7 +149,7 @@ class Optimizer:
         creator.create("SingleObjectiveFitness", deap.base.Fitness, weights=(-1.0,))
         creator.create("SingleObjectiveIndividual", gp.PrimitiveTree, fitness=creator.SingleObjectiveFitness)
 
-    def _init_toolbox(self, pset):
+    def _init_toolbox(self, pset, node_replacement_probability=1.0/3.0):
         self._toolbox = deap.base.Toolbox()
         self._toolbox.register("expression", genGrow, pset=pset, min_height=0, max_height=50)
         self._toolbox.register("mate", gp.cxOnePoint)
@@ -157,10 +157,10 @@ class Optimizer:
         def mutate(individual, pset_):
             # Use two different mutation operators
             operator_choice = random.random()
-            if operator_choice < 2.0/3.0:
-                return mutInsert(individual, 0, 10, pset_)
-            else:
+            if operator_choice < node_replacement_probability:
                 return mutNodeReplacement(individual, pset_)
+            else:
+                return mutInsert(individual, 0, 10, pset_)
 
         self._toolbox.register("mutate", mutate, pset_=pset)
 
@@ -384,7 +384,6 @@ class Optimizer:
                                   evaluation_samples=3, pde_parameter_values=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
-        self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity,
         if self.individual_in_cache(individual):
@@ -406,6 +405,7 @@ class Optimizer:
                                                               infinity=self.infinity, evaluation_samples=evaluation_samples,
                                                               global_variable_values=pde_parameter_values)
             end = time.time()
+            self._total_number_of_evaluations += 1
             self._total_evaluation_time += end - start
             fitness = average_time_to_convergence,
             if average_number_of_iterations >= self.infinity:
@@ -417,7 +417,6 @@ class Optimizer:
                                      evaluation_samples=3, pde_parameter_values=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
-        self._total_number_of_evaluations += 1
         if len(individual) > 150:
             return self.infinity, self.infinity
         if self.individual_in_cache(individual):
@@ -440,6 +439,7 @@ class Optimizer:
                                                               evaluation_samples=evaluation_samples,
                                                               global_variable_values=pde_parameter_values)
             end = time.time()
+            self._total_number_of_evaluations += 1
             self._total_evaluation_time += end - start
             # Use number of iteration
             # fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
@@ -668,8 +668,6 @@ class Optimizer:
                 for ind in offspring:
                     if not self.individual_in_cache(ind):
                         self.add_individual_to_cache(ind, ind.fitness.values)
-            # if self.is_root():
-            #     print("Average evaluation time:", self.total_evaluation_time / self._total_number_of_evaluations, flush=True)
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
@@ -707,7 +705,8 @@ class Optimizer:
 
     def SOGP(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
-             program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+             program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
+             pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
         elif model_based_estimation and self.is_root():
@@ -739,11 +738,13 @@ class Optimizer:
         hof = tools.HallOfFame(2 * mu_, similar=lambda a, b: str(a) == str(b))
         return self.ea_mu_plus_lambda(initial_population_size, generations, generalization_interval, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, evaluation_samples, logbooks, pde_parameter_values,
+                                      checkpoint_frequency, checkpoint, mstats, hof)
 
     def NSGAII(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                crossover_probability, mutation_probability, min_level, max_level,
-               program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+               program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
+               pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
 
         if pde_parameter_values is None:
             pde_parameter_values = {}
@@ -784,11 +785,13 @@ class Optimizer:
 
         return self.ea_mu_plus_lambda(initial_population_size, generations, generalization_interval, mu_, lambda_,
                                       crossover_probability, mutation_probability, min_level, max_level,
-                                      program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
+                                      program, solver, evaluation_samples, logbooks, pde_parameter_values,
+                                      checkpoint_frequency, checkpoint, mstats, hof)
 
     def NSGAIII(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                 crossover_probability, mutation_probability, min_level, max_level,
-                program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False, pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
+                program, storages, solver, evaluation_samples, logbooks, model_based_estimation=False,
+                pde_parameter_values=None, checkpoint_frequency=2, checkpoint=None):
         if pde_parameter_values is None:
             pde_parameter_values = {}
         elif model_based_estimation and self.is_root():
@@ -830,18 +833,18 @@ class Optimizer:
                                       crossover_probability, mutation_probability, min_level, max_level,
                                       program, solver, evaluation_samples, logbooks, pde_parameter_values, checkpoint_frequency, checkpoint, mstats, hof)
 
-    def evolutionary_optimization(self, gp_mu=128, gp_lambda=128, population_initialization_factor=1, gp_generations=150,
-                                  generalization_interval=50, gp_crossover_probability=0.5, gp_mutation_probability=0.5,
-                                  optimization_method=None, levels_per_run=None, evaluation_samples=3,
-                                  restart_from_checkpoint=False, maximum_block_size=8, model_based_estimation=False,
-                                  pde_parameter_values=None):
+    def evolutionary_optimization(self, mu_=128, lambda_=128, population_initialization_factor=1, generations=150,
+                                  generalization_interval=50, crossover_probability=0.5, mutation_probability=0.5,
+                                  node_replacement_probability=1.0/3.0, optimization_method=None, levels_per_run=None,
+                                  evaluation_samples=3, restart_from_checkpoint=False, maximum_block_size=8,
+                                  model_based_estimation=False, pde_parameter_values=None):
         levels = self.max_level - self.min_level
         if levels_per_run is None:
             levels_per_run = levels
-        if levels_per_run < levels and generalization_interval < gp_generations:
+        if levels_per_run < levels and generalization_interval < generations:
             print("Warning: Stepwise generalization only supported for single-stage optimizations")
             print("Adapting generalization interval accordingly...")
-            generalization_interval = gp_generations
+            generalization_interval = generations
         approximations = [self.approximation]
         right_hand_sides = [self.rhs]
         for i in range(1, levels + 1):
@@ -896,11 +899,11 @@ class Optimizer:
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
                                                                 LevelNotFinishedType=self._NotFinishedType)
-            self._init_toolbox(pset)
+            self._init_toolbox(pset, node_replacement_probability)
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
-            initial_population_size = population_initialization_factor * gp_mu
+            initial_population_size = population_initialization_factor * mu_
 
             self.program_generator._counter = 0
             self.program_generator._average_generation_time = 0
@@ -917,8 +920,8 @@ class Optimizer:
                     return convergence_factor * math.sqrt(self.infinity) * execution_time
 
             pop, log, hof, evaluation_min_level, evaluation_max_level = \
-                optimization_method(pset, initial_population_size, gp_generations, generalization_interval, gp_mu, gp_lambda,
-                                    gp_crossover_probability, gp_mutation_probability,
+                optimization_method(pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
+                                    crossover_probability, mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, evaluation_samples, logbooks,
                                     model_based_estimation=model_based_estimation, pde_parameter_values=pde_parameter_values,
                                     checkpoint_frequency=2, checkpoint=tmp)

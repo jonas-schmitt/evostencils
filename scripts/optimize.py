@@ -86,7 +86,6 @@ def main():
     if model_based_estimation:
         levels_per_run = 1
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
-    maximum_block_size = 8
     optimization_method = optimizer.NSGAII
     if len(sys.argv) > 1:
         if sys.argv[1].upper() == "NSGAII":
@@ -98,23 +97,25 @@ def main():
         elif sys.argv[1].upper() == "RANDOM":
             optimization_method = optimizer.multi_objective_random_search
 
-
-    gp_mu = 16
-    gp_lambda = 16
-    gp_generations = 50
+    mu_ = 16
+    lambda_ = 16
+    generations = 50
     population_initialization_factor = 1
     generalization_interval = 50
-    crossover_probability = 2.0/3.0
+    crossover_probability = 0.7
     mutation_probability = 1.0 - crossover_probability
+    node_replacement_probability = 0.1
     evaluation_samples = 3
+    maximum_block_size = 8
     restart_from_checkpoint = False
     program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
-                                                                     gp_mu=gp_mu, gp_lambda=gp_lambda,
+                                                                     mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
-                                                                     gp_generations=gp_generations,
+                                                                     generations=generations,
                                                                      generalization_interval=generalization_interval,
-                                                                     gp_crossover_probability=crossover_probability,
-                                                                     gp_mutation_probability=mutation_probability,
+                                                                     crossover_probability=crossover_probability,
+                                                                     mutation_probability=mutation_probability,
+                                                                     node_replacement_probability=node_replacement_probability,
                                                                      levels_per_run=levels_per_run,
                                                                      evaluation_samples=evaluation_samples,
                                                                      maximum_block_size=maximum_block_size,
