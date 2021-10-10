@@ -1,0 +1,552 @@
+
+/// domain
+
+Domain global< [ 0, 0 ] to [ 1, 1 ] >
+
+/// fields
+
+// Solution and error fields
+Field Solution@finest with Complex<Real> on Node of global = 0.0
+Field Solution@finest on boundary = applyBC_Solution@finest()
+//Field Solution@finest on boundary = 0.0
+
+Field u with Complex<Real> on Node of global
+Field u on boundary = applyBC_u()
+//Field u on boundary = 0.0
+
+Field gen_error_u with Complex<Real> on Node of global
+Field gen_error_u on boundary = applyBC_gen_error_u()
+//Field gen_error_u on boundary = 0.0
+
+// RHS fields
+
+// B-Spline approximation of the dirac pulse
+Field RHS@finest with Complex<Real> on Node of global = max(0, -(fabs(vf_nodePos_x - 0.5) - vf_gridWidth_x) / vf_gridWidth_x**2) * max(0, -(fabs(vf_nodePos_y - 0.5) - vf_gridWidth_y) / vf_gridWidth_y**2)
+//Field RHS@finest with Complex<Real> on Node of global = 0.0
+
+Field f with Complex<Real> on Node of global
+Field gen_rhs_u with Complex<Real> on Node of global
+
+// Residual fields
+Field Residual@finest with Complex<Real> on Node of global
+
+Field res with Complex<Real> on Node of global
+Field res on boundary = applyBC_res()
+//Field res on boundary = 0.0
+
+Field gen_residual_u with Complex<Real> on Node of global
+Field gen_residual_u on boundary = applyBC_gen_residual_u()
+//Field gen_residual_u on boundary = 0.0
+
+Field p@finest with Complex<Real> on Node of global
+Field ap@finest with Complex<Real> on Node of global
+Field s@finest with Complex<Real> on Node of global
+Field t@finest with Complex<Real> on Node of global
+Field h@finest with Complex<Real> on Node of global
+Field resHat@finest with Complex<Real> on Node of global
+
+/// for BiCGStab
+//Field nu@finest with Complex<Real> on Node of global
+//Field s@finest on boundary = applyBC_s@finest()
+//Field p@finest on boundary = applyBC_p@finest()
+
+/// operators
+
+Operator A from Stencil {
+  [ 0,  0] =>  2.0 / ( vf_gridWidth_x ** 2 ) + 2.0 / ( vf_gridWidth_y ** 2 ) - k**2
+  [-1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 0, -1] => -1.0 / ( vf_gridWidth_y ** 2 )
+  [ 0,  1] => -1.0 / ( vf_gridWidth_y ** 2 )
+}
+
+Operator M from Stencil {
+  [ 0,  0] =>  2.0 / ( vf_gridWidth_x ** 2 ) + 2.0 / ( vf_gridWidth_y ** 2 ) - k**2 * shift
+  [-1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 1,  0] => -1.0 / ( vf_gridWidth_x ** 2 )
+  [ 0, -1] => -1.0 / ( vf_gridWidth_y ** 2 )
+  [ 0,  1] => -1.0 / ( vf_gridWidth_y ** 2 )
+}
+
+Equation PrecEq {
+  M * u  == f
+}
+
+Operator Restriction_u  from default restriction  on Node with 'linear'
+Operator Prolongation_u from default prolongation on Node with 'linear'
+
+/// globals
+
+Globals {
+  Expr k = 80.0
+  Expr omegaRelax = 0.6
+  Var shift : Complex<Real> = (1.0 + 0.5j)
+}
+
+Function NormResidual@finest : Complex<Real> {
+  return sqrt ( dot ( Residual, Residual ) )
+}
+
+Function Solve@finest {
+  PreconditionedBiCGStab@finest (  )
+  //BiCGStab@finest (  )
+}
+/*
+Function BiCGStab@finest {
+  // init residual
+  Residual    = RHS - A * Solution
+  Var curRes  : Complex<Real> = NormResidual ( )
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+  resHat      = Residual
+  nu          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 20000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, Residual )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = Residual + beta * ( p - omega * nu )
+    nu        = A * p
+    alpha     = rhoNew / dot ( resHat, nu )
+    h         = Solution + alpha * p
+    s         = Residual - alpha * nu
+    t         = A * s
+    omega     = dot ( t, s ) / dot ( t, t )
+    Solution  = h + omega * s
+    Residual  = RHS - A * Solution
+    curRes    = NormResidual ( )
+    if (curStep % 100 == 0) {
+      print ( "Residual after", curStep, "iterations is", fabs(curRes), "--- convergence factor is", ( fabs(curRes) / fabs(initRes) ) )
+    }
+    if ( fabs(curRes) < 1e-6 * fabs(initRes) ) {
+      print ( "Residual after", curStep, "iterations is", fabs(curRes), "--- convergence factor is", ( fabs(curRes) / fabs(initRes) ) )
+      return
+    }
+    Residual  = s - omega * t
+  }
+
+  print ( "Maximum number of cgs iterations (", 20000, ") was exceeded" )
+}
+*/
+
+/// Preconditioned BiCGStab
+Function PreconditionedBiCGStab@finest {
+
+  Residual    = RHS - A * Solution
+  Var curRes  : Complex<Real> = NormResidual ( )
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+
+  resHat      = Residual
+  ap          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 10000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, Residual )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = Residual + beta * ( p - omega * ap )
+    u = 0
+    f = p
+    mgCycle()
+    ap        = A * u
+    alpha     = rhoNew / dot ( resHat, ap )
+    h         = Solution + alpha * u
+    s         = Residual - alpha * ap
+    u = 0
+    f = s
+    mgCycle()
+    t = A * u
+    omega     = dot ( t, s ) / dot ( t, t )
+    Solution = h + omega * u
+    Residual  = s - omega * t
+    curRes    = NormResidual ( )
+    /*
+    Residual  = RHS - A * Solution
+    curRes    = NormResidual ( )
+    if (curStep % 100 == 0) {
+      print ( "Residual after", curStep, "iterations is", fabs(curRes), "--- convergence factor is", ( fabs(curRes) / fabs(initRes) ) )
+    }
+    */
+    if ( fabs(curRes) < 1e-7 * fabs(initRes) ) {
+      print ( "Residual after", curStep, "iterations is", fabs(curRes), "--- convergence factor is", ( fabs(curRes) / fabs(initRes) ) )
+      return
+    }
+  }
+
+  print ( "Maximum number of solver iterations (", 10000, ") was exceeded" )
+  print ( "Residual after", curStep, "iterations is", fabs(curRes), "--- convergence factor is", ( fabs(curRes) / fabs(initRes) ) )
+}
+
+Function PreSmoother@all {
+  // RB-GS
+  repeat 2 times {
+    color with {
+      ((i0 + i1) % 2),
+      solve locally at u@[0,0] relax omegaRelax {
+        u@[0,0] => M@[0,0] * u@[0,0] == f@[0,0]
+      }
+    }
+  }
+  /*
+  // Jacobi
+  repeat 3 times {
+    solve locally at u@[0,0] with jacobi relax omegaRelax {
+      u@[0,0] => M@[0,0] * u@[0,0] == f@[0,0]
+    }
+  }*/
+}
+
+Function PostSmoother@all {
+  // RB-GS
+  repeat 1 times {
+    color with {
+      ((i0 + i1) % 2),
+      solve locally at u@[0,0] relax omegaRelax {
+        u@[0,0] => M@[0,0] * u@[0,0] == f@[0,0]
+      }
+    }
+  }
+  // Jacobi
+  /*
+  repeat 3 times {
+    solve locally at u@[0,0] with jacobi relax omegaRelax {
+      u@[0,0] => M@[0,0] * u@[0,0] == f@[0,0]
+    }
+  }*/
+}
+
+Function mgCycle@(coarsest + 2 to finest) {
+
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  u@coarser = 0.0
+  mgCycle@coarser ( )
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+/// Preconditioner
+
+Function mgCycle@(coarsest + 1) {
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  gen_error_u@coarser = 0.0
+  mgCycle@coarser ( )
+  u@coarser = gen_error_u@coarser
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+/*
+Function VCycle@(coarsest + 2 to finest) {
+
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  u@coarser = 0.0
+  VCycle@coarser ( )
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+
+Function VCycle@(coarsest + 1) {
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  gen_error_u@coarser = 0.0
+  VCycle@coarser ( )
+  u@coarser = gen_error_u@coarser
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+Function WCycle@(coarsest + 2 to finest) {
+
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  u@coarser = 0.0
+  WCycle@coarser ( )
+  WCycle@coarser ( )
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+
+Function WCycle@(coarsest + 1) {
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  gen_error_u@coarser = 0.0
+  WCycle@coarser ( )
+  WCycle@coarser ( )
+  u@coarser = gen_error_u@coarser
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+}
+
+Function FCycle@(coarsest + 2 to finest) {
+
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  u@coarser = 0.0
+  FCycle@coarser ( )
+  VCycle@coarser ( )
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+
+Function FCycle@(coarsest + 1) {
+  PreSmoother()
+
+  res = f - M * u
+  f@coarser = Restriction_u * res
+
+  gen_error_u@coarser = 0.0
+  FCycle@coarser ( )
+  VCycle@coarser ( )
+  u@coarser = gen_error_u@coarser
+
+  u += Prolongation_u@coarser * u@coarser
+
+  PostSmoother()
+
+}
+
+*/
+
+
+
+Field nu@coarsest with Complex<Real> on Node of global
+
+Field p@coarsest with Complex<Real> on Node of global
+Field p@coarsest on boundary = applyBC_p@coarsest()
+//Field p@coarsest on boundary = 0.0
+
+Field h@coarsest with Complex<Real> on Node of global
+
+Field s@coarsest with Complex<Real> on Node of global
+Field s@coarsest on boundary = applyBC_s@coarsest()
+//Field s@coarsest on boundary = 0.0
+
+Field t@coarsest with Complex<Real> on Node of global
+Field resHat@coarsest with Complex<Real> on Node of global
+
+Function mgCycle@coarsest {
+  // init residual
+  gen_residual_u    = f - M * gen_error_u
+  Var curRes  : Complex<Real> = sqrt(dot(gen_residual_u, gen_residual_u))
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+
+  resHat      = gen_residual_u
+  nu          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 1000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, gen_residual_u )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = gen_residual_u + beta * ( p - omega * nu )
+    nu        = M * p
+    alpha     = rhoNew / dot ( resHat, nu )
+    h         = gen_error_u + alpha * p
+    s         = gen_residual_u - alpha * nu
+    t         = M * s
+    omega     = dot ( t, s ) / dot ( t, t )
+    gen_error_u  = h + omega * s
+    gen_residual_u  = s - omega * t
+    curRes    = sqrt(dot(gen_residual_u, gen_residual_u))
+    if ( fabs(curRes) < 1e-6 * fabs(initRes)) { return }
+  }
+}
+/*
+Function VCycle@coarsest {
+  // init residual
+  gen_residual_u    = f - M * gen_error_u
+  Var curRes  : Complex<Real> = sqrt(dot(gen_residual_u, gen_residual_u))
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+
+  resHat      = gen_residual_u
+  nu          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 1000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, gen_residual_u )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = gen_residual_u + beta * ( p - omega * nu )
+    nu        = M * p
+    alpha     = rhoNew / dot ( resHat, nu )
+    h         = gen_error_u + alpha * p
+    s         = gen_residual_u - alpha * nu
+    t         = M * s
+    omega     = dot ( t, s ) / dot ( t, t )
+    gen_error_u  = h + omega * s
+    gen_residual_u  = s - omega * t
+    curRes    = sqrt(dot(gen_residual_u, gen_residual_u))
+    if ( fabs(curRes) < 1e-6 * fabs(initRes)) { return }
+  }
+}
+
+
+Function WCycle@coarsest {
+  // init residual
+  gen_residual_u    = f - M * gen_error_u
+  Var curRes  : Complex<Real> = sqrt(dot(gen_residual_u, gen_residual_u))
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+
+  resHat      = gen_residual_u
+  nu          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 1000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, gen_residual_u )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = gen_residual_u + beta * ( p - omega * nu )
+    nu        = M * p
+    alpha     = rhoNew / dot ( resHat, nu )
+    h         = gen_error_u + alpha * p
+    s         = gen_residual_u - alpha * nu
+    t         = M * s
+    omega     = dot ( t, s ) / dot ( t, t )
+    gen_error_u  = h + omega * s
+    gen_residual_u  = s - omega * t
+    curRes    = sqrt(dot(gen_residual_u, gen_residual_u))
+    if ( fabs(curRes) < 1e-6 * fabs(initRes)) { return }
+  }
+}
+
+Function FCycle@coarsest {
+  // init residual
+  gen_residual_u    = f - M * gen_error_u
+  Var curRes  : Complex<Real> = sqrt(dot(gen_residual_u, gen_residual_u))
+  Var initRes : Complex<Real> = curRes
+
+  if ( curRes == 0.0 ) { return }
+
+  // init variables and fields
+  Var alpha   : Complex<Real> = 1.0
+  Var beta    : Complex<Real> = 1.0
+  Var rho     : Complex<Real>
+  Var rhoNew  : Complex<Real> = 1.0
+  Var omega   : Complex<Real> = 1.0
+
+  resHat      = gen_residual_u
+  nu          = 0.0
+  p           = 0.0
+
+  // main loop
+  Var curStep : Int  = 0
+  repeat 1000 times count curStep {
+    rho       = rhoNew
+    rhoNew    = dot ( resHat, gen_residual_u )
+    beta      = ( rhoNew / rho ) * ( alpha / omega )
+    p         = gen_residual_u + beta * ( p - omega * nu )
+    nu        = M * p
+    alpha     = rhoNew / dot ( resHat, nu )
+    h         = gen_error_u + alpha * p
+    s         = gen_residual_u - alpha * nu
+    t         = M * s
+    omega     = dot ( t, s ) / dot ( t, t )
+    gen_error_u  = h + omega * s
+    gen_residual_u  = s - omega * t
+    curRes    = sqrt(dot(gen_residual_u, gen_residual_u))
+    if ( fabs(curRes) < 1e-6 * fabs(initRes)) { return }
+  }
+}
+*/

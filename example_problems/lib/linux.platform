@@ -1,0 +1,5 @@
+targetOS                   = "Linux"
+targetCompiler             = "GCC"
+targetCompilerVersion      = 9
+targetCompilerVersionMinor = 3
+//simd_instructionSet = "AVX2"

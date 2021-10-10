@@ -1,0 +1,11 @@
+dimensionality                 = 2
+
+minLevel                       = 3
+maxLevel                       = 7
+
+discr_type                     = "FiniteDifferences"
+
+// omp parallelization on exactly one fragment in one block
+import '../lib/domain_onePatch.knowledge'
+import '../lib/parallelization_pureOmp.knowledge'
+omp_fixArithmeticReductionOrder = true

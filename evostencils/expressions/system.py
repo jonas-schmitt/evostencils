@@ -102,10 +102,10 @@ class Diagonal(base.UnaryExpression):
 
 
 class ElementwiseDiagonal(base.UnaryExpression):
-    pass
+    #pass
 
-   # def __str__(self):
-    #    return "D"
+   def __str__(self):
+        return "D"
 
 def get_coarse_grid(grid: [base.Grid], coarsening_factors: List[Tuple[int, ...]]):
     return [base.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]

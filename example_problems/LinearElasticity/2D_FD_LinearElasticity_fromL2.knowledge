@@ -1,0 +1,22 @@
+dimensionality                 = 2
+
+minLevel                       = 4
+maxLevel                       = 8
+
+discr_type                     = "FiniteDifferences"
+
+// omp parallelization on exactly one fragment in one block
+import '../lib/domain_onePatch.knowledge'
+import '../lib/parallelization_pureOmp.knowledge'
+
+// optimizations
+//opt_useAddressPrecalc = true
+
+// CSE
+//opt_loopCarriedCSE = true
+
+// vectorization
+//opt_vectorize = true
+//experimental_resolveInverseFunctionCall = "Compiletime" // [Compiletime|Runtime] (with new strategies)
+//resolve local mat sys at runtime or compiletime
+//experimental_resolveLocalMatSys = "Compiletime"

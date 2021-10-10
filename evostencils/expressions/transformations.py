@@ -51,17 +51,17 @@ def invalidate_expression(expression: base.Expression):
 def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator, equations, fields):
     local_equations = {}
 
-    def recursive_descent(array1, array2, dimension, index, equation, i, j, level):
-        def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation, new, f, index):
-            for offsets, value in constant_stencil.entries:
-                symbol_name = f'{fields[j].name}@{level}@['
-                for idx, o in zip(index[:-1], offsets[:-1]):
+    def recursive_descent(array1, array2, dimension, index, equation, ii, jj, level_):
+        def constant_stencil_to_equation(constant_stencil: constant.Stencil, equation_, new, f, index_):
+            for offsets_, value_ in constant_stencil.entries:
+                symbol_name = f'{fields[jj].name}@{level_}@['
+                for idx, o in zip(index_[:-1], offsets_[:-1]):
                     symbol_name += f'{int(idx) + int(o)}, '
-                symbol_name += f'{int(index[-1]) + int(offsets[-1])}]'
+                symbol_name += f'{int(index_[-1]) + int(offsets_[-1])}]'
                 if new:
                     symbol_name += '_new'
-                equation = f(equation, value * sympy.Symbol(symbol_name))
-            return equation
+                equation_ = f(equation_, value_ * sympy.Symbol(symbol_name))
+            return equation_
 
         max_period = max(len(array1), len(array2))
         if dimension == 1:
@@ -71,22 +71,22 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
                 equation = constant_stencil_to_equation(array1[k % len(array1)], equation, True, lambda x, y: x + y, index_center)
                 equation = constant_stencil_to_equation(array1[k % len(array1)], equation, False, lambda x, y: x - y, index_center)
                 equation = constant_stencil_to_equation(array2[k % len(array2)], equation, False, lambda x, y: x + y, index_center)
-                if (fields[i], level, index_center) not in local_equations:
-                    field = fields[i]
+                if (fields[ii], level_, index_center) not in local_equations:
+                    field = fields[ii]
                     rhs_name = None
                     for eq_info in equations:
-                        if eq_info.level == level and eq_info.associated_field == field:
+                        if eq_info.level == level_ and eq_info.associated_field == field:
                             rhs_name = eq_info.rhs_name
                     if rhs_name is None:
                         raise RuntimeError("Local solve generation: Could not associate right-hand side with field")
-                    local_equations[(fields[i], level, index_center)] = sympy.sympify(0), \
-                                                          sympy.Symbol(f'{rhs_name}@{level}')
-                value = local_equations[(fields[i], level, index_center)]
-                local_equations[(fields[i], level, index_center)] = value[0] + equation, value[1]
+                    local_equations[(fields[ii], level_, index_center)] = sympy.sympify(0), \
+                                                                          sympy.Symbol(f'{rhs_name}@{level_}')
+                value = local_equations[(fields[ii], level_, index_center)]
+                local_equations[(fields[ii], level_, index_center)] = value[0] + equation, value[1]
         else:
             for k in range(max_period):
                 recursive_descent(array1[k % len(array1)], array2[k % len(array2)], dimension - 1, index + (k,),
-                                  equation, i, j, level)
+                                  equation, ii, jj, level_)
     if isinstance(smoothing_operator, system.Diagonal):
         for i, (row1, row2) in enumerate(zip(smoothing_operator.operand.entries, system_operator.entries)):
             for j, (entry1, entry2) in enumerate(zip(row1, row2)):
@@ -143,5 +143,3 @@ def find_independent_equation_sets(equations_dict: dict):
         else:
             dependent_set.append((key, value))
     return dependent_set, independent_set
-
-

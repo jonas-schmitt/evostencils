@@ -1,0 +1,9 @@
+
+omp_enabled                       = true
+omp_numThreads                    = 4
+
+mpi_enabled                       = false
+mpi_numThreads                    = 1
+
+omp_parallelizeLoopOverFragments  = false
+omp_parallelizeLoopOverDimensions = true

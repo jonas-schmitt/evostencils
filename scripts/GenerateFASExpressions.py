@@ -11,7 +11,7 @@ from evostencils.expressions.base import RightHandSide as baseRHS
 from evostencils.expressions.system import RightHandSide, ZeroApproximation, Operator, Restriction, Prolongation, get_coarse_grid, get_coarse_operator
 from evostencils.stencils.gallery import Poisson2D
 from evostencils.types import level_control
-from examples.plot_computational_graph import create_graph, save_graph
+from scripts.plot_computational_graph import create_graph, save_graph
 from evostencils.code_generation.exastencils import ProgramGenerator
 from plot_computational_graph import get_sub, get_super
 from deap import creator, gp, tools
@@ -88,11 +88,12 @@ elif generate == "PrimitiveSet":
     problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
     compiler_path = f'{cwd}/../../exastencils/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../../exastencils/Examples'
+    base_path = f'{cwd}/../example_problems'
+    platform_path = f'lib/linux.platform'
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
     cycle_name = "gen_mgCycle"
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name)
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, cycle_name=cycle_name)
 
     dimension = program_generator.dimension
     finest_grid = program_generator.finest_grid
@@ -112,7 +113,7 @@ elif generate == "PrimitiveSet":
     pset, terminal_list = generate_primitive_set(approximation, rhs, dimension,
                                                  coarsening_factor, max_level, equations,
                                                  operators, fields,
-                                                 maximum_block_size=maximum_block_size,
+                                                 maximum_local_system_size=maximum_block_size,
                                                  depth=levels_per_run,
                                                  LevelFinishedType=level_control.generate_finished_type(),
                                                  LevelNotFinishedType=level_control.generate_not_finished_type())

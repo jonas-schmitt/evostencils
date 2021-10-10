@@ -1,15 +1,14 @@
 import subprocess
-import shutil
-import numpy as np
 import os
-def main():
 
-    dir_name = 'LinearElasticity'
+
+def main():
+    dir_name = 'Poisson'
     problem_name = f'2D_FD_{dir_name}_fromL2'
     cwd = os.getcwd()
     platform = "linux"
-    compiler_path = f'{cwd}/../exastencils-meggie/Compiler/Compiler.jar'
-    base_path = f'{cwd}/../exastencils-meggie/Examples'
+    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    base_path = f'{cwd}/../exastencils/Examples'
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
     path_to_executable = f"{base_path}/generated/{problem_name}"

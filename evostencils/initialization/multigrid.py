@@ -152,7 +152,7 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     for op_info in operators_on_level:
         if op_info.operator_type == base.Restriction:
             # TODO hacky solution for now
-            if not "gen_restrictionForSol" in op_info.name:
+            if "gen_restrictionForSol" not in op_info.name:
                 restriction_operators.append(op_info)
         elif op_info.operator_type == base.Prolongation:
             prolongation_operators.append(op_info)
@@ -278,20 +278,20 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                                    relaxation_factor, cycle.predecessor)
         return approximation, rhs
 
-    def smoothing(generate_smoother, cycle, partitioning, relaxation_factor_index):
+    def smoothing(generate_smoother, cycle, partitioning_, relaxation_factor_index):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production'
         approximation = cycle.approximation
         rhs = cycle.rhs
         smoothing_operator = generate_smoother(cycle.correction.operator)
         correction = base.Multiplication(base.Inverse(smoothing_operator), cycle.correction)
-        return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning,
+        return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning_,
                                   predecessor=cycle.predecessor), relaxation_factor_index)
 
-    def decoupled_jacobi(cycle, partitioning, relaxation_factor_index):
-        return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning, relaxation_factor_index)
+    def decoupled_jacobi(cycle, partitioning_, relaxation_factor_index):
+        return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning_, relaxation_factor_index)
 
-    def collective_jacobi(cycle, partitioning, relaxation_factor_index):
-        return smoothing(smoother.generate_collective_jacobi, cycle, partitioning, relaxation_factor_index)
+    def collective_jacobi(cycle, partitioning_, relaxation_factor_index):
+        return smoothing(smoother.generate_collective_jacobi, cycle, partitioning_, relaxation_factor_index)
 
     def collective_block_jacobi(cycle, relaxation_factor_index, block_size):
         def generate_collective_block_jacobi_fixed(operator):
@@ -350,10 +350,11 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
             return iterate(new_cycle, relaxation_factor_index)
 
         if FAS:
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int),types.Restriction],
+            pset.addPrimitive(solve,
+                              [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int), types.Restriction],
                               multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                               f'solve_{level}')
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int),types.Restriction],
+            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int), types.Restriction],
                               multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                               f'solve_{level}')
         else:
@@ -363,7 +364,6 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
             pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
                               multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
                               f'solve_{level}')
-
 
         pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'CGS_{level}')
 
@@ -377,8 +377,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
-                           maximum_block_size=2, relaxation_factor_samples=37,
-                           coarse_grid_solver_expression=None, depth=2, LevelFinishedType=None, LevelNotFinishedType=None):
+                           maximum_local_system_size=8, relaxation_factor_samples=37,
+                           coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
@@ -401,10 +401,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     # Start: Exclude for FAS
-    if not FAS:
+    if enable_partitioning and not FAS:
         pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     # End: Exclude for FAS
-
     for i in range(0, relaxation_factor_samples):
         pset.addTerminal(i, TypeWrapper(int))
 
@@ -415,21 +414,20 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         for i in range(len(fields)):
             block_sizes.append([])
 
-            def generate_block_size(block_size, block_size_max, dimension):
-                if dimension == 1:
+            def generate_block_size(block_size_, block_size_max, dimension_):
+                if dimension_ == 1:
                     for k in range(1, block_size_max + 1):
-                        block_sizes[-1].append(block_size + (k,))
+                        block_sizes[-1].append(block_size_ + (k,))
                 else:
                     for k in range(1, block_size_max + 1):
-                        generate_block_size(block_size + (k,), block_size_max, dimension - 1)
+                        generate_block_size(block_size_ + (k,), block_size_max, dimension_ - 1)
 
-            generate_block_size((), maximum_block_size, dimension)
-        maximum_number_of_generatable_terms = 6
+            generate_block_size((), maximum_local_system_size, dimension)
         for block_size_permutation in itertools.product(*block_sizes):
             number_of_terms = 0
             for block_size in block_size_permutation:
                 number_of_terms += reduce(lambda x, y: x * y, block_size)
-            if len(approximation.grid) < number_of_terms <= maximum_number_of_generatable_terms:
+            if len(approximation.grid) < number_of_terms <= maximum_local_system_size:
                 pset.addTerminal(block_size_permutation, types.BlockSize)
     # End: not need for FAS
     add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)

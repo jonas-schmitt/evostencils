@@ -1,0 +1,145 @@
+Function Application {
+  // init
+  startTimer ( "setup" )
+  initGlobals ( )
+  initDomain ( )
+  initFieldsWithZero ( )
+  initGeometry ( )
+  InitFields ( )
+  apply bc to Solution@finest
+  stopTimer ( "setup" )
+
+  // solve
+  startTimer ( "solve" )
+  Solve@finest ( )
+  stopTimer ( "solve" )
+
+  // de-init
+  if ( !getKnowledge ( 'testing_enabled' ) ) {
+    printAllTimers ( )
+  }
+  destroyGlobals ( )
+}
+
+// Dirichlet BC on the top and bottom, Robin BC on the left and right
+Function applyBC_Solution@finest ( ) : Unit {
+
+  loop over Solution only dup [-1, 0] on boundary {
+    Solution@[0, 0] = Solution@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //Solution@[0, 0] = Solution@[1, 0]
+  }
+  loop over Solution only dup [1, 0] on boundary {
+    Solution@[0, 0] = Solution@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //Solution@[0, 0] = Solution@[-1, 0]
+  }
+  loop over Solution only dup [0,  1] on boundary {
+    Solution@[0, 0] = 0.0 
+  }
+  loop over Solution only dup [0, -1] on boundary {
+    Solution@[0, 0] = 0.0
+  }
+}
+
+Function applyBC_u@all ( ) : Unit {
+
+  loop over u only dup [-1, 0] on boundary {
+    u@[0, 0] = u@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //u@[0, 0] = u@[1, 0]
+  }
+  loop over u only dup [1, 0] on boundary {
+    u@[0, 0] = u@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //u@[0, 0] = u@[-1, 0]
+  }
+  loop over u only dup [0,  1] on boundary {
+    u@[0, 0] = 0.0
+  }
+  loop over u only dup [0, -1] on boundary {
+    u@[0, 0] = 0.0
+  }
+}
+
+Function applyBC_res@all ( ) : Unit {
+
+  loop over res only dup [-1, 0] on boundary {
+    res@[0, 0] = res@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+  }
+  loop over res only dup [1, 0] on boundary {
+    res@[0, 0] = res@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+  }
+  loop over res only dup [0,  1] on boundary {
+    res@[0, 0] = 0.0
+  }
+  loop over res only dup [0, -1] on boundary {
+    res@[0, 0] = 0.0
+  }
+}
+
+Function applyBC_gen_residual_u@all ( ) : Unit {
+
+  loop over gen_residual_u only dup [-1, 0] on boundary {
+    gen_residual_u@[0, 0] = gen_residual_u@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+  }
+  loop over gen_residual_u only dup [1, 0] on boundary {
+    gen_residual_u@[0, 0] = gen_residual_u@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+
+  }
+  loop over gen_residual_u only dup [0,  1] on boundary {
+    gen_residual_u@[0, 0] = 0.0
+  }
+  loop over gen_residual_u only dup [0, -1] on boundary {
+    gen_residual_u@[0, 0] = 0.0
+  }
+}
+
+Function applyBC_gen_error_u@all ( ) : Unit {
+
+  loop over gen_error_u only dup [-1, 0] on boundary {
+    gen_error_u@[0, 0] = gen_error_u@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+  }
+  loop over gen_error_u only dup [1, 0] on boundary {
+    gen_error_u@[0, 0] = gen_error_u@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+  }
+  loop over gen_error_u only dup [0,  1] on boundary {
+    gen_error_u@[0, 0] = 0.0
+  }
+  loop over gen_error_u only dup [0, -1] on boundary {
+    gen_error_u@[0, 0] = 0.0
+  }
+}
+
+//Function applyBC_p@(finest and coarsest) ( ) : Unit {
+Function applyBC_p@coarsest ( ) : Unit {
+  loop over p only dup [-1, 0] on boundary {
+    p@[0, 0] = p@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //p@[0, 0] = p@[1, 0]
+  }
+  loop over p only dup [1, 0] on boundary {
+    p@[0, 0] = p@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //p@[0, 0] = p@[-1, 0]
+  }
+  loop over p only dup [0,  1] on boundary {
+    p@[0, 0] = 0.0 
+  }
+  loop over p only dup [0, -1] on boundary {
+    p@[0, 0] = 0.0
+  }
+}
+
+
+//Function applyBC_s@(finest and coarsest) ( ) : Unit {
+Function applyBC_s@coarsest ( ) : Unit {
+  loop over s only dup [-1, 0] on boundary {
+    s@[0, 0] = s@[1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //s@[0, 0] = s@[1, 0]
+  }
+  loop over s only dup [1, 0] on boundary {
+    s@[0, 0] = s@[-1, 0] / (1.0 - (0.0 + 1.0j) * k * vf_gridWidth_x)
+    //s@[0, 0] = s@[-1, 0]
+  }
+  loop over s only dup [0,  1] on boundary {
+    s@[0, 0] = 0.0
+  }
+  loop over s only dup [0, -1] on boundary {
+    s@[0, 0] = 0.0
+  }
+}

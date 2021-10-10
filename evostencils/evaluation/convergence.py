@@ -10,7 +10,9 @@ from typing import List
 def stencil_to_lfa(stencil: periodic.Stencil, grid: base.Grid):
     def recursive_descent(array, dimension):
         if dimension == 1:
-            return [lfa_lab.SparseStencil(element.entries) for element in array]
+            # TODO fix this
+            return [lfa_lab.SparseStencil([(offset, complex(value)) for offset, value in element.entries])
+                    for element in array]
         else:
             return [recursive_descent(element, dimension - 1) for element in array]
 
@@ -26,10 +28,10 @@ def lfa_sparse_stencil_to_constant_stencil(stencil: lfa_lab.SparseStencil):
 
 class ConvergenceEvaluator:
 
-    def __init__(self, dimension, coarsening_factors, lfa_grids):
-        self._lfa_grids = lfa_grids
+    def __init__(self, dimension, coarsening_factors, finest_grid):
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
+        self._lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
 
     @property
     def lfa_grids(self):
@@ -38,8 +40,8 @@ class ConvergenceEvaluator:
     def set_lfa_grids(self, new_lfa_grids: List[lfa_lab.Grid]):
         self._lfa_grids = new_lfa_grids
 
-    def reinitialize_lfa_grids(self, finest_grids: List[base.Grid]):
-        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.step_size) for g in finest_grids]
+    def reinitialize_lfa_grids(self, finest_grid: List[base.Grid]):
+        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.step_size) for g in finest_grid]
 
     @property
     def coarsening_factors(self):

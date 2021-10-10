@@ -33,6 +33,7 @@ class RedBlack:
     def __repr__(self):
         return 'RedBlack()'
 
+
 class FourWay:
     @staticmethod
     def generate(stencil, grid):
@@ -43,6 +44,7 @@ class FourWay:
 
     def __repr__(self):
         return 'FourWay()'
+
 
 class NineWay:
     @staticmethod
@@ -55,6 +57,7 @@ class NineWay:
     def __repr__(self):
         return 'NineWay()'
 
+
 class EightWay:
     @staticmethod
     def generate(stencil, grid):
@@ -65,6 +68,7 @@ class EightWay:
 
     def __repr__(self):
         return 'EightWay()'
+
 
 class TwentySevenWay:
     @staticmethod
