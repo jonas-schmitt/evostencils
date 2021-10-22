@@ -264,7 +264,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         cycle = args[0]
         if FAS:
             correction_FAS = base.mul(restriction, cycle.predecessor.approximation)  # Subract this term for FAS
-            correction_c = base.sub(cycle.approximation, correction_FAS)
+            correction_c = base.sub(cycle, correction_FAS)
             correction = base.mul(interpolation, correction_c)
         else:
             correction = base.mul(interpolation, cycle)
