@@ -129,7 +129,7 @@ elif generate == "PrimitiveSet":
     save_graph()
     program = ProgramGeneratorFAS('Solution', 'RHS', 'Residual', 'Approximation',
                                   'RestrictionNode', 'CorrectionNode',
-                                  'Laplace', 'gamSten', 'mgCycle', 5, 4, 'CGS', 'Smoother')
+                                  'Laplace', 'gamSten', 'mgCycle', 5, 3, 'CGS', 'Smoother')
 
     with open('mgcycle.txt', 'w', newline='\n') as f:
         print(program.generate_mgfunction(obj[0]), file=f)

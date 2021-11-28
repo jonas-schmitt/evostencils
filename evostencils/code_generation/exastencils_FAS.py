@@ -35,12 +35,12 @@ class ProgramGeneratorFAS:
             self.rhs[i] = Field(rhs, i)
             self.residual[i] = Field(residual, i)
             self.FASApproximation[i] = Field(FASApproximation, i)
-            self.restriction[i] = Field(restriction, i)
-            self.prolongation[i] = Field(prolongation, i)
-            self.op_linear[i] = Field(op_linear, i)
+            self.restriction[i] = Stencil(restriction, i)
+            self.prolongation[i] = Stencil(prolongation, i)
+            self.op_linear[i] = Stencil(op_linear, i)
             self.update_rhs[i] = True
             if op_nonlinear is not None:
-                self.op_nonlinear[i] = Field(op_nonlinear, i)
+                self.op_nonlinear[i] = Stencil(op_nonlinear, i)
 
         # mgcycle generated
         self.fct_name = fct_name_mgcycle + f"@{max_level}"
