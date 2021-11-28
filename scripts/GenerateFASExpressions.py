@@ -17,6 +17,7 @@ from plot_computational_graph import get_sub, get_super
 from deap import creator, gp, tools
 from deap import base as deap_base
 from evostencils.genetic_programming import genGrow
+from evostencils.code_generation.exastencils_FAS import ProgramGeneratorFAS
 
 generate = "PrimitiveSet"
 
@@ -45,7 +46,7 @@ def init_toolbox(ipset):
 
 
 if generate == "GraphRepresentation":
-    fg = [Grid([8, 8], [1.0 / 8, 1.0 / 8], 3)]
+    fg = [Grid([32, 32], [1.0 / 8, 1.0 / 8], 5)]
     coarsening_factor = [(2, 2)]
     cg = get_coarse_grid(fg, coarsening_factor)
     ccg = get_coarse_grid(cg, coarsening_factor)
@@ -74,12 +75,15 @@ if generate == "GraphRepresentation":
     rhs = RightHandSide('f', [baseRHS('f', g) for g in fg])
 
     U1 = generate_FAS_v_22_cycle_three_grid(terminals_fine_level, terminals_coarse, rhs)  # terminals_coarse, rhs)
-    U2 = generate_FAS_v_22_cycle_two_grid(terminals_fine_level, rhs)
-    print(U1)
-    print(U1.correction)
-    print(U1.approximation)
     create_graph(U1)
     save_graph()
+    program = ProgramGeneratorFAS('Solution', 'RHS', 'Residual', 'Approximation',
+                                  'RestrictionNode', 'CorrectionNode',
+                                  'Laplace', 'gamSten', 'VCycle', 5, 3, 'CGS', 'Smoother')
+
+    with open('mgcycle.txt', 'w', newline='\n') as f:
+        print(program.generate_mgfunction(U1), file=f)
+
 elif generate == "PrimitiveSet":
 
     # ExaStencils configuration
@@ -123,5 +127,11 @@ elif generate == "PrimitiveSet":
     obj = gp.compile(expr, pset)
     create_graph(obj[0])
     save_graph()
+    program = ProgramGeneratorFAS('Solution', 'RHS', 'Residual', 'Approximation',
+                                  'RestrictionNode', 'CorrectionNode',
+                                  'Laplace', 'gamSten', 'mgCycle', 5, 4, 'CGS', 'Smoother')
+
+    with open('mgcycle.txt', 'w', newline='\n') as f:
+        print(program.generate_mgfunction(obj[0]), file=f)
     # visualize_tree(expr, "graph")
 print("completed")
