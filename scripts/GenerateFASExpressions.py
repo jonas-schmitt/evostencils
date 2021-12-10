@@ -18,8 +18,9 @@ from deap import creator, gp, tools
 from deap import base as deap_base
 from evostencils.genetic_programming import genGrow
 from evostencils.code_generation.exastencils_FAS import ProgramGeneratorFAS
+import pandas as pd
 
-generate = "PrimitiveSet"
+generate = "GraphRepresentation"
 
 
 def visualize_tree(expression, filename):
@@ -77,12 +78,12 @@ if generate == "GraphRepresentation":
     U1 = generate_FAS_v_22_cycle_three_grid(terminals_fine_level, terminals_coarse, rhs)  # terminals_coarse, rhs)
     create_graph(U1)
     save_graph()
-    program = ProgramGeneratorFAS('Solution', 'RHS', 'Residual', 'Approximation',
+    program = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
                                   'RestrictionNode', 'CorrectionNode',
-                                  'Laplace', 'gamSten', 'VCycle', 5, 3, 'CGS', 'Smoother')
+                                  'Laplace', 'gamSten', 'mgCycle', 5, 3, 'CGS', 'Smoother')
 
-    with open('mgcycle.txt', 'w', newline='\n') as f:
-        print(program.generate_mgfunction(U1), file=f)
+    time_solution, convergence_factor, n_iterations = program.evaluate_solver(U1, 3)
+    print(f'time to solution:{time_solution}; convergence factor:{convergence_factor}; n_iterations{n_iterations}')
 
 elif generate == "PrimitiveSet":
 
@@ -121,17 +122,28 @@ elif generate == "PrimitiveSet":
                                                  depth=levels_per_run,
                                                  LevelFinishedType=level_control.generate_finished_type(),
                                                  LevelNotFinishedType=level_control.generate_not_finished_type())
-    toolbox = init_toolbox(pset)
-    expr = toolbox.individual()
-
-    obj = gp.compile(expr, pset)
-    create_graph(obj[0])
-    save_graph()
-    program = ProgramGeneratorFAS('Solution', 'RHS', 'Residual', 'Approximation',
+    program = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
                                   'RestrictionNode', 'CorrectionNode',
-                                  'Laplace', 'gamSten', 'mgCycle', 5, 3, 'CGS', 'Smoother')
+                                  'Laplace', 'gamSten', 'mgCycle', max_level, min_level, 'CGS', 'Smoother')
 
-    with open('mgcycle.txt', 'w', newline='\n') as f:
-        print(program.generate_mgfunction(obj[0]), file=f)
-    # visualize_tree(expr, "graph")
+    toolbox = init_toolbox(pset)
+    time_solution_list = []
+    convergence_factor_list = []
+    n_iterations_list = []
+    for _ in range(20):
+        expr = toolbox.individual()
+        obj = gp.compile(expr, pset)
+        time_solution, convergence_factor, n_iterations = program.evaluate_solver(obj[0], evaluation_samples=1)
+        time_solution_list.append(time_solution)
+        convergence_factor_list.append(convergence_factor)
+        n_iterations_list.append(n_iterations)
+
+    # dictionary of lists
+    dict = {'time to solution (in ms)': time_solution_list, 'convergence factor': convergence_factor_list, 'number of iterations': n_iterations_list}
+
+    df = pd.DataFrame(dict)
+
+    # saving the dataframe
+    df.to_csv('mg_evaluate.csv')
+
 print("completed")
