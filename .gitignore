@@ -97,5 +97,17 @@ ENV/
 # mkdocs documentation
 /site
 
+# Ignore pycache values
+src/__pycache__/
+*.pyc
+
+# Ignore macOS system files
+.DS_Store
+._.DS_Store
+
+# Ignore .idea
+.idea/
+
+
 # mypy
 .mypy_cache/
