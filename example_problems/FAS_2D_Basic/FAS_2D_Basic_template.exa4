@@ -1,0 +1,211 @@
+Domain global< [ 0, 0 ] to [ 1, 1 ] >
+
+Layout NoComm< Real, Node >@all {
+	ghostLayers = [ 0, 0 ]
+	duplicateLayers = [ 1, 1 ]
+}
+Layout BasicComm< Real, Node >@all {
+	ghostLayers = [ 1, 1 ] with communication
+	duplicateLayers = [ 1, 1 ] with communication
+}
+
+Field Solution< global, BasicComm, 0.0 >[2]@(coarsest to (finest - 1))
+Field Solution< global, BasicComm, 0.0 >[2]@finest
+Field Residual< global, BasicComm, 0.0 >@all
+Field RHS< global, NoComm, None >@all
+
+Field Approximation< global, BasicComm, 0.0 >[2]@all
+
+Stencil Laplace@all {
+	[ 0,  0] => ( 2.0 / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) + 2.0 / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) )
+	[ 1,  0] => ( ( -1.0 / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) ) )
+	[-1,  0] => ( ( -1.0 / ( vf_gridWidth_x@current * vf_gridWidth_x@current ) ) )
+	[ 0,  1] => ( ( -1.0 / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) ) )
+	[ 0, -1] => ( ( -1.0 / ( vf_gridWidth_y@current * vf_gridWidth_y@current ) ) )
+}
+Stencil gamSten@all {
+	[ 0,  0] => ( gam * exp( Solution<active>@current ) )
+}
+
+Stencil RestrictionNode@all from default restriction on Node with 'linear'
+Stencil CorrectionNode@all from default prolongation on Node with 'linear'
+
+Globals {
+	Val gam : Real = 10.0
+}
+
+/* basic test problem
+Function rhsFct ( xPos : Real, yPos : Real ) : Real {
+	return (
+		2.0 * ( xPos - xPos ** 2 ) + 2.0 * ( yPos - yPos ** 2 )
+		+ gam * ( ( xPos - xPos ** 2 ) * ( yPos - yPos ** 2 )
+			* exp ( ( xPos - xPos ** 2 ) * ( yPos - yPos ** 2 ) ) ) )
+}
+Function solFct ( xPos : Real, yPos : Real ) : Real {
+	return ( ( xPos - xPos ** 2 ) * ( yPos - yPos ** 2 ) )
+}*/
+/* enhanced test problem */
+Function rhsFct ( xPos : Real, yPos : Real ) : Real {
+	return ( (
+		( 9.0 * PI ** 2 + gam * exp ( solFct ( xPos, yPos ) ) )
+			* ( xPos ** 2 - xPos ** 3 ) + 6.0 * xPos - 2.0 )
+		* sin ( 3.0 * PI * yPos ) )
+}
+Function solFct ( xPos : Real, yPos : Real ) : Real {
+	return ( ( xPos ** 2 - xPos ** 3 ) * sin ( 3.0 * PI * yPos ) )
+}
+
+Function CGS@coarsest ( ) : Unit {
+	// TODO: actual CGS...
+	repeat 30 times {
+		Smoother@current ( )
+	}
+}
+
+
+
+Function Smoother@all ( ) : Unit {
+	communicate ghost of Solution<active>@current
+	loop over Solution@current {
+		Solution<next>@current = Solution<active>@current + 0.8 * (
+			( RHS@current - ( Laplace@current * Solution<active>@current + gamSten@current * Solution<active>@current ) )
+			/ ( diag ( Laplace@current ) + gam * ( 1.0 + Solution<active>@current ) * exp ( Solution<active>@current ) ) )
+	}
+	advance Solution@current
+}
+
+Function UpResidual@all (  ) : Unit {
+	communicate Solution@current
+	loop over Residual@current {
+		Residual@current = RHS@current - ( Laplace@current * Solution@current + gamSten@current * Solution@current )
+	}
+}
+Function NormResidual_0@(coarsest and finest) ( ) : Real {
+	Variable res : Real = 0
+	loop over Residual@current where x > 0 && y > 0 with reduction( + : res ) {
+		res += Residual@current * Residual@current
+	}
+	return sqrt ( res )
+}
+
+Function NormError_0@(finest) ( ) : Real {
+	Variable err : Real = 0
+	loop over Solution@current where x > 0 && y > 0 with reduction( max : err ) {
+		Variable curErr : Real = fabs ( Solution<active>@current
+			- solFct ( vf_nodePosition_x@current, vf_nodePosition_y@current ) )
+		err = max ( err, curErr )
+	}
+	return ( err )
+}
+
+
+
+Function InitSolution ( ) : Unit {
+	loop over Solution@finest {
+		Solution<active>@finest = 0
+	}
+}
+Function InitRHS@finest ( ) : Unit {
+	loop over RHS@current {
+		RHS@current = rhsFct ( vf_nodePosition_x@current, vf_nodePosition_y@current )
+	}
+}
+
+
+
+
+
+Function Solve ( ) : Unit {
+	UpResidual@finest ( )
+	Variable resStart_0 : Real = NormResidual_0@finest (  )
+	Variable res_0 : Real = resStart_0
+	Variable resOld_0 : Real = 0
+		if ( resStart_0 <= 1.0E-12 ) {
+			print ( 'EFFECTIVELY ZERO' )
+		} else if ( resStart_0 <= 1.0E-11 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(1)' )
+			print ( "Initial Residual:",resStart_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		} else if ( resStart_0 <= 1.0E-10 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(2)' )
+			print ( "Initial Residual:",resStart_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		} else if ( resStart_0 <= 1.0E-9 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(3)' )
+			print ( "Initial Residual:",resStart_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		} else {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(4)' )
+			print ( "Initial Residual:",resStart_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		}
+	Variable numIt : Integer = 0
+	Variable t_sol : Real = 0
+	repeat until (res_0 < ( 1.0E-10 * resStart_0 ) || numIt >= 100) {
+		numIt += 1
+		startTimer ( 'cycle' )
+		mgCycle@finest (  )
+		stopTimer ( 'cycle' )
+		t_sol += getTotalFromTimer('cycle')
+		if (getTotalFromTimer ( 'cycle' ) > 1200000 ) {
+			print ( 'Aborting solve after', getTotalFromTimer ( 'cycle' ), 'ms which exceeds the limit of', 1200000, 'ms' )
+			return
+		}
+		UpResidual@finest ( )
+		resOld_0 = res_0
+		res_0 = NormResidual_0@finest (  )
+		if ( res_0 <= 1.0E-12 ) {
+			print ( 'EFFECTIVELY ZERO' )
+		} else if ( res_0 <= 1.0E-11 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(1)' )
+			print ( "Residual after",numIt,"iterations is", res_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		} else if ( res_0 <= 1.0E-10 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(2)' )
+			print ( "Residual after",numIt,"iterations is", res_0 )
+			native ( 'std::cout.precision(oldPrec)' )
+		} else if ( res_0 <= 1.0E-9 ) {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(3)' )
+			print ( "Residual after",numIt,"iterations is", res_0)
+			native ( 'std::cout.precision(oldPrec)' )
+		} else {
+			native ( 'std::streamsize oldPrec = std::cout.precision()' )
+			native ( 'std::cout.precision(4)' )
+			print ( "Residual after",numIt,"iterations is", res_0)
+			native ( 'std::cout.precision(oldPrec)' )
+		}
+	}
+	print ( "total no of iterations",numIt )
+	print ( "time to solution (in ms) is", t_sol)
+}
+
+Function Application ( ) : Unit {
+	initGlobals ( )
+	initDomain ( )
+	initFieldsWithZero ( )
+	InitRHS@finest ( )
+	InitSolution ( )
+
+	apply bc to Solution<0>@3
+	apply bc to Solution<1>@3
+	apply bc to Solution<0>@4
+	apply bc to Solution<1>@4
+	apply bc to Solution<0>@5
+	apply bc to Solution<1>@5
+	
+	Solve ( )
+	destroyGlobals ( )
+}
+
+
+//generated by EvoStencils
+
+
+

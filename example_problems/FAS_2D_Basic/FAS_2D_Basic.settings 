@@ -1,0 +1,20 @@
+user                = "Guest"
+
+configName          = "FAS_2D_Basic"
+
+basePathPrefix      = "./FAS_2D_Basic/"
+
+l4file              = "$configName$.exa4"
+
+debugL1File         = "../debug_FAS/$configName$_debug.exa1"
+debugL2File         = "../debug_FAS/$configName$_debug.exa2"
+debugL3File         = "../debug_FAS/$configName$_debug.exa3"
+debugL4File         = "../debug_FAS/$configName$_debug.exa4"
+
+htmlLogFile         = "../debug_FAS/$configName$_log.html"
+outputPath          = "../generated/$configName$/"
+
+produceHtmlLog      = true
+timeStrategies      = true
+
+buildfileGenerators = { "MakefileGenerator" }
