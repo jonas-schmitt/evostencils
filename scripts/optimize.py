@@ -1,13 +1,15 @@
 from evostencils.optimization.program import Optimizer
+from evostencils.code_generation.exastencils_FAS import ProgramGeneratorFAS
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import sys
 from mpi4py import MPI
 
+FAS = True
+
 
 def main():
-
-    cwd = os.getcwd()
+    cwd = f'{os.getcwd()}/..'
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     # Path to base folder
@@ -20,7 +22,7 @@ def main():
     # Relative path to knowledge file (from base folder)
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
     # Name of the multigrid cycle function
-    cycle_name = "gen_mgCycle" # Default name on L2
+    cycle_name = "gen_mgCycle"  # Default name on L2
     # Additional global parameter values within the PDE system
     pde_parameter_values = None
     # The maximum number of iterations considered acceptable for a solver
@@ -46,7 +48,6 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
-
     model_based_estimation = False
     use_jacobi_prefix = True
     # Experimental and not recommended:
@@ -56,9 +57,14 @@ def main():
         # LFA based estimation inaccurate with jacobi prefix
         use_jacobi_prefix = False
     # Create program generator object
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, mpi_rank,
-                                         cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
-                                         solver_iteration_limit=solver_iteration_limit)
+    if not FAS:
+        program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, mpi_rank,
+                                             cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
+                                             solver_iteration_limit=solver_iteration_limit)
+    else:
+        program_generator = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
+                                                'RestrictionNode', 'CorrectionNode',
+                                                'Laplace', 'gamSten', 'mgCycle', 'CGS', 'Smoother', mpi_rank=mpi_rank)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension  # Dimensionality of the problem

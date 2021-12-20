@@ -1,16 +1,31 @@
 from evostencils.code_generation.layer4 import *
+from evostencils.code_generation import parser
+from evostencils.expressions import base
 from statistics import mean
 import subprocess
 import math
 
-class ProgramGeneratorFAS:
-    def __init__(self, problem_name, solution, rhs, residual, FASApproximation,
-                 restriction, prolongation, op_linear, op_nonlinear,
-                 fct_name_mgcycle, max_level, min_level, fct_cgs, fct_smoother=None):
 
-        # initialize max and min grid levels
-        self.maxlevel = max_level
-        self.minlevel = min_level
+class ProgramGeneratorFAS:
+    def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation, op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0):
+        # ExaStencils configuration
+        self.problem_name = problem_name
+        self.platform_file = "../Compiler/mac.platform"
+        self.build_path = "../example_problems/"
+        self.exastencils_compiler = "../Compiler/Compiler.jar"
+        self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
+        self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
+        self.settings_file_generated = f"{problem_name}/{problem_name}_froml4_{mpi_rank}.settings"
+        self.knowledge_file = f"{problem_name}/{problem_name}.knowledge"
+        self.exa_file_template = f"{problem_name}/{problem_name}_template.exa4"
+        self.exa_file_out = f"{problem_name}/{problem_name}_{mpi_rank}.exa4"
+        self.min_level = 0
+        self.max_level = 0
+        self.dimension = 0
+        self.mpi_rank = mpi_rank
+
+        # get info from knowledge file and set dimensionality, max, min grid levels
+        self.dimension, self.min_level, self.max_level = parser.extract_knowledge_information(self.build_path, self.knowledge_file)
 
         # get function names if already defined in exa4
         self.fct_CGS = fct_cgs
@@ -32,7 +47,7 @@ class ProgramGeneratorFAS:
         else:
             self.op_nonlinear = None
 
-        for i in range(min_level, max_level + 1):
+        for i in range(self.min_level, self.max_level + 1):
             self.solution[i] = Field(solution, i)
             self.rhs[i] = Field(rhs, i)
             self.residual[i] = Field(residual, i)
@@ -45,19 +60,20 @@ class ProgramGeneratorFAS:
                 self.op_nonlinear[i] = Stencil(op_nonlinear, i)
 
         # mgcycle generated
-        self.fct_name = fct_name_mgcycle + f"@{max_level}"
+        self.fct_name = fct_name_mgcycle + f"@{self.max_level}"
         self.fct_mgcycle = None
         self.fct_body = []
 
-        # ExaStencils configuration
-        self.problem_name = problem_name
-        self.platform_file = "../Compiler/mac.platform"
-        self.build_path = "../example_problems/"
-        self.exastencils_compiler = "../Compiler/Compiler.jar"
-        self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
-        self.knowledge_file = f"{problem_name}/{problem_name}.knowledge"
-        self.exa_file_template = f"{problem_name}/{problem_name}_template.exa4"
-        self.exa_file_out = f"{problem_name}/{problem_name}.exa4"
+        # variables to maintain compatibility during optimisation pipeline
+        self.equations, self.operators, self.fields = \
+            parser.extract_l2_information(self.build_path + self.layer3_file, self.dimension, None)
+        size = 2 ** self.max_level
+        grid_size = tuple([size] * self.dimension)
+        h = 1 / (2 ** self.max_level)
+        step_size = tuple([h] * self.dimension)
+        tmp = tuple([2] * self.dimension)
+        self.coarsening_factor = [tmp for _ in range(len(self.fields))]
+        self.finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
 
     def traverse_graph(self, expression):
         def level(obj):
@@ -98,7 +114,7 @@ class ProgramGeneratorFAS:
 
         def updateRHS(rhs_obj):
             if type(rhs_obj).__name__ != "RightHandSide":  # not the finest grid i.e cur_lvl < max_level
-                assert cur_lvl < self.maxlevel
+                assert cur_lvl < self.max_level
 
                 # update rhs field
                 if self.update_rhs[cur_lvl]:  # rhs at the current level is not updated
@@ -241,25 +257,42 @@ class ProgramGeneratorFAS:
             with open(self.build_path + self.exa_file_out, 'w') as f:
                 f.write(file_contents)
 
+            # TODO: modify settings file for each mpi rank
+
+        def modify_settings_file():
+            with open(self.build_path + self.settings_file, 'r') as input_file:
+                with open(self.build_path + self.settings_file_generated, 'w') as output_file:
+                    for line in input_file:
+                        tokens = line.split('=')
+                        lhs = tokens[0].strip(' \n\t')
+                        if lhs == 'configName':
+                            config_name = f'{self.problem_name}_{self.mpi_rank}'
+                            output_file.write(f'  {lhs}\t = "{config_name}"\n')
+                        else:
+                            output_file.write(line)
+
         # create exa4 file with the generated mgcycle function
         create_l4_file()
+
+        # adapt settings file according to mpi rank
+        modify_settings_file()
 
         # generate c++ code with ExaStencils
         subprocess.check_call(["mkdir", "-p", "debug_FAS"], cwd=self.build_path)
         with open(f"{self.build_path}/debug_FAS/generate_output.txt", "w") as f:
             subprocess.check_call(["java", "-cp", self.exastencils_compiler, "Main",
-                                   self.settings_file, self.knowledge_file, self.platform_file],
+                                   self.settings_file_generated, self.knowledge_file, self.platform_file],
                                   stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
 
     def compile_code(self):
         with open(f"{self.build_path}/debug_FAS/build_output.txt", "w") as f:
-            subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + self.problem_name)
+            subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
 
     def execute_code(self):
-        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + self.problem_name)
+        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
         return result.stdout.decode('utf8')
 
-    def evaluate_solver(self, expression, evaluation_samples=3):
+    def generate_and_evaluate(self, *args, **kwargs):
         def parse_output(output):
             lines = output.split('\n')
             res_initial = 0.0
@@ -284,9 +317,18 @@ class ProgramGeneratorFAS:
             else:
                 return t, c, n
 
+        expression = None
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
+        evaluation_samples = 1
+
+        for arg in args:
+            if type(arg).__name__ == 'Cycle':
+                expression = arg
+
+        if 'evaluation_samples' in kwargs:
+            evaluation_samples = kwargs['evaluation_samples']
 
         # create ExaSlang representation of MG expression
         self.fct_body.clear()
@@ -306,3 +348,23 @@ class ProgramGeneratorFAS:
 
         # average evaluated metrics over all samples and return
         return mean(time_solution_list), mean(convergence_factor_list), mean(n_iterations_list)
+
+    # dummy functions to maintain compatibility in the optimisation pipeline
+    def generate_storage(self, *args):
+        empty_list = []
+        return empty_list
+
+    def initialize_code_generation(self, *args):
+        pass
+
+    def generate_cycle_function(self, *args):
+        expression = None
+        for arg in args:
+            if type(arg).__name__ == 'Cycle':
+                expression = arg
+
+        # create ExaSlang representation of MG expression
+        self.fct_body.clear()
+        self.generate_mgfunction(expression)
+
+        return print_exa(self.fct_mgcycle)
