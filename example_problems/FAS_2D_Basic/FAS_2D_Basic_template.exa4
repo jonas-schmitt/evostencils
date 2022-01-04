@@ -57,7 +57,7 @@ Function solFct ( xPos : Real, yPos : Real ) : Real {
 
 Function CGS@coarsest ( ) : Unit {
 	// TODO: actual CGS...
-	repeat 30 times {
+	repeat 100 times {
 		Smoother@current ( )
 	}
 }
@@ -145,7 +145,7 @@ Function Solve ( ) : Unit {
 		}
 	Variable numIt : Integer = 0
 	Variable t_sol : Real = 0
-	repeat until (res_0 < ( 1.0E-10 * resStart_0 ) || numIt >= 100) {
+	repeat until (res_0 < ( 1.0E-10 * resStart_0 ) || numIt >= 300) {
 		numIt += 1
 		startTimer ( 'cycle' )
 		mgCycle@finest (  )
@@ -193,12 +193,16 @@ Function Application ( ) : Unit {
 	InitRHS@finest ( )
 	InitSolution ( )
 
-	apply bc to Solution<0>@3
-	apply bc to Solution<1>@3
-	apply bc to Solution<0>@4
-	apply bc to Solution<1>@4
-	apply bc to Solution<0>@5
-	apply bc to Solution<1>@5
+	apply bc to Solution<0>@6
+	apply bc to Solution<1>@6
+	apply bc to Solution<0>@7
+	apply bc to Solution<1>@7
+	apply bc to Solution<0>@8
+	apply bc to Solution<1>@8
+	apply bc to Solution<0>@9
+	apply bc to Solution<1>@9
+	apply bc to Solution<0>@10
+	apply bc to Solution<1>@10
 	
 	Solve ( )
 	destroyGlobals ( )
