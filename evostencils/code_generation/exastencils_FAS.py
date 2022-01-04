@@ -1,9 +1,11 @@
 from evostencils.code_generation.layer4 import *
 from evostencils.code_generation import parser
 from evostencils.expressions import base
-from statistics import mean
+from statistics import mean, stdev
 import subprocess
 import math
+from evostencils.initialization import multigrid as initialization
+import sympy
 
 
 class ProgramGeneratorFAS:
@@ -11,7 +13,7 @@ class ProgramGeneratorFAS:
         # ExaStencils configuration
         self.problem_name = problem_name
         self.platform_file = "../Compiler/mac.platform"
-        self.build_path = "../example_problems/"
+        self.build_path = "./example_problems/"
         self.exastencils_compiler = "../Compiler/Compiler.jar"
         self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
         self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
@@ -64,9 +66,16 @@ class ProgramGeneratorFAS:
         self.fct_mgcycle = None
         self.fct_body = []
 
-        # variables to maintain compatibility during optimisation pipeline
-        self.equations, self.operators, self.fields = \
-            parser.extract_l2_information(self.build_path + self.layer3_file, self.dimension, None)
+        # required to generate primitive set
+        self.equations = []
+        self.operators = []
+        self.fields = [sympy.Symbol('u')]
+        for i in range(self.min_level, self.max_level + 1):
+            self.equations.append(initialization.EquationInfo('solEq', i, f"( Laplace@{i} * u@{i} ) == RHS_u@{i}"))
+            self.operators.append(initialization.OperatorInfo('RestrictionNode', i, None, base.Restriction))
+            self.operators.append(initialization.OperatorInfo('ProlongationNode', i, None, base.Prolongation))
+            self.operators.append(initialization.OperatorInfo('Laplace', i, None, base.Operator))
+
         size = 2 ** self.max_level
         grid_size = tuple([size] * self.dimension)
         h = 1 / (2 ** self.max_level)
@@ -257,8 +266,6 @@ class ProgramGeneratorFAS:
             with open(self.build_path + self.exa_file_out, 'w') as f:
                 f.write(file_contents)
 
-            # TODO: modify settings file for each mpi rank
-
         def modify_settings_file():
             with open(self.build_path + self.settings_file, 'r') as input_file:
                 with open(self.build_path + self.settings_file_generated, 'w') as output_file:
@@ -279,17 +286,17 @@ class ProgramGeneratorFAS:
 
         # generate c++ code with ExaStencils
         subprocess.check_call(["mkdir", "-p", "debug_FAS"], cwd=self.build_path)
-        with open(f"{self.build_path}/debug_FAS/generate_output.txt", "w") as f:
+        with open(f"{self.build_path}/debug_FAS/generate_output_{self.mpi_rank}.txt", "w") as f:
             subprocess.check_call(["java", "-cp", self.exastencils_compiler, "Main",
                                    self.settings_file_generated, self.knowledge_file, self.platform_file],
                                   stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
 
     def compile_code(self):
-        with open(f"{self.build_path}/debug_FAS/build_output.txt", "w") as f:
+        with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
             subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
 
     def execute_code(self):
-        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):
