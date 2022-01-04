@@ -129,10 +129,10 @@ def main():
     # Option to use random search instead of crossover and mutation to create new individuals
     use_random_search = False
 
-    mu_ = 4  # Population size
-    lambda_ = 4  # Number of offspring
-    generations = 1  # Number of generations
-    population_initialization_factor = 1  # Multiply mu_ by this factor to set the initial population size
+    mu_ = 32  # Population size
+    lambda_ = 32  # Number of offspring
+    generations = 50  # Number of generations
+    population_initialization_factor = 2  # Multiply mu_ by this factor to set the initial population size
 
     # Number of generations after which a generalization is performed
     # This is achieved by incrementing min_level and max_level within the optimization
