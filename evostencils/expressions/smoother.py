@@ -36,3 +36,11 @@ def generate_decoupled_block_jacobi(operator: system.Operator, block_sizes: [tup
                 new_entry = base.ZeroOperator(entry.grid)
             entries[-1].append(new_entry)
     return system.Operator(f'{operator.name}_block_diag', entries)
+
+
+def generate_jacobi_picard(operator: system.Operator):
+    return system.ElementwiseDiagonal(operator)
+
+
+def generate_jacobi_newton(operator: system.Operator, n_newton_steps: int):
+    return base.Addition(system.ElementwiseDiagonal(operator), system.Jacobian(operator, n_newton_steps))
