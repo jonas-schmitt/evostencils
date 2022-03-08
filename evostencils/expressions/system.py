@@ -83,7 +83,7 @@ class ZeroApproximation(Approximation):
 class InterGridOperator(Operator):
     def __init__(self, name, list_of_intergrid_operators, ZeroOperatorType):
         entries = [[intergrid_operator if i == j else ZeroOperatorType(intergrid_operator.fine_grid, intergrid_operator.coarse_grid)
-                    for j in range(len(list_of_intergrid_operators))]for i, intergrid_operator in enumerate(list_of_intergrid_operators)]
+                    for j in range(len(list_of_intergrid_operators))] for i, intergrid_operator in enumerate(list_of_intergrid_operators)]
         super().__init__(name, entries)
 
 
@@ -102,10 +102,18 @@ class Diagonal(base.UnaryExpression):
 
 
 class ElementwiseDiagonal(base.UnaryExpression):
-    #pass
-
-   def __str__(self):
+    def __str__(self):
         return "D"
+
+
+class Jacobian(base.UnaryExpression):
+    def __init__(self, dummy_op, n_newton_steps):
+        self.n_newton_steps = n_newton_steps
+        super().__init__(dummy_op)
+
+    def __str__(self):
+        return f"J[{self.n_newton_steps}]"
+
 
 def get_coarse_grid(grid: [base.Grid], coarsening_factors: List[Tuple[int, ...]]):
     return [base.get_coarse_grid(g, cf) for g, cf in zip(grid, coarsening_factors)]
