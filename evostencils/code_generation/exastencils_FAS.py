@@ -13,7 +13,7 @@ class ProgramGeneratorFAS:
         # ExaStencils configuration
         self.problem_name = problem_name
         self.platform_file = "../Compiler/mac.platform"
-        self.build_path = "./example_problems/"
+        self.build_path = "../example_problems/"
         self.exastencils_compiler = "../Compiler/Compiler.jar"
         self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
         self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
@@ -44,8 +44,14 @@ class ProgramGeneratorFAS:
         self.restriction = {}
         self.prolongation = {}
         self.op_linear = {}
+        self.relaxation_factors = []
+        self.partitioning = []
         if op_nonlinear is not None:
             self.op_nonlinear = {}
+            self.sympy_expr_nonlinear = parser.extract_nonlinear_term(self.build_path, self.exa_file_template, op_nonlinear, solution)
+            self.sympy_symbol_solution = sympy.Symbol(solution)
+            self.sympy_jacobian = sympy.simplify(
+                sympy.diff(self.sympy_expr_nonlinear, self.sympy_symbol_solution))
         else:
             self.op_nonlinear = None
 
@@ -75,6 +81,7 @@ class ProgramGeneratorFAS:
             self.operators.append(initialization.OperatorInfo('RestrictionNode', i, None, base.Restriction))
             self.operators.append(initialization.OperatorInfo('ProlongationNode', i, None, base.Prolongation))
             self.operators.append(initialization.OperatorInfo('Laplace', i, None, base.Operator))
+            # TODO: Use operator names from input instead of hard-coding
 
         size = 2 ** self.max_level
         grid_size = tuple([size] * self.dimension)
@@ -94,7 +101,9 @@ class ProgramGeneratorFAS:
 
             if correction is not None:
                 # update solution fields with correction
-                self.fct_body.append(FieldLoop(solution, [Update(solution, correction)]))
+                relaxation_factor = self.relaxation_factors.pop()
+                self.partitioning.pop()
+                self.fct_body.append(FieldLoop(solution, [Update(solution, Multiplication([relaxation_factor, correction]))]))
 
                 # apply bc
                 self.fct_body.append(ApplyBC(solution))
@@ -182,13 +191,66 @@ class ProgramGeneratorFAS:
         def smoothing():
             residual = expression.operand2
             updateRHS(residual.rhs)
+            relaxation_factor = self.relaxation_factors.pop()
+            partitioning = self.partitioning.pop()
+            RBGS = (partitioning == base.part.RedBlack)
+            if self.fct_smoother is None:
+                loop_stms = []
+                solution = self.solution[cur_lvl]
+                op_linear = self.op_linear[cur_lvl]
+                operator = expression.operand1.operand
+                rhs = self.rhs[cur_lvl]
+                mul_expr = Multiplication([op_linear, solution])
+                if self.op_nonlinear is not None:
+                    op_nonlinear = self.op_nonlinear[cur_lvl]
+                    mul_expr = Addition([mul_expr, Multiplication([op_nonlinear, solution])])
 
-            # call smoother
-            self.fct_body.append(FunctionCall(self.fct_smoother + f'@{cur_lvl}'))
+                # construct correction term for smoothing
+                Jacobian = None
+                n_newton_steps = 1
+                if type(operator).__name__ == "Addition":
+                    Jacobian = str(self.sympy_jacobian.subs(self.sympy_symbol_solution, sympy.Symbol(print_exa(solution))))
+                    n_newton_steps = operator.operand2.n_newton_steps
+                numerator = Subtraction(rhs, mul_expr)
+                if Jacobian is None:
+                    denominator = StencilElement(op_linear, "[0,0]")
+                else:
+                    denominator = Addition([StencilElement(op_linear, "[0,0]"), Jacobian])
+                correction = Division(numerator, denominator)
+
+                # Gather loop stms
+                temp_var = "Solution_old"
+                if not RBGS:
+                    loop_stms.append(Assignment(VariableDecl(temp_var, "Real"), solution))  # TODO: read data type from the exaslang file
+                for _ in range(n_newton_steps):
+                    loop_stms.append(Smoothing(solution, correction, relaxation_factor))
+                if not RBGS:
+                    loop_stms.append(Assignment(FieldSlotted(solution, "next"), solution))
+                    loop_stms.append(Assignment(solution, temp_var))
+
+                # Gather color stms
+                color_stms = []
+                if RBGS:
+                    color_stms.append(Communicate(solution))
+                    color_stms.append(FieldLoop(solution, loop_stms))
+                    color_stms.append(ApplyBC(solution))
+
+                # statements within the function body
+                if not RBGS:
+                    self.fct_body.append(Communicate(solution))
+                    self.fct_body.append(FieldLoop(solution, loop_stms))
+                    self.fct_body.append(Advance(solution))
+                if RBGS:
+                    self.fct_body.append(ApplyColor(["( i0 + i1 ) % 2"], color_stms))
+
+            else:  # call predefined smoother
+                self.fct_body.append(FunctionCall(self.fct_smoother + f'@{cur_lvl}'))
 
         cur_lvl = level(expression)
         expr_type = type(expression).__name__
         if expr_type == "Cycle":
+            self.relaxation_factors.append(expression.relaxation_factor)
+            self.partitioning.append(expression.partitioning)
             solution = updateSolution()
             return solution
 
@@ -199,7 +261,7 @@ class ProgramGeneratorFAS:
             if op_type == "CoarseGridSolver":
                 solution = solve()
                 return solution
-            elif op_type == "Inverse" and self.fct_smoother is not None:  # call predefined smoother
+            elif op_type == "Inverse":
                 smoothing()
                 return None
             elif op_type == "Operator":
@@ -296,7 +358,7 @@ class ProgramGeneratorFAS:
             subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
 
     def execute_code(self):
-        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):
@@ -356,14 +418,6 @@ class ProgramGeneratorFAS:
         # average evaluated metrics over all samples and return
         return mean(time_solution_list), mean(convergence_factor_list), mean(n_iterations_list)
 
-    # dummy functions to maintain compatibility in the optimisation pipeline
-    def generate_storage(self, *args):
-        empty_list = []
-        return empty_list
-
-    def initialize_code_generation(self, *args):
-        pass
-
     def generate_cycle_function(self, *args):
         expression = None
         for arg in args:
@@ -375,3 +429,11 @@ class ProgramGeneratorFAS:
         self.generate_mgfunction(expression)
 
         return print_exa(self.fct_mgcycle)
+
+    # dummy functions to maintain compatibility in the optimisation pipeline
+    def generate_storage(self, *args):
+        empty_list = []
+        return empty_list
+
+    def initialize_code_generation(self, *args):
+        pass

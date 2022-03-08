@@ -13,7 +13,7 @@ class Subtraction:
         self.subtrahend = subtrahend
 
     def pretty_print(self):
-        return f'{print_exa(self.minuend)} - {print_exa(self.subtrahend)} '
+        return f'( {print_exa(self.minuend)} - {print_exa(self.subtrahend)} )'
 
 
 class Multiplication:
@@ -22,6 +22,15 @@ class Multiplication:
 
     def pretty_print(self):
         return "( " + " * ".join(print_exa(s) for s in self.factors) + " )"
+
+
+class Division:
+    def __init__(self, dividend, divisor):
+        self.dividend = dividend
+        self.divisor = divisor
+
+    def pretty_print(self):
+        return f'( {print_exa(self.dividend)} / {print_exa(self.divisor)} )'
 
 
 class FunctionCall:
@@ -33,6 +42,15 @@ class FunctionCall:
 
     def pretty_print(self):
         return self.fct_name + " ( " + (", ".join(print_exa(s) for s in self.args)) + " )"
+
+
+class VariableDecl:
+    def __init__(self, name: str, type: str):
+        self.name = name
+        self.type = type
+
+    def pretty_print(self):
+        return f'Variable {self.name} : {self.type}'
 
 
 class Assignment:
@@ -71,6 +89,14 @@ class ApplyBC:
         return f'apply bc to {print_exa(self.field)}'
 
 
+class Advance:
+    def __init__(self, field):
+        self.field = field
+
+    def pretty_print(self):
+        return f'advance {print_exa(self.field)}'
+
+
 class FieldLoop:
     def __init__(self, field, body):
         self.field = field
@@ -84,6 +110,29 @@ class FieldLoop:
         return expr
 
 
+class ApplyColor:
+    def __init__(self, colors, body):
+        self.colors = colors
+        self.body = body
+
+    def pretty_print(self):
+        expr = f'color with' + ' {\n' \
+               + '  ' + (',\n  '.join(print_exa(s) for s in self.colors)) + ','\
+               + '\n  ' + ('\n  '.join(print_exa(s) for s in self.body))  \
+               + '\n}'
+        return expr
+
+
+class Smoothing:
+    def __init__(self, field, correction, relaxation_factor):
+        self.field = field
+        self.correction = correction
+        self.relaxation_factor = relaxation_factor
+
+    def pretty_print(self):
+        return f'{print_exa(self.field)} += {str(self.relaxation_factor)} * {print_exa(self.correction)}'
+
+
 # -------------------FIELDS AND STENCILS---------------------------------
 class Field:
     def __init__(self, field_name, level):
@@ -94,6 +143,15 @@ class Field:
         return f'{self.field_name}@{self.lvl}'
 
 
+class FieldSlotted:
+    def __init__(self, field, slot):
+        self.field = field
+        self.slot = slot
+
+    def pretty_print(self):
+        return f'{self.field.field_name}<{self.slot}>@{self.field.lvl}'
+
+
 class Stencil:
     def __init__(self, stencil_name, level):
         self.stencil_name = stencil_name
@@ -101,6 +159,15 @@ class Stencil:
 
     def pretty_print(self):
         return f'{self.stencil_name}@{self.lvl}'
+
+
+class StencilElement:
+    def __init__(self, stencil, modifier):
+        self.stencil = stencil
+        self.modifier = modifier
+
+    def pretty_print(self):
+        return f'{self.stencil.stencil_name}@{self.stencil.lvl}:{self.modifier}'
 
 
 # --------------------------------FUNCTIONS---------------------------------------
@@ -127,5 +194,7 @@ class Function:
 def print_exa(expr):
     if type(expr).__name__ == 'str':
         return expr
+    elif 'float' in type(expr).__name__:
+        return str(expr)
     else:
         return expr.pretty_print()
