@@ -1,5 +1,4 @@
 from sympy.parsing.sympy_parser import parse_expr
-
 from evostencils.expressions import base
 import re
 from evostencils.stencils import constant
@@ -141,3 +140,29 @@ def extract_settings_information(base_path: str, relative_file_path: str):
         debug_l3_path = f"{base_path_prefix}/{debug_l3_path.replace('$configName$', config_name)}"
         output_path = f"{base_path_prefix}/{output_path.replace('$configName$', config_name)}"
     return base_path_prefix, config_name, debug_l3_path, output_path
+
+
+def extract_nonlinear_term(base_path: str, relative_file_path: str, stencil_nonlinear: str, solution_field: str):
+    def simplify_expr(ilayer4: str):  # remove field modifiers
+        ilayer4 = re.sub('<[^>]+>', '', ilayer4)  # remove slot modifiers
+        ilayer4 = re.sub('@[^)]+', '', ilayer4)  # remove modifiers starting with @
+        return ilayer4
+
+    # get layer4 expression of the nonlinear term
+    stencil_expr = ""
+    with open(f'{base_path}/{relative_file_path}', 'r') as file:
+        line = file.readline()
+        while line:
+            tokens = line.split(' ')
+            if tokens[0] == "Stencil" and stencil_nonlinear in tokens[1]:
+                line = file.readline()
+                tokens = line.split("=>")
+                stencil_expr = tokens[1]
+                line = False
+            else:
+                line = file.readline()
+
+    nonlinear_expr = simplify_expr(stencil_expr.strip('\n') + " * " + solution_field)
+
+    # convert to sympy
+    return parse_expr(nonlinear_expr)
