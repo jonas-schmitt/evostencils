@@ -16,6 +16,8 @@ from sympy.parsing.sympy_parser import parse_expr
 import itertools
 from functools import reduce
 
+FAS = True
+
 
 class OperatorInfo:
     def __init__(self, name, level, stencil, operator_type=base.Operator):
@@ -220,11 +222,10 @@ class Types:
         self.Partitioning = partitioning.generate_any_partitioning_type()
         # self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
         self.BlockSize = TypeWrapper(tuple)
+        if FAS:
+            self.NewtonSteps = TypeWrapper(int, True)
         self.Finished = FinishedType
         self.NotFinished = NotFinishedType
-
-
-FAS = True
 
 
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
@@ -299,6 +300,15 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
         return smoothing(generate_collective_block_jacobi_fixed, cycle, part.Single, relaxation_factor_index)
 
+    def jacobi_picard(cycle, partitioning_, relaxation_factor_index):
+        return smoothing(smoother.generate_jacobi_picard, cycle, partitioning_, relaxation_factor_index)
+
+    def jacobi_newton(cycle, partitioning_, relaxation_factor_index, n_newton_steps):
+        def generate_jacobi_newton_fixed(operator):
+            return smoother.generate_jacobi_newton(operator, n_newton_steps)
+
+        return smoothing(generate_jacobi_newton_fixed, cycle, partitioning_, relaxation_factor_index)
+
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
 
@@ -308,18 +318,26 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
                           multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
-                      multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
-    pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
-                      multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
-
     # start: Exclude for FAS
     if not FAS:
+        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
+        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
         pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize],
                           multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
         pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize],
                           multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
     # end : Exclude for FAS
+    if FAS:
+        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"jacobi_picard_{level}")
+        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"jacobi_picard_{level}")
+        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"jacobi_newton_{level}")
+        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"jacobi_newton_{level}")
 
     if not coarsest:
         if FAS:
@@ -343,7 +361,7 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
             if FAS:
                 approximation_c = base.mul(cgs, cycle.correction)
                 restricted_solution_FAS = base.mul(restriction, cycle.approximation)
-                correction = base.mul(interpolation, base.sub(approximation_c,restricted_solution_FAS))  # Subtract term for FAS
+                correction = base.mul(interpolation, base.sub(approximation_c, restricted_solution_FAS))  # Subtract term for FAS
             else:
                 correction = base.mul(interpolation, base.mul(cgs, cycle.correction))
             new_cycle = base.Cycle(cycle.approximation, cycle.rhs, correction, predecessor=cycle.predecessor)
@@ -401,7 +419,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     # Start: Exclude for FAS
-    if enable_partitioning and not FAS:
+    if enable_partitioning:
         pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
     # End: Exclude for FAS
     for i in range(0, relaxation_factor_samples):
@@ -430,6 +448,12 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
             if len(approximation.grid) < number_of_terms <= maximum_local_system_size:
                 pset.addTerminal(block_size_permutation, types.BlockSize)
     # End: not need for FAS
+    # Newton Steps
+    if FAS:
+        newton_steps = [1, 2, 3, 4]
+        for i in newton_steps:
+            pset.addTerminal(i, types.NewtonSteps)
+
     add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)
 
     terminal_list = [terminals]
