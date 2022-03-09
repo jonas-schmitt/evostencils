@@ -31,7 +31,7 @@ Stencil RestrictionNode@all from default restriction on Node with 'linear'
 Stencil CorrectionNode@all from default prolongation on Node with 'linear'
 
 Globals {
-	Val gam : Real = 10.0
+	Val gam : Real = 20.0
 }
 
 /* basic test problem
@@ -57,12 +57,10 @@ Function solFct ( xPos : Real, yPos : Real ) : Real {
 
 Function CGS@coarsest ( ) : Unit {
 	// TODO: actual CGS...
-	repeat 100 times {
+	repeat 200 times {
 		Smoother@current ( )
 	}
 }
-
-
 
 Function Smoother@all ( ) : Unit {
 	communicate ghost of Solution<active>@current
