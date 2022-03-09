@@ -358,7 +358,7 @@ class ProgramGeneratorFAS:
             subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
 
     def execute_code(self):
-        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):
