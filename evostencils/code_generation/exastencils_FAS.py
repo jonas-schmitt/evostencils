@@ -378,6 +378,8 @@ class ProgramGeneratorFAS:
                     n = int(line.split('total no of iterations')[1])
                 elif "time to solution (in ms) is" in line:
                     t = float(line.split('time to solution (in ms) is')[1])
+                elif "Aborting solve" in line:
+                    return infinity, infinity, infinity
 
             # calculate asymptotic convergence factor
             c = (res_final / res_initial) ** (1.0 / n)
