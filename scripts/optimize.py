@@ -5,11 +5,10 @@ import os
 import sys
 from mpi4py import MPI
 
-FAS = True
 
 
 def main():
-    cwd = f'{os.getcwd()}/..'
+    cwd = f'{os.getcwd()}'
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     # Path to base folder
@@ -19,14 +18,19 @@ def main():
     # Example problem from L2
     # Relative path to settings file (from base folder)
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # settings_path = f'FAS_2D_Basic/FAS_2D_Basic.settings'
     # Relative path to knowledge file (from base folder)
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # knowledge_path = f'FAS_2D_Basic/FAS_2D_Basic.knowledge'
     # Name of the multigrid cycle function
     cycle_name = "gen_mgCycle"  # Default name on L2
+    # cycle_name = "mgCycle"
     # Additional global parameter values within the PDE system
     pde_parameter_values = None
     # The maximum number of iterations considered acceptable for a solver
     solver_iteration_limit = 500
+    FAS = False
+    # FAS = True
 
     # Example problem from L3
     # Warning: Currently not working, due to a bug in the ExaStencils compiler!

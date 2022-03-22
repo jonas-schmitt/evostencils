@@ -794,6 +794,9 @@ class Optimizer:
         logbooks = []
         hofs = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
+        FAS = False
+        if self._program_generator.uses_FAS:
+            FAS = True
         for i in range(0, levels, levels_per_run):
             min_level = self.max_level - (i + levels_per_run)
             max_level = self.max_level - i
@@ -825,7 +828,8 @@ class Optimizer:
                                                                 maximum_local_system_size=maximum_local_system_size,
                                                                 depth=levels_per_run,
                                                                 LevelFinishedType=self._FinishedType,
-                                                                LevelNotFinishedType=self._NotFinishedType)
+                                                                LevelNotFinishedType=self._NotFinishedType,
+                                                                FAS=FAS)
             self._init_toolbox(pset, node_replacement_probability)
             tmp = None
             if pass_checkpoint:

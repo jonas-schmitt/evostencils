@@ -17,6 +17,11 @@ class Expression(abc.ABC):
     def shape(self):
         pass
 
+    @property
+    @abc.abstractmethod
+    def grid(self):
+        pass
+
     @abc.abstractmethod
     def apply(self, transform: callable, *args):
         pass
@@ -28,9 +33,19 @@ class Expression(abc.ABC):
 
 class Entity(Expression):
 
+    def __init__(self, name, grid, shape):
+        self._name = name
+        self._grid = grid
+        self._shape = shape
+        super().__init__()
+
     @property
     def name(self):
         return self._name
+
+    @property
+    def grid(self):
+        return self._grid
 
     @property
     def shape(self):
@@ -42,7 +57,7 @@ class Entity(Expression):
     def apply(self, _, *args):
         return self
 
-    def mutate(self, f: callable, *args):
+    def mutate(self, _, *args):
         pass
 
 
@@ -74,6 +89,11 @@ class UnaryExpression(Expression):
 
 class BinaryExpression(Expression):
 
+    def __init__(self, operand1, operand2):
+        self._operand1 = operand1
+        self._operand2 = operand2
+        super().__init__()
+
     @property
     def operand1(self):
         return self._operand1
@@ -85,6 +105,10 @@ class BinaryExpression(Expression):
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def grid(self):
+        return self.operand1.grid
 
     def apply(self, transform: callable, *args):
         return type(self)(transform(self.operand1, *args), transform(self.operand2, *args))
@@ -98,12 +122,10 @@ class BinaryExpression(Expression):
 class Operator(Entity):
     def __init__(self, name, grid, stencil_generator):
         import operator
-        self._name = name
-        self._grid = grid
         tmp = reduce(operator.mul, grid.size)
-        self._shape = (tmp, tmp)
+        shape = (tmp, tmp)
         self._stencil_generator = stencil_generator
-        super().__init__()
+        super().__init__(name, grid, shape)
 
     @property
     def grid(self):
@@ -181,10 +203,8 @@ class Grid:
 class Approximation(Entity):
     def __init__(self, name, grid):
         import operator
-        self._name = name
-        self._grid = grid
-        self._shape = (reduce(operator.mul, grid.size), 1)
-        super().__init__()
+        shape = (reduce(operator.mul, grid.size), 1)
+        super().__init__(name, grid, shape)
 
     def __eq__(self, other):
         if not isinstance(other, Approximation):
@@ -327,10 +347,8 @@ class Addition(BinaryExpression):
         # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
         #     "Grids must match"
-        self._operand1 = operand1
-        self._operand2 = operand2
         self._shape = operand1.shape
-        super().__init__()
+        super().__init__(operand1, operand2)
 
     @property
     def grid(self):
@@ -352,10 +370,8 @@ class Subtraction(BinaryExpression):
         # assert operand1.shape == operand2.shape, "Operand shapes are not equal"
         # assert operand1.grid.size == operand2.grid.size and operand1.grid.step_size == operand2.grid.step_size, \
         #     "Grids must match"
-        self._operand1 = operand1
-        self._operand2 = operand2
         self._shape = operand1.shape
-        super().__init__()
+        super().__init__(operand1, operand2)
 
     @property
     def grid(self):
@@ -375,10 +391,8 @@ class Multiplication(BinaryExpression):
 
     def __init__(self, operand1, operand2):
         assert operand1.shape[1] == operand2.shape[0], "Operand shapes are not aligned"
-        self._operand1 = operand1
-        self._operand2 = operand2
         self._shape = (operand1.shape[0], operand2.shape[1])
-        super().__init__()
+        super().__init__(operand1, operand2)
 
     @property
     def grid(self):
@@ -557,19 +571,14 @@ class ZeroProlongation(Prolongation):
 
 class CoarseGridSolver(Entity):
     def __init__(self, operator, expression=None):
-        self._name = "CGS"
-        self._shape = operator.shape
+        shape = operator.shape
         self._operator = operator
         self._expression = expression
-        super().__init__()
+        super().__init__("CGS", operator.grid, shape)
 
     @staticmethod
     def generate_stencil():
         return None
-
-    @property
-    def grid(self):
-        return self.operator.grid
 
     @property
     def operator(self):

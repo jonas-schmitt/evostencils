@@ -16,7 +16,9 @@ from sympy.parsing.sympy_parser import parse_expr
 import itertools
 from functools import reduce
 
-FAS = True
+
+class NewtonSteps:
+    pass
 
 
 class OperatorInfo:
@@ -203,7 +205,7 @@ class Terminals:
 
 
 class Types:
-    def __init__(self, terminals: Terminals, FinishedType, NotFinishedType):
+    def __init__(self, terminals: Terminals, FinishedType, NotFinishedType, FAS=False):
         types = [grid_types.generate_grid_type(grid.size) for grid in terminals.grid]
         self.Grid = multiple.generate_type_list(*types)
         types = [grid_types.generate_correction_type(grid.size) for grid in terminals.grid]
@@ -223,13 +225,13 @@ class Types:
         # self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
         self.BlockSize = TypeWrapper(tuple)
         if FAS:
-            self.NewtonSteps = TypeWrapper(int, True)
+            self.NewtonSteps = TypeWrapper(NewtonSteps)
         self.Finished = FinishedType
         self.NotFinished = NotFinishedType
 
 
 def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
-              coarsest=False):
+              coarsest=False, FAS=False):
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
 
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
@@ -396,7 +398,8 @@ def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
                            maximum_local_system_size=8, relaxation_factor_samples=37,
-                           coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None):
+                           coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None,
+                           FAS=False):
     assert depth >= 1, "The maximum number of cycles must be greater zero"
     coarsest = False
     cgs_expression = None
@@ -414,7 +417,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
         LevelNotFinishedType = level_control.generate_not_finished_type()
-    types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
+    types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
     pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS, types.Finished))
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
@@ -454,7 +457,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         for i in newton_steps:
             pset.addTerminal(i, types.NewtonSteps)
 
-    add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest)
+    add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest, FAS=FAS)
 
     terminal_list = [terminals]
     for i in range(1, depth):
@@ -479,8 +482,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
 
         terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction,
                               prolongation, cgs_expression)
-        types = Types(terminals, LevelFinishedType, LevelNotFinishedType)
-        add_cycle(pset, terminals, types, i, relaxation_factor_samples, coarsest)
+        types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
+        add_cycle(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
         terminal_list.append(terminals)
 
     return pset, terminal_list

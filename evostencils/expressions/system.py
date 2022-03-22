@@ -2,19 +2,44 @@ from evostencils.expressions import base
 from typing import List, Tuple
 
 
-class Operator(base.Entity):
+class System(base.Expression):
 
-    def __init__(self, name, entries):
+    def __init__(self, name, entries, shape):
         self._name = name
         self._entries = entries
+        self._shape = shape
+        super().__init__()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def entries(self):
+        return self._entries
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def apply(self, _, *args):
+        return self
+
+    def mutate(self, _, *args):
+        pass
+
+
+class Operator(System):
+
+    def __init__(self, name, entries):
         shape = [0, 0]
         for row in entries:
             entry = row[0]
             shape[0] += entry.shape[0]
         for entry in entries[0]:
             shape[1] += entry.shape[1]
-        self._shape = tuple(shape)
-        super().__init__()
+        shape = tuple(shape)
+        super().__init__(name, entries, shape)
 
     @property
     def entries(self):
@@ -44,19 +69,17 @@ class Identity(Operator):
         super().__init__(name, entries)
 
 
-class Approximation(base.Entity):
+class Approximation(System):
 
     def __init__(self, name, entries):
-        self._name = name
-        self._entries = entries
         if len(entries) == 1:
-            self._shape = entries[0].shape
+            shape = entries[0].shape
         else:
             acc = 0
             for entry in entries:
                 acc += entry.shape[0]
-            self._shape = tuple((acc, entries[0].shape[1]))
-        super().__init__()
+            shape = tuple((acc, entries[0].shape[1]))
+        super().__init__(name, entries, shape)
 
     @property
     def entries(self):

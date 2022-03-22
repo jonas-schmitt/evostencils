@@ -11,11 +11,12 @@ import sympy
 class ProgramGeneratorFAS:
     def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation, op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0):
         # ExaStencils configuration
+        # TODO pass paths as argument as in original code generator
         self.problem_name = problem_name
-        self.platform_file = "../Compiler/mac.platform"
-        self.build_path = "../example_problems/"
-        self.exastencils_compiler = "../Compiler/Compiler.jar"
-        self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
+        self.platform_file = "lib/linux.platform"
+        self.build_path = "example_problems/"
+        self.exastencils_compiler = "../../exastencils/Compiler/Compiler.jar"
+        # self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
         self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
         self.settings_file_generated = f"{problem_name}/{problem_name}_froml4_{mpi_rank}.settings"
         self.knowledge_file = f"{problem_name}/{problem_name}.knowledge"
@@ -90,6 +91,10 @@ class ProgramGeneratorFAS:
         tmp = tuple([2] * self.dimension)
         self.coarsening_factor = [tmp for _ in range(len(self.fields))]
         self.finest_grid = [base.Grid(grid_size, step_size, self.max_level) for _ in range(len(self.fields))]
+
+    @property
+    def uses_FAS(self):
+        return True
 
     def traverse_graph(self, expression):
         def level(obj):

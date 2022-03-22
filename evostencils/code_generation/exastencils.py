@@ -104,6 +104,10 @@ class ProgramGenerator:
         self._field_declaration_cache = set()
 
     @property
+    def uses_FAS(self):
+        return False
+
+    @property
     def absolute_compiler_path(self):
         return self._absolute_compiler_path
 
