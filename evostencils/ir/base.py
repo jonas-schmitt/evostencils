@@ -1,6 +1,6 @@
 import abc
 from functools import reduce
-from evostencils.expressions import partitioning as part
+from evostencils.ir import partitioning as part
 from evostencils.stencils import periodic, gallery
 from evostencils.stencils import constant
 
@@ -170,10 +170,10 @@ class ZeroOperator(Operator):
 
 
 class Grid:
-    def __init__(self, size, step_size, level):
-        assert len(size) == len(step_size), "Dimensions of the size and step size must match"
+    def __init__(self, size, spacing, level):
+        assert len(size) == len(spacing), "Dimensions of the size and step size must match"
         self._size = size
-        self._step_size = step_size
+        self._spacing = spacing
         self._level = level
 
     @property
@@ -181,8 +181,8 @@ class Grid:
         return self._size
 
     @property
-    def step_size(self):
-        return self._step_size
+    def spacing(self):
+        return self._spacing
 
     @property
     def level(self):
@@ -194,10 +194,10 @@ class Grid:
 
     def __eq__(self, other):
         if isinstance(other, Grid):
-            return self.size == other.size and self.step_size == other.step_size
+            return self.size == other.size and self.spacing == other.spacing
 
     def __repr__(self):
-        return f'Grid({repr(self.size)}, {repr(self.step_size)}'
+        return f'Grid({repr(self.size)}, {repr(self.spacing)}'
 
 
 class Approximation(Entity):
@@ -719,7 +719,7 @@ class Cycle(Expression):
 
 def get_coarse_grid(grid: Grid, coarsening_factor):
     coarse_size = tuple(size // factor for size, factor in zip(grid.size, coarsening_factor))
-    coarse_step_size = tuple(h * factor for h, factor in zip(grid.step_size, coarsening_factor))
+    coarse_step_size = tuple(h * factor for h, factor in zip(grid.spacing, coarsening_factor))
     coarse_level = grid.level - 1
     return Grid(coarse_size, coarse_step_size, coarse_level)
 

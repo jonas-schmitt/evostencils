@@ -1,14 +1,14 @@
 import os
 
-from evostencils.expressions import base, system
-from evostencils.expressions.reference_cycles import generate_v_22_cycle_three_grid, generate_FAS_v_22_cycle_two_grid, generate_v_22_cycle_two_grid, generate_FAS_v_22_cycle_three_grid
-from evostencils.initialization.multigrid import Terminals, generate_primitive_set
-from evostencils.expressions.base import Grid, sub
-from evostencils.expressions.base import Operator as baseOperator
-from evostencils.expressions.base import Restriction as baseRestriction
-from evostencils.expressions.base import Prolongation as baseProlongation
-from evostencils.expressions.base import RightHandSide as baseRHS
-from evostencils.expressions.system import RightHandSide, ZeroApproximation, Operator, Restriction, Prolongation, get_coarse_grid, get_coarse_operator
+from evostencils.ir import base, system
+from evostencils.ir.reference_cycles import generate_v_22_cycle_three_grid, generate_FAS_v_22_cycle_two_grid, generate_v_22_cycle_two_grid, generate_FAS_v_22_cycle_three_grid
+from evostencils.grammar.multigrid import Terminals, generate_primitive_set
+from evostencils.ir.base import Grid, sub
+from evostencils.ir.base import Operator as baseOperator
+from evostencils.ir.base import Restriction as baseRestriction
+from evostencils.ir.base import Prolongation as baseProlongation
+from evostencils.ir.base import RightHandSide as baseRHS
+from evostencils.ir.system import RightHandSide, ZeroApproximation, Operator, Restriction, Prolongation, get_coarse_grid, get_coarse_operator
 from evostencils.stencils.gallery import Poisson2D
 from evostencils.types import level_control
 from scripts.plot_computational_graph import create_graph, save_graph

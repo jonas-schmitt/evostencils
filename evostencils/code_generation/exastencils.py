@@ -1,6 +1,6 @@
-from evostencils.expressions import base, partitioning as part, system, transformations
-from evostencils.expressions import krylov_subspace
-from evostencils.initialization import multigrid
+from evostencils.ir import base, partitioning as part, system, transformations
+from evostencils.ir import krylov_subspace
+from evostencils.grammar import multigrid
 from evostencils.code_generation import parser
 import os
 import subprocess

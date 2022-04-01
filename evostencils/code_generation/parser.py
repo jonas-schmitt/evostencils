@@ -1,8 +1,8 @@
 from sympy.parsing.sympy_parser import parse_expr
-from evostencils.expressions import base
+from evostencils.ir import base
 import re
 from evostencils.stencils import constant
-from evostencils.initialization import multigrid as initialization
+from evostencils.grammar import multigrid as initialization
 
 
 def parse_stencil_offsets(string: str, is_prolongation=False):

@@ -1,7 +1,7 @@
 import lfa_lab
 import evostencils.stencils.periodic as periodic
 import evostencils.stencils.constant as constant
-from evostencils.expressions import base, system, partitioning
+from evostencils.ir import base, system, partitioning
 from multiprocessing import Process, Queue
 from typing import List
 
@@ -31,7 +31,7 @@ class ConvergenceEvaluator:
     def __init__(self, dimension, coarsening_factors, finest_grid):
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
-        self._lfa_grids = [lfa_lab.Grid(dimension, g.step_size) for g in finest_grid]
+        self._lfa_grids = [lfa_lab.Grid(dimension, g.spacing) for g in finest_grid]
 
     @property
     def lfa_grids(self):
@@ -41,7 +41,7 @@ class ConvergenceEvaluator:
         self._lfa_grids = new_lfa_grids
 
     def reinitialize_lfa_grids(self, finest_grid: List[base.Grid]):
-        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.step_size) for g in finest_grid]
+        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.spacing) for g in finest_grid]
 
     @property
     def coarsening_factors(self):
@@ -53,10 +53,10 @@ class ConvergenceEvaluator:
 
     def get_lfa_grid(self, grid: base.Grid, i: int):
         lfa_grid = self.lfa_grids[i]
-        step_size = lfa_grid.step_size()
-        while step_size < grid.step_size:
+        step_size = lfa_grid.spacing()
+        while step_size < grid.spacing:
             lfa_grid = lfa_grid.coarse(self.coarsening_factors[i])
-            step_size = lfa_grid.step_size()
+            step_size = lfa_grid.spacing()
         return lfa_grid
 
     def transform(self, expression: base.Expression):

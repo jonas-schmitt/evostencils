@@ -1,4 +1,4 @@
-from evostencils.expressions import base, system
+from evostencils.ir import base, system
 from evostencils.code_generation.exastencils import ProgramGenerator
 from deap import creator, tools, algorithms, cma
 import deap

@@ -1,5 +1,5 @@
-from evostencils.expressions import base, system, smoother
-from evostencils.initialization import multigrid as mg
+from evostencils.ir import base, system, smoother
+from evostencils.grammar import multigrid as mg
 
 
 def generate_v_22_cycle_three_grid(terminals_fine_level: mg.Terminals, terminals_coarse_level: mg.Terminals, rhs: system.RightHandSide):

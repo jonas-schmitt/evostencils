@@ -1,10 +1,10 @@
 from evostencils.code_generation.layer4 import *
 from evostencils.code_generation import parser
-from evostencils.expressions import base
+from evostencils.ir import base
 from statistics import mean, stdev
 import subprocess
 import math
-from evostencils.initialization import multigrid as initialization
+from evostencils.grammar import multigrid as initialization
 import sympy
 
 

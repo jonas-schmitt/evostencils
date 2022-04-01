@@ -1,4 +1,4 @@
-from evostencils.expressions.base import Entity
+from evostencils.ir.base import Entity
 
 
 class KrylovSubspaceMethod(Entity):

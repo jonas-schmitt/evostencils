@@ -3,8 +3,8 @@ from deap import gp, creator, tools
 import random
 import pickle
 import os.path
-from evostencils.initialization import multigrid as multigrid_initialization
-from evostencils.expressions import base, transformations, system
+from evostencils.grammar import multigrid as multigrid_initialization
+from evostencils.ir import base, transformations, system
 from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
 from evostencils.types import level_control
 import math

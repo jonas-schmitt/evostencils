@@ -1,8 +1,8 @@
-from evostencils.expressions import base
-from evostencils.expressions import system
-from evostencils.expressions import partitioning as part
-from evostencils.expressions import smoother
-from evostencils.expressions.base import ConstantStencilGenerator
+from evostencils.ir import base
+from evostencils.ir import system
+from evostencils.ir import partitioning as part
+from evostencils.ir import smoother
+from evostencils.ir.base import ConstantStencilGenerator
 from evostencils.types import operator as matrix_types
 from evostencils.types import grid as grid_types
 from evostencils.types import multiple

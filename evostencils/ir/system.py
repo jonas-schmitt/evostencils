@@ -1,4 +1,4 @@
-from evostencils.expressions import base
+from evostencils.ir import base
 from typing import List, Tuple
 
 

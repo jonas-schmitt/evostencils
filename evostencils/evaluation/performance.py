@@ -1,11 +1,11 @@
-from evostencils.expressions import base, partitioning, system
+from evostencils.ir import base, partitioning, system
 import evostencils.stencils.periodic as periodic
 from functools import reduce
 
 
 class PerformanceEvaluator:
     """
-    Class for estimating the performance of matrix expressions by applying a simple roofline model
+    Class for estimating the performance of matrix ir by applying a simple roofline model
     """
     def __init__(self, peak_performance: float, peak_bandwidth: float, bytes_per_word: int,
                  runtime_coarse_grid_solver=0):

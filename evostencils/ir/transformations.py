@@ -1,4 +1,4 @@
-from evostencils.expressions import base, system
+from evostencils.ir import base, system
 from evostencils.stencils import constant, periodic
 import sympy
 

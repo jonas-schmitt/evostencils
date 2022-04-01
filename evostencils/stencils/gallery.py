@@ -16,7 +16,7 @@ class StencilGenerator(abc.ABC):
 class Poisson1D(StencilGenerator):
 
     def generate_stencil(self, grid):
-        h, = grid.step_size
+        h, = grid.spacing
         entries = [
             ((-1,), -1 / (h * h)),
             ((0,), 2 / (h * h)),
@@ -33,7 +33,7 @@ class Poisson2D(StencilGenerator):
 
     def generate_stencil(self, grid):
         eps = 1.0
-        h0, h1 = grid.step_size
+        h0, h1 = grid.spacing
         entries = [
             ((0, -1), -1 / (h1 * h1)),
             ((-1, 0), -1 / (h0 * h0) * eps),
@@ -58,7 +58,7 @@ Operator A from Stencil {
 class Poisson3D(StencilGenerator):
 
     def generate_stencil(self, grid):
-        h0, h1, h2 = grid.step_size
+        h0, h1, h2 = grid.spacing
         entries = [
             ((0, 0, 0), 2 / (h0 * h0) + 2 / (h1 * h1) + 2 / (h2 * h2)),
             ((-1, 0, 0), -1 / (h0 * h0)),
@@ -99,7 +99,7 @@ class Poisson2DVariableCoefficients(StencilGenerator):
     def generate_stencil(self, grid):
         pos_x = self.position[0]
         pos_y = self.position[1]
-        width_x, width_y = grid.step_size
+        width_x, width_y = grid.spacing
         entries = [
             ((0, 0), (((self.get_coefficient((pos_x + (0.5 * width_x)), pos_y) + self.get_coefficient((pos_x - (0.5 * width_x)), pos_y))
                        / (width_x * width_x))
@@ -150,7 +150,7 @@ class Poisson3DVariableCoefficients(StencilGenerator):
 
     def generate_stencil(self, grid):
         vf_nodePosition_x, vf_nodePosition_y, vf_nodePosition_z = self.position
-        vf_gridWidth_x, vf_gridWidth_y, vf_gridWidth_z = grid.step_size
+        vf_gridWidth_x, vf_gridWidth_y, vf_gridWidth_z = grid.spacing
         getCoefficient = self.get_coefficient
         entries = [
             ((0, 0, 0), ( ( ( ( getCoefficient ( ( vf_nodePosition_x + ( 0.5 * vf_gridWidth_x ) ), vf_nodePosition_y, vf_nodePosition_z ) + getCoefficient ( ( vf_nodePosition_x - ( 0.5 * vf_gridWidth_x ) ), vf_nodePosition_y, vf_nodePosition_z ) ) / ( vf_gridWidth_x * vf_gridWidth_x ) ) + ( ( getCoefficient ( vf_nodePosition_x, ( vf_nodePosition_y + ( 0.5 * vf_gridWidth_y ) ), vf_nodePosition_z ) + getCoefficient ( vf_nodePosition_x, ( vf_nodePosition_y - ( 0.5 * vf_gridWidth_y ) ), vf_nodePosition_z ) ) / ( vf_gridWidth_y * vf_gridWidth_y ) ) ) + ( ( getCoefficient ( vf_nodePosition_x, vf_nodePosition_y, ( vf_nodePosition_z + ( 0.5 * vf_gridWidth_z ) ) ) + getCoefficient ( vf_nodePosition_x, vf_nodePosition_y, ( vf_nodePosition_z - ( 0.5 * vf_gridWidth_z ) ) ) ) / ( vf_gridWidth_z * vf_gridWidth_z ) ) )),
@@ -193,7 +193,7 @@ class MultilinearInterpolationGenerator:
     def generate_stencil(self, grid):
         import lfa_lab as lfa
         from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
-        lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
+        lfa_grid = lfa.Grid(grid.dimension, grid.spacing)
         lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
         return lfa_sparse_stencil_to_constant_stencil(lfa_interpolation)
 
@@ -210,7 +210,7 @@ class FullWeightingRestrictionGenerator:
     def generate_stencil(self, grid):
         import lfa_lab as lfa
         from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
-        lfa_grid = lfa.Grid(grid.dimension, grid.step_size)
+        lfa_grid = lfa.Grid(grid.dimension, grid.spacing)
         lfa_restriction = lfa.gallery.fw_restriction_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
         return lfa_sparse_stencil_to_constant_stencil(lfa_restriction)
 
