@@ -169,14 +169,14 @@ Function PreconditionedBiCGStab@finest {
     p         = Residual + beta * ( p - omega * ap )
     u = 0
     f = p
-    mgCycle()
+    gen_mgCycle()
     ap        = A * u
     alpha     = rhoNew / dot ( resHat, ap )
     h         = Solution + alpha * u
     s         = Residual - alpha * ap
     u = 0
     f = s
-    mgCycle()
+    gen_mgCycle()
     t = A * u
     omega     = dot ( t, s ) / dot ( t, t )
     Solution = h + omega * u
@@ -237,7 +237,7 @@ Function PostSmoother@all {
   }*/
 }
 
-Function mgCycle@(coarsest + 2 to finest) {
+Function gen_mgCycle@(coarsest + 2 to finest) {
 
   PreSmoother()
 
@@ -245,7 +245,7 @@ Function mgCycle@(coarsest + 2 to finest) {
   f@coarser = Restriction_u * res
 
   u@coarser = 0.0
-  mgCycle@coarser ( )
+  gen_mgCycle@coarser ( )
 
   u += Prolongation_u@coarser * u@coarser
 
@@ -255,14 +255,14 @@ Function mgCycle@(coarsest + 2 to finest) {
 
 /// Preconditioner
 
-Function mgCycle@(coarsest + 1) {
+Function gen_mgCycle@(coarsest + 1) {
   PreSmoother()
 
   res = f - M * u
   f@coarser = Restriction_u * res
 
   gen_error_u@coarser = 0.0
-  mgCycle@coarser ( )
+  gen_mgCycle@coarser ( )
   u@coarser = gen_error_u@coarser
 
   u += Prolongation_u@coarser * u@coarser
@@ -393,7 +393,7 @@ Field s@coarsest on boundary = applyBC_s@coarsest()
 Field t@coarsest with Complex<Real> on Node of global
 Field resHat@coarsest with Complex<Real> on Node of global
 
-Function mgCycle@coarsest {
+Function gen_mgCycle@coarsest {
   // init residual
   gen_residual_u    = f - M * gen_error_u
   Var curRes  : Complex<Real> = sqrt(dot(gen_residual_u, gen_residual_u))

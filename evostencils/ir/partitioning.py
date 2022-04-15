@@ -1,6 +1,6 @@
 import abc
 import evostencils.stencils.constant as constant
-import evostencils.stencils.periodic as periodic
+import evostencils.stencils.multiple as multiple
 
 
 class Partitioning(abc.ABC):
@@ -28,7 +28,7 @@ class RedBlack:
         if stencil is None:
             return [None]
         else:
-            return periodic.red_black_partitioning(stencil, grid)
+            return multiple.red_black_partitioning(stencil, grid)
 
     def __repr__(self):
         return 'RedBlack()'

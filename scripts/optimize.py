@@ -18,19 +18,22 @@ def main():
     # Example problem from L2
     # Relative path to settings file (from base folder)
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
     # settings_path = f'FAS_2D_Basic/FAS_2D_Basic.settings'
     # Relative path to knowledge file (from base folder)
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
     # knowledge_path = f'FAS_2D_Basic/FAS_2D_Basic.knowledge'
     # Name of the multigrid cycle function
-    cycle_name = "gen_mgCycle"  # Default name on L2
-    # cycle_name = "mgCycle"
+    cycle_name = "gen_mgCycle"  # Default name
     # Additional global parameter values within the PDE system
     pde_parameter_values = None
     # The maximum number of iterations considered acceptable for a solver
     solver_iteration_limit = 500
     FAS = False
-    # FAS = True
+    # Hacky solution for now
+    if "FAS" in knowledge_path or "FAS" in settings_path:
+        FAS = True
 
     # Example problem from L3
     # Warning: Currently not working, due to a bug in the ExaStencils compiler!
@@ -66,9 +69,10 @@ def main():
                                              cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
                                              solver_iteration_limit=solver_iteration_limit)
     else:
+        # Warning: FAS Support experimental, requires adaption of the symbol names provided to this class
         program_generator = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
                                                 'RestrictionNode', 'CorrectionNode',
-                                                'Laplace', 'gamSten', 'mgCycle', 'CGS', 'Smoother', mpi_rank=mpi_rank)
+                                                'Laplace', 'gamSten', cycle_name, 'CGS', 'Smoother', mpi_rank=mpi_rank)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension  # Dimensionality of the problem

@@ -1,7 +1,7 @@
 import abc
 from functools import reduce
 from evostencils.ir import partitioning as part
-from evostencils.stencils import periodic, gallery
+from evostencils.stencils import multiple, gallery
 from evostencils.stencils import constant
 
 
@@ -104,7 +104,7 @@ class BinaryExpression(Expression):
 
     @property
     def shape(self):
-        return self._shape
+        raise NotImplementedError("Shape undefined in binary expression")
 
     @property
     def grid(self):
@@ -120,7 +120,7 @@ class BinaryExpression(Expression):
 
 # Entities
 class Operator(Entity):
-    def __init__(self, name, grid, stencil_generator):
+    def __init__(self, name, grid, stencil_generator=None):
         import operator
         tmp = reduce(operator.mul, grid.size)
         shape = (tmp, tmp)
@@ -260,7 +260,7 @@ class ZeroApproximation(Approximation):
 # Unary Expressions
 class Diagonal(UnaryExpression):
     def generate_stencil(self):
-        return periodic.diagonal(self.operand.generate_stencil())
+        return multiple.diagonal(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.diag'
@@ -271,7 +271,7 @@ class Diagonal(UnaryExpression):
 
 class LowerTriangle(UnaryExpression):
     def generate_stencil(self):
-        return periodic.lower(self.operand.generate_stencil())
+        return multiple.lower(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.lower'
@@ -282,7 +282,7 @@ class LowerTriangle(UnaryExpression):
 
 class UpperTriangle(UnaryExpression):
     def generate_stencil(self):
-        return periodic.upper(self.operand.generate_stencil())
+        return multiple.upper(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.upper'
@@ -297,7 +297,7 @@ class BlockDiagonal(UnaryExpression):
         super().__init__(operand)
 
     def generate_stencil(self):
-        return periodic.block_diagonal(self.operand.generate_stencil(), self.block_size)
+        return multiple.block_diagonal(self.operand.generate_stencil(), self.block_size)
 
     @property
     def block_size(self):
@@ -315,7 +315,7 @@ class BlockDiagonal(UnaryExpression):
 
 class Inverse(UnaryExpression):
     def generate_stencil(self):
-        return periodic.inverse(self.operand.generate_stencil())
+        return multiple.inverse(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.I'
@@ -331,7 +331,7 @@ class Transpose(UnaryExpression):
         super().__init__(operand)
 
     def generate_stencil(self):
-        return periodic.transpose(self.operand.generate_stencil())
+        return multiple.transpose(self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.operand)}.T'
@@ -354,8 +354,12 @@ class Addition(BinaryExpression):
     def grid(self):
         return self.operand1.grid
 
+    @property
+    def shape(self):
+        return self._shape
+
     def generate_stencil(self):
-        return periodic.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return multiple.add(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} + {str(self.operand2)})'
@@ -377,8 +381,12 @@ class Subtraction(BinaryExpression):
     def grid(self):
         return self.operand1.grid
 
+    @property
+    def shape(self):
+        return self._shape
+
     def generate_stencil(self):
-        return periodic.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return multiple.sub(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} - {str(self.operand2)})'
@@ -398,8 +406,12 @@ class Multiplication(BinaryExpression):
     def grid(self):
         return self.operand1.grid
 
+    @property
+    def shape(self):
+        return self._shape
+
     def generate_stencil(self):
-        return periodic.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
+        return multiple.mul(self.operand1.generate_stencil(), self.operand2.generate_stencil())
 
     def __str__(self):
         return f'({str(self.operand1)} * {str(self.operand2)})'
@@ -434,7 +446,7 @@ class Scaling(Expression):
         return self._shape
 
     def generate_stencil(self):
-        return periodic.scale(self.factor, self.operand.generate_stencil())
+        return multiple.scale(self.factor, self.operand.generate_stencil())
 
     def __str__(self):
         return f'{str(self.factor)} * {str(self.operand)}'
@@ -649,7 +661,7 @@ class Residual(Expression):
 
 
 class Cycle(Expression):
-    def __init__(self, approximation, rhs, correction, partitioning=part.Single,
+    def __init__(self, approximation, rhs, correction=None, partitioning=part.Single,
                  relaxation_factor=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \

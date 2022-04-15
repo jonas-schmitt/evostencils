@@ -148,7 +148,7 @@ Function Solve ( ) : Unit {
 	repeat until (res_0 < ( 1.0E-10 * resStart_0 ) || numIt >= 300) {
 		numIt += 1
 		startTimer ( 'cycle' )
-		mgCycle@finest (  )
+		gen_mgCycle@finest (  )
 		stopTimer ( 'cycle' )
 		t_sol += getTotalFromTimer('cycle')
 		if (getTotalFromTimer ( 'cycle' ) > 1200000 ) {

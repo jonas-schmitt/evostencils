@@ -230,7 +230,7 @@ class Types:
         self.NotFinished = NotFinishedType
 
 
-def add_cycle(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
+def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
               coarsest=False, FAS=False):
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
 
@@ -400,7 +400,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                            maximum_local_system_size=8, relaxation_factor_samples=37,
                            coarse_grid_solver_expression=None, depth=2, enable_partitioning=True, LevelFinishedType=None, LevelNotFinishedType=None,
                            FAS=False):
-    assert depth >= 1, "The maximum number of cycles must be greater zero"
+    assert depth >= 1, "The maximum number of levels must be greater zero"
     coarsest = False
     cgs_expression = None
     if depth == 1:
@@ -457,7 +457,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         for i in newton_steps:
             pset.addTerminal(i, types.NewtonSteps)
 
-    add_cycle(pset, terminals, types, 0, relaxation_factor_samples, coarsest, FAS=FAS)
+    add_level(pset, terminals, types, 0, relaxation_factor_samples, coarsest, FAS=FAS)
 
     terminal_list = [terminals]
     for i in range(1, depth):
@@ -483,7 +483,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction,
                               prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
-        add_cycle(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
+        add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
         terminal_list.append(terminals)
 
     return pset, terminal_list

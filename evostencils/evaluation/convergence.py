@@ -1,5 +1,5 @@
 import lfa_lab
-import evostencils.stencils.periodic as periodic
+import evostencils.stencils.multiple as periodic
 import evostencils.stencils.constant as constant
 from evostencils.ir import base, system, partitioning
 from multiprocessing import Process, Queue

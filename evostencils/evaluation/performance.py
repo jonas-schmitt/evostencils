@@ -1,5 +1,5 @@
 from evostencils.ir import base, partitioning, system
-import evostencils.stencils.periodic as periodic
+import evostencils.stencils.multiple as periodic
 from functools import reduce
 
 

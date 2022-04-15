@@ -1,5 +1,5 @@
 from evostencils.ir import base, system
-from evostencils.stencils import constant, periodic
+from evostencils.stencils import constant, multiple
 import sympy
 
 
@@ -92,18 +92,18 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
             for j, (entry1, entry2) in enumerate(zip(row1, row2)):
                 level = entry2.grid.level
                 if i == j:
-                    stencil1 = periodic.diagonal(entry1.generate_stencil())
+                    stencil1 = multiple.diagonal(entry1.generate_stencil())
                 else:
-                    stencil1 = periodic.map_stencil(constant.get_null_stencil(entry1.grid), lambda x: x)
-                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                    stencil1 = multiple.map_stencil(constant.get_null_stencil(entry1.grid), lambda x: x)
+                stencil2 = multiple.map_stencil(entry2.generate_stencil(), lambda x: x)
                 recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
                                   sympy.sympify(0), i, j, level)
     elif isinstance(smoothing_operator, system.ElementwiseDiagonal):
         for i, (row1, row2) in enumerate(zip(smoothing_operator.operand.entries, system_operator.entries)):
             for j, (entry1, entry2) in enumerate(zip(row1, row2)):
                 level = entry2.grid.level
-                stencil1 = periodic.diagonal(entry1.generate_stencil())
-                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                stencil1 = multiple.diagonal(entry1.generate_stencil())
+                stencil2 = multiple.map_stencil(entry2.generate_stencil(), lambda x: x)
                 recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
                                   sympy.sympify(0), i, j, level)
     elif isinstance(smoothing_operator, system.Operator):
@@ -111,8 +111,8 @@ def obtain_sympy_expression_for_local_system(smoothing_operator, system_operator
         for i, (row1, row2) in enumerate(zip(smoothing_operator.entries, system_operator.entries)):
             for j, (entry1, entry2) in enumerate(zip(row1, row2)):
                 level = entry2.grid.level
-                stencil1 = periodic.map_stencil(entry1.generate_stencil(), lambda x: x)
-                stencil2 = periodic.map_stencil(entry2.generate_stencil(), lambda x: x)
+                stencil1 = multiple.map_stencil(entry1.generate_stencil(), lambda x: x)
+                stencil2 = multiple.map_stencil(entry2.generate_stencil(), lambda x: x)
                 recursive_descent(stencil1.constant_stencils, stencil2.constant_stencils, entry2.grid.dimension, (),
                                   sympy.sympify(0), i, j, level)
     else:
