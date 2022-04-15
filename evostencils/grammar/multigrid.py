@@ -3,8 +3,8 @@ from evostencils.ir import system
 from evostencils.ir import partitioning as part
 from evostencils.ir import smoother
 from evostencils.ir.base import ConstantStencilGenerator
-from evostencils.types import operator as matrix_types
-from evostencils.types import grid as grid_types
+from evostencils.types import operator as operator_types
+from evostencils.types import expression as expression_types
 from evostencils.types import multiple
 from evostencils.types import partitioning, level_control
 from evostencils.types.wrapper import TypeWrapper
@@ -183,18 +183,15 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
 
 
 class Terminals:
-    def __init__(self, approximation, dimension, coarsening_factors, operator, coarse_operator, restriction, prolongation,
+    def __init__(self, approximation, coarsening_factors, operator, coarse_operator, restriction, prolongation,
                  coarse_grid_solver_expression=None):
+        self.grid = approximation.grid
+        self.coarse_grid = system.get_coarse_grid(self.grid, coarsening_factors)
         self.operator = operator
         self.approximation = approximation
-        self.grid = approximation.grid
-        self.dimension = dimension
-        self.coarsening_factor = coarsening_factors
         self.prolongation = prolongation
         self.restriction = restriction
-        self.coarse_grid = system.get_coarse_grid(self.approximation.grid, self.coarsening_factor)
         self.coarse_operator = coarse_operator
-        self.identity = system.Identity(approximation.grid)
         self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
         self.red_black_partitioning = part.RedBlack
@@ -206,20 +203,20 @@ class Terminals:
 
 class Types:
     def __init__(self, terminals: Terminals, FinishedType, NotFinishedType, FAS=False):
-        types = [grid_types.generate_grid_type(grid.size) for grid in terminals.grid]
-        self.Grid = multiple.generate_type_list(*types)
-        types = [grid_types.generate_correction_type(grid.size) for grid in terminals.grid]
+        types = [expression_types.generate_approximation_type(grid.size) for grid in terminals.grid]
+        self.Approximation = multiple.generate_type_list(*types)
+        types = [expression_types.generate_correction_type(grid.size) for grid in terminals.grid]
         self.Correction = multiple.generate_type_list(*types)
-        types = [grid_types.generate_rhs_type(grid.size) for grid in terminals.grid]
+        types = [expression_types.generate_rhs_type(grid.size) for grid in terminals.grid]
         self.RHS = multiple.generate_type_list(*types)
-        self.Prolongation = matrix_types.generate_inter_grid_operator_type(terminals.prolongation.shape)
-        self.Restriction = matrix_types.generate_inter_grid_operator_type(terminals.restriction.shape)
-        self.CoarseGridSolver = matrix_types.generate_solver_type(terminals.coarse_operator.shape)
-        types = [grid_types.generate_grid_type(grid.size) for grid in terminals.coarse_grid]
-        self.CoarseGrid = multiple.generate_type_list(*types)
-        types = [grid_types.generate_rhs_type(grid.size) for grid in terminals.coarse_grid]
+        self.Prolongation = operator_types.generate_inter_grid_operator_type(terminals.prolongation.shape)
+        self.Restriction = operator_types.generate_inter_grid_operator_type(terminals.restriction.shape)
+        self.CoarseGridSolver = operator_types.generate_solver_type(terminals.coarse_operator.shape)
+        types = [expression_types.generate_approximation_type(grid.size) for grid in terminals.coarse_grid]
+        self.CoarseApproximation = multiple.generate_type_list(*types)
+        types = [expression_types.generate_rhs_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseRHS = multiple.generate_type_list(*types)
-        types = [grid_types.generate_correction_type(grid.size) for grid in terminals.coarse_grid]
+        types = [expression_types.generate_correction_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseCorrection = multiple.generate_type_list(*types)
         self.Partitioning = partitioning.generate_any_partitioning_type()
         # self.BlockSize = TypeWrapper(typing.Tuple[typing.Tuple[int]])
@@ -235,11 +232,11 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
 
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
-    pset.addTerminal(null_grid_coarse, types.CoarseGrid, f'zero_grid_{level + 1}')
+    pset.addTerminal(null_grid_coarse, types.CoarseApproximation, f'zero_grid_{level + 1}')
     pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
     pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
 
-    GridType = types.Grid
+    GridType = types.Approximation
     scalar_equation = False
     if len(terminals.grid) == 1:
         scalar_equation = True
@@ -311,51 +308,51 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
         return smoothing(generate_jacobi_newton_fixed, cycle, partitioning_, relaxation_factor_index)
 
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
 
     if not scalar_equation:
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
     # start: Exclude for FAS
     if not FAS:
-        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
+        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"collective_jacobi_{level}")
+        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
+        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
+        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
     # end : Exclude for FAS
     if FAS:
-        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Grid, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"jacobi_newton_{level}")
-        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
-                          multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), f"jacobi_newton_{level}")
+        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"jacobi_picard_{level}")
+        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"jacobi_picard_{level}")
+        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"jacobi_newton_{level}")
+        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"jacobi_newton_{level}")
 
     if not coarsest:
         if FAS:
-            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(int), types.Restriction],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
+            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), TypeWrapper(int), types.Restriction],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
         else:
-            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseGrid, types.CoarseRHS, types.Finished), TypeWrapper(int)],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished), f"cgc_{level}")
+            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), TypeWrapper(int)],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished)],
-                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.NotFinished),
+                          [types.CoarseApproximation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished)],
+                          multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.NotFinished),
                           f"coarse_cycle_{level}")
         pset.addPrimitive(coarse_cycle,
-                          [types.CoarseGrid, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished)],
-                          multiple.generate_type_list(types.CoarseGrid, types.CoarseCorrection, types.Finished),
+                          [types.CoarseApproximation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished)],
+                          multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.Finished),
                           f"coarse_cycle_{level}")
 
     else:
@@ -371,28 +368,28 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
         if FAS:
             pset.addPrimitive(solve,
-                              [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int), types.Restriction],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
+                              [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished), TypeWrapper(int), types.Restriction],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int), types.Restriction],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
+            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished), TypeWrapper(int), types.Restriction],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
         else:
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
+            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
-                              multiple.generate_type_list(types.Grid, types.RHS, types.Finished),
+            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
+                              multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
 
         pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'CGS_{level}')
 
     # Multigrid recipes
-    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.Finished)],
-                      multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.Finished),
+    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
+                      multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished),
                       f'restrict_{level}')
-    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Grid, types.Correction, types.NotFinished)],
-                      multiple.generate_type_list(types.Grid, types.CoarseCorrection, types.NotFinished),
+    pset.addPrimitive(restrict, [types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
+                      multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished),
                       f'restrict_{level}')
 
 
@@ -412,14 +409,14 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
     coarse_operator, coarse_restriction, coarse_prolongation, = \
         generate_operators_from_l2_information(equations, operators, fields, max_level - 1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
-    terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction, prolongation, cgs_expression)
+    terminals = Terminals(approximation, coarsening_factors, operator, coarse_operator, restriction, prolongation, cgs_expression)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
         LevelNotFinishedType = level_control.generate_not_finished_type()
     types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
-    pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Grid, types.RHS, types.Finished))
-    pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Grid, types.RHS, types.NotFinished), 'u_and_f')
+    pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Approximation, types.RHS, types.Finished))
+    pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
     # Start: Exclude for FAS
     if enable_partitioning:
@@ -480,7 +477,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, coarse_grid,
                                                        system.get_coarse_grid(coarse_grid, coarsening_factors))
 
-        terminals = Terminals(approximation, dimension, coarsening_factors, operator, coarse_operator, restriction,
+        terminals = Terminals(approximation, coarsening_factors, operator, coarse_operator, restriction,
                               prolongation, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
         add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)

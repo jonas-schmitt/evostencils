@@ -1,4 +1,4 @@
-class GridType:
+class ExpressionType:
     def __init__(self, size_, type_):
         self.size = size_
         self.type = type_
@@ -14,8 +14,8 @@ class GridType:
             is_subtype = True
             if self.size != other.size:
                 return False
-            if self.type == "grid":
-                is_subtype = is_subtype and other.type == "grid"
+            if self.type == "approximation":
+                is_subtype = is_subtype and other.type == "approximation"
             elif self.type == "rhs":
                 is_subtype = is_subtype and other.type == "rhs"
             elif self.type == "correction":
@@ -30,15 +30,15 @@ class GridType:
         return hash((type(self), *self.size, self.type))
 
 
-def generate_grid_type(size):
-    return GridType(size, 'grid')
+def generate_approximation_type(size):
+    return ExpressionType(size, 'approximation')
 
 
 def generate_correction_type(size):
-    return GridType(size, 'correction')
+    return ExpressionType(size, 'correction')
 
 
 def generate_rhs_type(size):
-    return GridType(size, 'rhs')
+    return ExpressionType(size, 'rhs')
 
 
