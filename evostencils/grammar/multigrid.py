@@ -183,19 +183,15 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
 
 
 class Terminals:
-    def __init__(self, approximation, operator, coarse_operator, restriction, prolongation, coarse_grid_solver_expression=None):
+    def __init__(self, approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings=None, coarse_grid_solver_expression=None):
         self.operator = operator
-        self.approximation = approximation
-        self.prolongation = prolongation
-        self.restriction = restriction
         self.coarse_operator = coarse_operator
+        self.approximation = approximation
+        self.prolongation_operators = prolongation_operators
+        self.restriction_operators = restriction_operators
         self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
         self.no_partitioning = part.Single
-        self.red_black_partitioning = part.RedBlack
-        self.four_way_partitioning = part.FourWay
-        self.nine_way_partitioning = part.NineWay
-        self.eight_way_partitioning = part.EightWay
-        self.twenty_seven_way_partitioning = part.TwentySevenWay
+        self.partitionings = partitionings
 
     @property
     def grid(self):
@@ -214,8 +210,9 @@ class Types:
         self.Correction = multiple.generate_type_list(*types)
         types = [expression_types.generate_rhs_type(grid.size) for grid in terminals.grid]
         self.RHS = multiple.generate_type_list(*types)
-        self.Prolongation = operator_types.generate_inter_grid_operator_type(terminals.prolongation.shape)
-        self.Restriction = operator_types.generate_inter_grid_operator_type(terminals.restriction.shape)
+        # Assumes prolongation and restriction operators to all have the same shape
+        self.Prolongation = operator_types.generate_inter_grid_operator_type(terminals.prolongation_operators[0].shape)
+        self.Restriction = operator_types.generate_inter_grid_operator_type(terminals.restriction_operators[0].shape)
         self.CoarseGridSolver = operator_types.generate_solver_type(terminals.coarse_operator.shape)
         types = [expression_types.generate_approximation_type(grid.size) for grid in terminals.coarse_grid]
         self.CoarseApproximation = multiple.generate_type_list(*types)
@@ -238,8 +235,10 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseApproximation, f'zero_grid_{level + 1}')
-    pset.addTerminal(terminals.prolongation, types.Prolongation, f'P_{level}')
-    pset.addTerminal(terminals.restriction, types.Restriction, f'R_{level}')
+    for prolongation in terminals.prolongation_operators:
+        pset.addTerminal(prolongation, types.Prolongation, prolongation.name)
+    for restriction in terminals.restriction_operators:
+        pset.addTerminal(restriction, types.Restriction, restriction.name)
 
     GridType = types.Approximation
     scalar_equation = False
@@ -414,7 +413,12 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
     coarse_operator, coarse_restriction, coarse_prolongation, = \
         generate_operators_from_l2_information(equations, operators, fields, max_level - 1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
-    terminals = Terminals(approximation, operator, coarse_operator, restriction, prolongation, cgs_expression)
+    # For now assumes that only one prolongation, restriction and partitioning operator is available
+    # TODO: Extend in the future
+    partitionings = [part.RedBlack]
+    restriction_operators = [restriction]
+    prolongation_operators = [prolongation]
+    terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings, cgs_expression)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
@@ -422,10 +426,11 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
     pset = PrimitiveSetTyped("main", [], multiple.generate_type_list(types.Approximation, types.RHS, types.Finished))
     pset.addTerminal((approximation, rhs), multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), 'u_and_f')
-    pset.addTerminal(terminals.no_partitioning, types.Partitioning, f'no')
+    pset.addTerminal(terminals.no_partitioning, types.Partitioning, terminals.no_partitioning.get_name())
     # Start: Exclude for FAS
     if enable_partitioning:
-        pset.addTerminal(terminals.red_black_partitioning, types.Partitioning, f'red_black')
+        for p in terminals.partitionings:
+            pset.addTerminal(p, types.Partitioning, p.get_name())
     # End: Exclude for FAS
     for i in range(0, relaxation_factor_samples):
         pset.addTerminal(i, TypeWrapper(int))
@@ -465,8 +470,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     for i in range(1, depth):
         approximation = system.ZeroApproximation(terminals.coarse_grid)
         operator = coarse_operator
-        prolongation = coarse_prolongation
-        restriction = coarse_restriction
+        prolongation_operators = [coarse_prolongation]
+        restriction_operators = [coarse_restriction]
         fine_grid = terminals.coarse_grid
         coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
         cgs_expression = None
@@ -482,7 +487,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, coarse_grid,
                                                        system.get_coarse_grid(coarse_grid, coarsening_factors))
 
-        terminals = Terminals(approximation, operator, coarse_operator, restriction, prolongation, cgs_expression)
+        terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings, cgs_expression)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
         add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
         terminal_list.append(terminals)

@@ -9,6 +9,11 @@ class Partitioning(abc.ABC):
     def generate(_):
         pass
 
+    @property
+    @abc.abstractmethod
+    def name(self):
+        pass
+
 
 class Single:
     @staticmethod
@@ -17,6 +22,10 @@ class Single:
             return [None]
         else:
             return [constant.get_unit_stencil(grid)]
+
+    @staticmethod
+    def get_name():
+        return "single"
 
     def __repr__(self):
         return 'Single()'
@@ -30,53 +39,9 @@ class RedBlack:
         else:
             return multiple.red_black_partitioning(stencil, grid)
 
+    @staticmethod
+    def get_name():
+        return "red_black"
+
     def __repr__(self):
         return 'RedBlack()'
-
-
-class FourWay:
-    @staticmethod
-    def generate(stencil, grid):
-        if stencil is None:
-            return [None]
-        else:
-            raise RuntimeError("Stencil generation for 4-way partitioning not implemented")
-
-    def __repr__(self):
-        return 'FourWay()'
-
-
-class NineWay:
-    @staticmethod
-    def generate(stencil, grid):
-        if stencil is None:
-            return [None]
-        else:
-            raise RuntimeError("Stencil generation for 9-way partitioning not implemented")
-
-    def __repr__(self):
-        return 'NineWay()'
-
-
-class EightWay:
-    @staticmethod
-    def generate(stencil, grid):
-        if stencil is None:
-            return [None]
-        else:
-            raise RuntimeError("Stencil generation for 8-way partitioning not implemented")
-
-    def __repr__(self):
-        return 'EightWay()'
-
-
-class TwentySevenWay:
-    @staticmethod
-    def generate(stencil, grid):
-        if stencil is None:
-            return [None]
-        else:
-            raise RuntimeError("Stencil generation for 27-way partitioning not implemented")
-
-    def __repr__(self):
-        return 'TwentySevenWay()'
