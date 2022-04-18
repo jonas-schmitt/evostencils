@@ -183,13 +183,13 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
 
 
 class Terminals:
-    def __init__(self, approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings=None, coarse_grid_solver_expression=None):
+    def __init__(self, approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings=None):
         self.operator = operator
         self.coarse_operator = coarse_operator
         self.approximation = approximation
         self.prolongation_operators = prolongation_operators
         self.restriction_operators = restriction_operators
-        self.coarse_grid_solver = base.CoarseGridSolver(self.coarse_operator, expression=coarse_grid_solver_expression)
+        self.coarse_grid_solver = coarse_grid_solver
         self.no_partitioning = part.Single
         self.partitionings = partitionings
 
@@ -406,7 +406,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     cgs_expression = None
     if depth == 1:
         coarsest = True
-        cgs_expression = coarse_grid_solver_expression
     fine_grid = approximation.grid
     coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
     operator, restriction, prolongation, = \
@@ -418,7 +417,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     partitionings = [part.RedBlack]
     restriction_operators = [restriction]
     prolongation_operators = [prolongation]
-    terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings, cgs_expression)
+    coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
+    terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
@@ -474,11 +474,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         restriction_operators = [coarse_restriction]
         fine_grid = terminals.coarse_grid
         coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
-        cgs_expression = None
         coarsest = False
         if i == depth - 1:
             coarsest = True
-            cgs_expression = coarse_grid_solver_expression
             coarse_operator = \
                 generate_system_operator_from_l2_information(equations, operators, fields, max_level - i - 1,
                                                              coarse_grid)
@@ -487,7 +485,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                 generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, coarse_grid,
                                                        system.get_coarse_grid(coarse_grid, coarsening_factors))
 
-        terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, partitionings, cgs_expression)
+        coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
+        terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
         add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
         terminal_list.append(terminals)
