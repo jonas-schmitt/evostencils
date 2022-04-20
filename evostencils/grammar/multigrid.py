@@ -240,37 +240,44 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     for restriction in terminals.restriction_operators:
         pset.addTerminal(restriction, types.Restriction, restriction.name)
 
-    GridType = types.Approximation
+    ApproximationType = types.Approximation
     scalar_equation = False
     if len(terminals.grid) == 1:
         scalar_equation = True
     CorrectionType = types.Correction
 
-    def coarse_cycle(coarse_grid, cycle):
-        tmp = base.Cycle(coarse_grid, cycle.correction, base.Residual(terminals.coarse_operator, coarse_grid, cycle.correction))
+    def apply(operator, cycle):
+        cycle.correction = base.Multiplication(operator, cycle.correction)
+        return cycle
+
+    def coarse_cycle(coarse_approximation, cycle):
+        tmp = base.Cycle(coarse_approximation, cycle.correction, base.Residual(terminals.coarse_operator, coarse_approximation, cycle.correction))
         cycle.correction = tmp
         cycle.correction.predecessor = cycle
         return cycle.correction
 
-    def residual(args):
-        return base.Cycle(args[0], args[1], base.Residual(terminals.operator, args[0], args[1]), predecessor=args[0].predecessor)
+    def residual(state):
+        return base.Cycle(state[0], state[1], base.Residual(terminals.operator, state[0], state[1]), predecessor=state[0].predecessor)
 
     def restrict(operator, cycle):
-        residual_c = base.mul(operator, cycle.correction)
         if FAS:
+            # Special treatment for FAS
+            residual_c = base.mul(operator, cycle.correction)
             residual_FAS = base.mul(terminals.coarse_operator, base.Multiplication(operator, cycle.approximation))  # Add this term for FAS
             residual_c = base.add(residual_c, residual_FAS)
-        cycle.correction = residual_c
-        return cycle
+            cycle.correction = residual_c
+            return cycle
+        else:
+            return apply(operator, cycle)
 
-    def coarse_grid_correction(interpolation, args, relaxation_factor_index, restriction=None):
-        cycle = args[0]
+    def coarse_grid_correction(interpolation, state, relaxation_factor_index, restriction=None):
+        cycle = state[0]
         if FAS:
             correction_FAS = base.mul(restriction, cycle.predecessor.approximation)  # Subract this term for FAS
             correction_c = base.sub(cycle, correction_FAS)
             correction = base.mul(interpolation, correction_c)
         else:
-            correction = base.mul(interpolation, cycle)
+            correction = base.Multiplication(interpolation, cycle)
         cycle.predecessor.correction = correction
         return iterate(relaxation_factor_index, terminals.no_partitioning, cycle.predecessor)
 
@@ -285,8 +292,7 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     def smoothing(generate_smoother, cycle, partitioning_, relaxation_factor_index):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production'
         smoothing_operator = generate_smoother(cycle.correction.operator)
-        correction = base.Multiplication(base.Inverse(smoothing_operator), cycle.correction)
-        cycle.correction = correction
+        cycle = apply(base.Inverse(smoothing_operator), cycle)
         return iterate(relaxation_factor_index, partitioning_, cycle)
 
     def decoupled_jacobi(cycle, partitioning_, relaxation_factor_index):
@@ -310,8 +316,8 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
         return smoothing(generate_jacobi_newton_fixed, cycle, partitioning_, relaxation_factor_index)
 
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.Finished)], multiple.generate_type_list(GridType, CorrectionType, types.Finished), f"residual_{level}")
-    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished)], multiple.generate_type_list(GridType, CorrectionType, types.NotFinished), f"residual_{level}")
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.Finished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.Finished), f"residual_{level}")
+    pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.NotFinished), f"residual_{level}")
 
     if not scalar_equation:
         pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
