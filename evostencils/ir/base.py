@@ -666,11 +666,11 @@ class Cycle(Expression):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
-        self._approximation = approximation
-        self._rhs = rhs
-        self._correction = correction
-        self._relaxation_factor = relaxation_factor
-        self._partitioning = partitioning
+        self.approximation = approximation
+        self.rhs = rhs
+        self.correction = correction
+        self.relaxation_factor = relaxation_factor
+        self.partitioning = partitioning
         self.predecessor = predecessor
         self.global_id = None
         self.weight_obtained = False
@@ -679,31 +679,11 @@ class Cycle(Expression):
 
     @property
     def shape(self):
-        return self._approximation.shape
+        return self.approximation.shape
 
     @property
     def grid(self):
         return self.approximation.grid
-
-    @property
-    def approximation(self):
-        return self._approximation
-
-    @property
-    def rhs(self):
-        return self._rhs
-
-    @property
-    def correction(self):
-        return self._correction
-
-    @property
-    def relaxation_factor(self):
-        return self._relaxation_factor
-
-    @property
-    def partitioning(self):
-        return self._partitioning
 
     @staticmethod
     def generate_stencil():

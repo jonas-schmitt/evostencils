@@ -247,12 +247,10 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
     CorrectionType = types.Correction
 
     def coarse_cycle(coarse_grid, cycle):
-        result = base.Cycle(cycle.approximation, cycle.rhs,
-                            base.Cycle(coarse_grid, cycle.correction,
-                                       base.Residual(terminals.coarse_operator, coarse_grid, cycle.correction)),
-                            predecessor=cycle.predecessor)
-        result.correction.predecessor = result
-        return result.correction
+        tmp = base.Cycle(coarse_grid, cycle.correction, base.Residual(terminals.coarse_operator, coarse_grid, cycle.correction))
+        cycle.correction = tmp
+        cycle.correction.predecessor = cycle
+        return cycle.correction
 
     def residual(args):
         return base.Cycle(args[0], args[1], base.Residual(terminals.operator, args[0], args[1]), predecessor=args[0].predecessor)
@@ -262,7 +260,8 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         if FAS:
             residual_FAS = base.mul(terminals.coarse_operator, base.Multiplication(operator, cycle.approximation))  # Add this term for FAS
             residual_c = base.add(residual_c, residual_FAS)
-        return base.Cycle(cycle.approximation, cycle.rhs, residual_c, predecessor=cycle.predecessor)
+        cycle.correction = residual_c
+        return cycle
 
     def coarse_grid_correction(interpolation, args, relaxation_factor_index, restriction=None):
         cycle = args[0]
@@ -272,24 +271,23 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
             correction = base.mul(interpolation, correction_c)
         else:
             correction = base.mul(interpolation, cycle)
-        cycle.predecessor._correction = correction
-        return iterate(cycle.predecessor, relaxation_factor_index)
+        cycle.predecessor.correction = correction
+        return iterate(relaxation_factor_index, terminals.no_partitioning, cycle.predecessor)
 
-    def iterate(cycle, relaxation_factor_index):
-        rhs = cycle.rhs
+    def iterate(relaxation_factor_index, partitioning_, cycle):
         relaxation_factor = relaxation_factor_interval[relaxation_factor_index]
-        approximation = base.Cycle(cycle.approximation, cycle.rhs, cycle.correction, cycle.partitioning,
-                                   relaxation_factor, cycle.predecessor)
+        rhs = cycle.rhs
+        cycle.relaxation_factor = relaxation_factor
+        cycle.partitioning = partitioning_
+        approximation = cycle
         return approximation, rhs
 
     def smoothing(generate_smoother, cycle, partitioning_, relaxation_factor_index):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production'
-        approximation = cycle.approximation
-        rhs = cycle.rhs
         smoothing_operator = generate_smoother(cycle.correction.operator)
         correction = base.Multiplication(base.Inverse(smoothing_operator), cycle.correction)
-        return iterate(base.Cycle(approximation, rhs, correction, partitioning=partitioning_,
-                                  predecessor=cycle.predecessor), relaxation_factor_index)
+        cycle.correction = correction
+        return iterate(relaxation_factor_index, partitioning_, cycle)
 
     def decoupled_jacobi(cycle, partitioning_, relaxation_factor_index):
         return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning_, relaxation_factor_index)
@@ -367,8 +365,8 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 correction = base.mul(interpolation, base.sub(approximation_c, restricted_solution_FAS))  # Subtract term for FAS
             else:
                 correction = base.mul(interpolation, base.mul(cgs, cycle.correction))
-            new_cycle = base.Cycle(cycle.approximation, cycle.rhs, correction, predecessor=cycle.predecessor)
-            return iterate(new_cycle, relaxation_factor_index)
+            cycle.correction = correction
+            return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
         if FAS:
             pset.addPrimitive(solve,
@@ -403,7 +401,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                            FAS=False):
     assert depth >= 1, "The maximum number of levels must be greater zero"
     coarsest = False
-    cgs_expression = None
     if depth == 1:
         coarsest = True
     fine_grid = approximation.grid
