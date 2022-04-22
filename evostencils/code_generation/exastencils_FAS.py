@@ -363,7 +363,7 @@ class ProgramGeneratorFAS:
             subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
 
     def execute_code(self):
-        result = subprocess.run(["./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):
@@ -383,6 +383,8 @@ class ProgramGeneratorFAS:
                     n = int(line.split('total no of iterations')[1])
                 elif "time to solution (in ms) is" in line:
                     t = float(line.split('time to solution (in ms) is')[1])
+                elif "Aborting solve" in line:
+                    return infinity, infinity, infinity
 
             # calculate asymptotic convergence factor
             c = (res_final / res_initial) ** (1.0 / n)

@@ -596,6 +596,9 @@ class Optimizer:
                     print(e, flush=True)
                     print(f'Skipping checkpoint on process with rank {self.mpi_rank}', flush=True)
             # Select the next generation population
+            elitism = 1.0
+            assert int(mu_*elitism) + len(offspring) >= mu_
+            population = self.toolbox.select(population, int(mu_*elitism))
             population = self.toolbox.select(population + offspring, mu_)
             total_time_to_convergence = 0
             if len(population[0].fitness.values) == 1:
