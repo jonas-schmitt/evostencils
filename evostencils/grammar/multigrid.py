@@ -257,7 +257,8 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return cycle.correction
 
     def residual(state):
-        return base.Cycle(state[0], state[1], base.Residual(terminals.operator, state[0], state[1]), predecessor=state[0].predecessor)
+        approximation, rhs = state
+        return base.Cycle(approximation, rhs, base.Residual(terminals.operator, approximation, rhs), predecessor=approximation.predecessor)
 
     def restrict(operator, cycle):
         if FAS:

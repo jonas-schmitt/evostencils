@@ -215,14 +215,6 @@ class Approximation(Entity):
     def predecessor(self):
         return None
 
-    @property
-    def grid(self):
-        return self._grid
-
-    @property
-    def dimension(self):
-        return len(self.grid.dimension)
-
     def generate_stencil(self):
         return constant.get_unit_stencil(self)
 
