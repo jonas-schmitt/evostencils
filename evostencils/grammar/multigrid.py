@@ -350,9 +350,15 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         if FAS:
             pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), types.Restriction],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
+            if level > 0:
+                pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished), types.Restriction],
+                                  multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"cgc_{level}")
         else:
             pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished)],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
+            if level > 0:
+                pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished)],
+                          multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
                           [types.CoarseApproximation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished)],
@@ -467,7 +473,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         for i in newton_steps:
             pset.addTerminal(i, types.NewtonSteps)
 
-    add_level(pset, terminals, types, 0, relaxation_factor_samples, coarsest, FAS=FAS)
+    add_level(pset, terminals, types, 0, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
 
     terminal_list = [terminals]
     for i in range(1, depth):
@@ -491,7 +497,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
         terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
-        add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest, FAS=FAS)
+        add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
         terminal_list.append(terminals)
 
     return pset, terminal_list
