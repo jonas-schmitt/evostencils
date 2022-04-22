@@ -270,7 +270,7 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         else:
             return apply(operator, cycle)
 
-    def coarse_grid_correction(interpolation, state, relaxation_factor_index, restriction=None):
+    def coarse_grid_correction(relaxation_factor_index, interpolation, state, restriction=None):
         cycle = state[0]
         if FAS:
             correction_FAS = base.mul(restriction, cycle.predecessor.approximation)  # Subract this term for FAS
@@ -289,69 +289,69 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         approximation = cycle
         return approximation, rhs
 
-    def smoothing(generate_smoother, cycle, partitioning_, relaxation_factor_index):
+    def smoothing(relaxation_factor_index, partitioning_, generate_smoother, cycle):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production'
         smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
         return iterate(relaxation_factor_index, partitioning_, cycle)
 
-    def decoupled_jacobi(cycle, partitioning_, relaxation_factor_index):
-        return smoothing(smoother.generate_decoupled_jacobi, cycle, partitioning_, relaxation_factor_index)
+    def decoupled_jacobi(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_decoupled_jacobi, cycle)
 
-    def collective_jacobi(cycle, partitioning_, relaxation_factor_index):
-        return smoothing(smoother.generate_collective_jacobi, cycle, partitioning_, relaxation_factor_index)
+    def collective_jacobi(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_collective_jacobi, cycle)
 
-    def collective_block_jacobi(cycle, relaxation_factor_index, block_size):
+    def collective_block_jacobi(relaxation_factor_index, block_size, cycle):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_size)
 
-        return smoothing(generate_collective_block_jacobi_fixed, cycle, part.Single, relaxation_factor_index)
+        return smoothing(relaxation_factor_index, part.Single, generate_collective_block_jacobi_fixed, cycle)
 
-    def jacobi_picard(cycle, partitioning_, relaxation_factor_index):
-        return smoothing(smoother.generate_jacobi_picard, cycle, partitioning_, relaxation_factor_index)
+    def jacobi_picard(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_jacobi_picard, cycle)
 
-    def jacobi_newton(cycle, partitioning_, relaxation_factor_index, n_newton_steps):
+    def jacobi_newton(relaxation_factor_index, partitioning_, n_newton_steps, cycle):
         def generate_jacobi_newton_fixed(operator):
             return smoother.generate_jacobi_newton(operator, n_newton_steps)
 
-        return smoothing(generate_jacobi_newton_fixed, cycle, partitioning_, relaxation_factor_index)
+        return smoothing(relaxation_factor_index, partitioning_, generate_jacobi_newton_fixed, cycle)
 
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.Finished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.Finished), f"residual_{level}")
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.NotFinished), f"residual_{level}")
 
     if not scalar_equation:
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(decoupled_jacobi, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"decoupled_jacobi_{level}")
-        pset.addPrimitive(decoupled_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(decoupled_jacobi, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"decoupled_jacobi_{level}")
 
     # start: Exclude for FAS
     if not FAS:
-        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(collective_jacobi, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(collective_jacobi, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), TypeWrapper(int), types.BlockSize],
+        pset.addPrimitive(collective_block_jacobi, [TypeWrapper(int), types.BlockSize, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"collective_block_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), TypeWrapper(int), types.BlockSize],
+        pset.addPrimitive(collective_block_jacobi, [TypeWrapper(int), types.BlockSize, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"collective_block_jacobi_{level}")
     # end : Exclude for FAS
     if FAS:
-        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(jacobi_picard, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_picard, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int)],
+        pset.addPrimitive(jacobi_picard, [TypeWrapper(int), types.Partitioning, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Approximation, types.Correction, types.Finished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+        pset.addPrimitive(jacobi_newton, [TypeWrapper(int), types.Partitioning, types.NewtonSteps, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"jacobi_newton_{level}")
-        pset.addPrimitive(jacobi_newton, [multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished), types.Partitioning, TypeWrapper(int), types.NewtonSteps],
+        pset.addPrimitive(jacobi_newton, [TypeWrapper(int), types.Partitioning, types.NewtonSteps, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"jacobi_newton_{level}")
 
     if not coarsest:
         if FAS:
-            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), TypeWrapper(int), types.Restriction],
+            pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), types.Restriction],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
         else:
-            pset.addPrimitive(coarse_grid_correction, [types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), TypeWrapper(int)],
+            pset.addPrimitive(coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished)],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"cgc_{level}")
 
         pset.addPrimitive(coarse_cycle,
