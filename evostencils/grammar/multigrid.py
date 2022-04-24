@@ -183,13 +183,14 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
 
 
 class Terminals:
-    def __init__(self, approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings=None):
+    def __init__(self, approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings=None):
         self.operator = operator
         self.coarse_operator = coarse_operator
         self.approximation = approximation
         self.prolongation_operators = prolongation_operators
         self.restriction_operators = restriction_operators
         self.coarse_grid_solver = coarse_grid_solver
+        self.relaxation_factor_interval = relaxation_factor_interval
         self.no_partitioning = part.Single
         self.partitionings = partitionings
 
@@ -231,7 +232,6 @@ class Types:
 
 def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, level, relaxation_factor_samples=37,
               coarsest=False, FAS=False):
-    relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
 
     null_grid_coarse = system.ZeroApproximation(terminals.coarse_grid)
     pset.addTerminal(null_grid_coarse, types.CoarseApproximation, f'zero_grid_{level + 1}')
@@ -271,19 +271,19 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         else:
             return apply(operator, cycle)
 
-    def coarse_grid_correction(relaxation_factor_index, interpolation, state, restriction=None):
+    def coarse_grid_correction(relaxation_factor_index, prolongation, state, restriction=None):
         cycle = state[0]
         if FAS:
             correction_FAS = base.mul(restriction, cycle.predecessor.approximation)  # Subract this term for FAS
             correction_c = base.sub(cycle, correction_FAS)
-            correction = base.mul(interpolation, correction_c)
+            correction = base.mul(prolongation, correction_c)
         else:
-            correction = base.Multiplication(interpolation, cycle)
+            correction = base.Multiplication(prolongation, cycle)
         cycle.predecessor.correction = correction
         return iterate(relaxation_factor_index, terminals.no_partitioning, cycle.predecessor)
 
     def iterate(relaxation_factor_index, partitioning_, cycle):
-        relaxation_factor = relaxation_factor_interval[relaxation_factor_index]
+        relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
         rhs = cycle.rhs
         cycle.relaxation_factor = relaxation_factor
         cycle.partitioning = partitioning_
@@ -291,7 +291,7 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return approximation, rhs
 
     def smoothing(relaxation_factor_index, partitioning_, generate_smoother, cycle):
-        assert isinstance(cycle.correction, base.Residual), 'Invalid production'
+        assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
         smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
         return iterate(relaxation_factor_index, partitioning_, cycle)
@@ -428,7 +428,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     restriction_operators = [restriction]
     prolongation_operators = [prolongation]
     coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
-    terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings)
+    relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
+    terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
     if LevelFinishedType is None:
         LevelFinishedType = level_control.generate_finished_type()
     if LevelNotFinishedType is None:
@@ -496,7 +497,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
                                                        system.get_coarse_grid(coarse_grid, coarsening_factors))
 
         coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
-        terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, partitionings)
+        terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
         types = Types(terminals, LevelFinishedType, LevelNotFinishedType, FAS=FAS)
         add_level(pset, terminals, types, i, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
         terminal_list.append(terminals)

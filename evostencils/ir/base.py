@@ -605,11 +605,11 @@ class Residual(Expression):
 
     @property
     def shape(self):
-        return self.approximation.shape
+        return self.rhs.shape
 
     @property
     def grid(self):
-        return self.approximation.grid
+        return self.rhs.grid
 
     @property
     def operator(self):
