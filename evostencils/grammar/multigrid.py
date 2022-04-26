@@ -375,29 +375,29 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                           f"coarse_cycle_{level}")
 
     else:
-        def solve(cgs, interpolation, cycle, relaxation_factor_index, restriction=None):
+        def coarse_grid_solver(relaxation_factor_index, prolongation, solver, cycle, restriction=None):
             if FAS:
-                approximation_c = base.mul(cgs, cycle.correction)
+                approximation_c = base.mul(solver, cycle.correction)
                 restricted_solution_FAS = base.mul(restriction, cycle.approximation)
-                correction = base.mul(interpolation, base.sub(approximation_c, restricted_solution_FAS))  # Subtract term for FAS
+                correction = base.mul(prolongation, base.sub(approximation_c, restricted_solution_FAS))  # Subtract term for FAS
+                cycle.correction = correction
             else:
-                correction = base.mul(interpolation, base.mul(cgs, cycle.correction))
-            cycle.correction = correction
+                cycle = apply(prolongation, apply(solver, cycle))
             return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
         if FAS:
-            pset.addPrimitive(solve,
-                              [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished), TypeWrapper(int), types.Restriction],
+            pset.addPrimitive(coarse_grid_solver, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished), types.Restriction],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished), TypeWrapper(int), types.Restriction],
+            pset.addPrimitive(coarse_grid_solver, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished), types.Restriction],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
         else:
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished), TypeWrapper(int)],
+
+            pset.addPrimitive(coarse_grid_solver, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.NotFinished)],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
-            pset.addPrimitive(solve, [types.CoarseGridSolver, types.Prolongation, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished), TypeWrapper(int)],
+            pset.addPrimitive(coarse_grid_solver, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, multiple.generate_type_list(types.Approximation, types.CoarseCorrection, types.Finished)],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                               f'solve_{level}')
 
