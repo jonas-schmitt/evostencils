@@ -251,10 +251,10 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         return cycle
 
     def coarse_cycle(coarse_approximation, cycle):
-        tmp = base.Cycle(coarse_approximation, cycle.correction, base.Residual(terminals.coarse_operator, coarse_approximation, cycle.correction))
-        cycle.correction = tmp
-        cycle.correction.predecessor = cycle
-        return cycle.correction
+        coarse_residual = base.Residual(terminals.coarse_operator, coarse_approximation, cycle.correction)
+        new_cycle = base.Cycle(coarse_approximation, cycle.correction, coarse_residual)
+        new_cycle.predecessor = cycle
+        return new_cycle
 
     def residual(state):
         approximation, rhs = state
