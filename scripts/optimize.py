@@ -17,15 +17,15 @@ def main():
     platform_path = f'lib/linux.platform'
     # Example problem from L2
     # Relative path to settings file (from base folder)
-    settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
+    # settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    # settings_path = f'FAS_2D_Basic/FAS_2D_Basic.settings'
+    settings_path = f'FAS_2D_Basic/FAS_2D_Basic.settings'
     # Relative path to knowledge file (from base folder)
-    knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
+    # knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
     # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    # knowledge_path = f'FAS_2D_Basic/FAS_2D_Basic.knowledge'
+    knowledge_path = f'FAS_2D_Basic/FAS_2D_Basic.knowledge'
     # Name of the multigrid cycle function
     cycle_name = "gen_mgCycle"  # Default name
     # Additional global parameter values within the PDE system
