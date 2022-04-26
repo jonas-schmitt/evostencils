@@ -288,8 +288,8 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         cycle.predecessor.correction = correction
         return cycle.predecessor
 
-    def iterate_coarse_grid_correction(relaxation_factor_index, prolongation, state, restriction=None):
-        cycle = coarse_grid_correction(prolongation, state, restriction)
+    def iterate_coarse_grid_correction(relaxation_factor_index, prolongation_operator, state, restriction_operator=None):
+        cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
         return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
     def iterate(relaxation_factor_index, partitioning_, cycle):
@@ -381,24 +381,24 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                           f"cocy_restrict_{level}")
 
     else:
-        def solve(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction=None):
+        def exact_coarse_grid_correction(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator=None):
             if FAS:
                 approximation_c = base.mul(coarse_grid_solver, cycle.correction)
-                restricted_solution_FAS = base.mul(restriction, cycle.approximation)
+                restricted_solution_FAS = base.mul(restriction_operator, cycle.approximation)
                 correction = base.mul(prolongation_operator, base.sub(approximation_c, restricted_solution_FAS))  # Subtract term for FAS
                 cycle.correction = correction
             else:
                 cycle = apply(prolongation_operator, apply(coarse_grid_solver, cycle))
             return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
-        def restrict_and_solve(relaxation_factor_index, prolongation_operator, coarse_grid_solver, restriction_operator, cycle):
+        def restrict_and_iterate_exact_coarse_grid_correction(relaxation_factor_index, prolongation_operator, coarse_grid_solver, restriction_operator, cycle):
             cycle = restrict(restriction_operator, cycle)
-            return solve(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction)
+            return exact_coarse_grid_correction(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator)
 
-        pset.addPrimitive(restrict_and_solve, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
+        pset.addPrimitive(restrict_and_iterate_exact_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                           f'prolongate_solve_restrict_{level}')
-        pset.addPrimitive(restrict_and_solve, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
+        pset.addPrimitive(restrict_and_iterate_exact_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                           f'prolongate_solve_restrict{level}')
 
