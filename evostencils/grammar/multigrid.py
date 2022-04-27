@@ -248,34 +248,27 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         scalar_equation = True
     CorrectionType = types.Correction
 
-    def apply(operator, cycle):
-        cycle.correction = base.Multiplication(operator, cycle.correction)
-        return cycle
-
-    def coarse_cycle(coarse_operator, coarse_approximation, cycle):
-        coarse_residual = base.Residual(coarse_operator, coarse_approximation, cycle.correction)
-        new_cycle = base.Cycle(coarse_approximation, cycle.correction, coarse_residual)
-        new_cycle.predecessor = cycle
-        return new_cycle
-
     def residual(state):
         approximation, rhs = state
         return base.Cycle(approximation, rhs, base.Residual(terminals.operator, approximation, rhs), predecessor=approximation.predecessor)
 
-    def restrict(restriction_operator, cycle):
-        if FAS:
-            # Special treatment for FAS
-            residual_c = base.mul(restriction_operator, cycle.correction)
-            residual_FAS = base.mul(terminals.coarse_operator, base.Multiplication(restriction_operator, cycle.approximation))  # Add this term for FAS
-            residual_c = base.add(residual_c, residual_FAS)
-            cycle.correction = residual_c
-            return cycle
-        else:
-            return apply(restriction_operator, cycle)
+    def apply(operator, cycle):
+        cycle.correction = base.Multiplication(operator, cycle.correction)
+        return cycle
 
-    def restrict_and_create_coarse_cycle(coarse_operator, coarse_approximation, restriction_operator, cycle):
-        cycle = restrict(restriction_operator, cycle)
-        return coarse_cycle(coarse_operator, coarse_approximation, cycle)
+    def iterate(relaxation_factor_index, partitioning_, cycle):
+        relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
+        rhs = cycle.rhs
+        cycle.relaxation_factor = relaxation_factor
+        cycle.partitioning = partitioning_
+        approximation = cycle
+        return approximation, rhs
+
+    def initiate_cycle(coarse_operator, coarse_approximation, cycle):
+        coarse_residual = base.Residual(coarse_operator, coarse_approximation, cycle.correction)
+        new_cycle = base.Cycle(coarse_approximation, cycle.correction, coarse_residual)
+        new_cycle.predecessor = cycle
+        return new_cycle
 
     def coarse_grid_correction(prolongation_operator, state, restriction=None):
         cycle = state[0]
@@ -288,17 +281,24 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         cycle.predecessor.correction = correction
         return cycle.predecessor
 
+    def restrict(restriction_operator, cycle):
+        if FAS:
+            # Special treatment for FAS
+            residual_c = base.mul(restriction_operator, cycle.correction)
+            residual_FAS = base.mul(terminals.coarse_operator, base.Multiplication(restriction_operator, cycle.approximation))  # Add this term for FAS
+            residual_c = base.add(residual_c, residual_FAS)
+            cycle.correction = residual_c
+            return cycle
+        else:
+            return apply(restriction_operator, cycle)
+
+    def restrict_and_initiate_cycle(coarse_operator, coarse_approximation, restriction_operator, cycle):
+        cycle = restrict(restriction_operator, cycle)
+        return initiate_cycle(coarse_operator, coarse_approximation, cycle)
+
     def update_with_coarse_grid_correction(relaxation_factor_index, prolongation_operator, state, restriction_operator=None):
         cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
         return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
-
-    def iterate(relaxation_factor_index, partitioning_, cycle):
-        relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
-        rhs = cycle.rhs
-        cycle.relaxation_factor = relaxation_factor
-        cycle.partitioning = partitioning_
-        approximation = cycle
-        return approximation, rhs
 
     def smoothing(relaxation_factor_index, partitioning_, generate_smoother, cycle):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
@@ -371,11 +371,11 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 pset.addPrimitive(update_with_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"iterate_cgc_{level}")
 
-        pset.addPrimitive(restrict_and_create_coarse_cycle,
+        pset.addPrimitive(restrict_and_initiate_cycle,
                           [types.CoarseOperator, types.CoarseApproximation, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.NotFinished),
                           f"cocy_restrict_{level}")
-        pset.addPrimitive(restrict_and_create_coarse_cycle,
+        pset.addPrimitive(restrict_and_initiate_cycle,
                           [types.CoarseOperator, types.CoarseApproximation, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.Finished),
                           f"cocy_restrict_{level}")
