@@ -292,40 +292,40 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
         else:
             return apply(restriction_operator, cycle)
 
-    def restrict_and_initiate_cycle(coarse_operator, coarse_approximation, restriction_operator, cycle):
+    def coarsening(coarse_operator, coarse_approximation, restriction_operator, cycle):
         cycle = restrict(restriction_operator, cycle)
         return initiate_cycle(coarse_operator, coarse_approximation, cycle)
 
-    def update_with_coarse_grid_correction(relaxation_factor_index, prolongation_operator, state, restriction_operator=None):
+    def coarse_grid_correction_iteration(relaxation_factor_index, prolongation_operator, state, restriction_operator=None):
         cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
         return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
-    def smoothing(relaxation_factor_index, partitioning_, generate_smoother, cycle):
+    def smoothing_iteration(relaxation_factor_index, partitioning_, generate_smoother, cycle):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
         smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
         return iterate(relaxation_factor_index, partitioning_, cycle)
 
     def decoupled_jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_decoupled_jacobi, cycle)
+        return smoothing_iteration(relaxation_factor_index, partitioning_, smoother.generate_decoupled_jacobi, cycle)
 
     def collective_jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_collective_jacobi, cycle)
+        return smoothing_iteration(relaxation_factor_index, partitioning_, smoother.generate_collective_jacobi, cycle)
 
     def collective_block_jacobi(relaxation_factor_index, block_size, cycle):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_size)
 
-        return smoothing(relaxation_factor_index, part.Single, generate_collective_block_jacobi_fixed, cycle)
+        return smoothing_iteration(relaxation_factor_index, part.Single, generate_collective_block_jacobi_fixed, cycle)
 
     def jacobi_picard(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_jacobi_picard, cycle)
+        return smoothing_iteration(relaxation_factor_index, partitioning_, smoother.generate_jacobi_picard, cycle)
 
     def jacobi_newton(relaxation_factor_index, partitioning_, n_newton_steps, cycle):
         def generate_jacobi_newton_fixed(operator):
             return smoother.generate_jacobi_newton(operator, n_newton_steps)
 
-        return smoothing(relaxation_factor_index, partitioning_, generate_jacobi_newton_fixed, cycle)
+        return smoothing_iteration(relaxation_factor_index, partitioning_, generate_jacobi_newton_fixed, cycle)
 
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.Finished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.Finished), f"residual_{level}")
     pset.addPrimitive(residual, [multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished)], multiple.generate_type_list(ApproximationType, CorrectionType, types.NotFinished), f"residual_{level}")
@@ -359,29 +359,29 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
     if not coarsest:
         if FAS:
-            pset.addPrimitive(update_with_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), types.Restriction],
+            pset.addPrimitive(coarse_grid_correction_iteration, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished), types.Restriction],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"iterate_cgc_{level}")
             if level > 0:
-                pset.addPrimitive(update_with_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished), types.Restriction],
+                pset.addPrimitive(coarse_grid_correction_iteration, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished), types.Restriction],
                                   multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"iterate_cgc_{level}")
         else:
-            pset.addPrimitive(update_with_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished)],
+            pset.addPrimitive(coarse_grid_correction_iteration, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.Finished)],
                               multiple.generate_type_list(types.Approximation, types.RHS, types.Finished), f"iterate_cgc_{level}")
             if level > 0:
-                pset.addPrimitive(update_with_coarse_grid_correction, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished)],
+                pset.addPrimitive(coarse_grid_correction_iteration, [TypeWrapper(int), types.Prolongation, multiple.generate_type_list(types.CoarseApproximation, types.CoarseRHS, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.NotFinished), f"iterate_cgc_{level}")
 
-        pset.addPrimitive(restrict_and_initiate_cycle,
+        pset.addPrimitive(coarsening,
                           [types.CoarseOperator, types.CoarseApproximation, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.NotFinished),
-                          f"cocy_restrict_{level}")
-        pset.addPrimitive(restrict_and_initiate_cycle,
+                          f"coarsening_{level}")
+        pset.addPrimitive(coarsening,
                           [types.CoarseOperator, types.CoarseApproximation, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.CoarseApproximation, types.CoarseCorrection, types.Finished),
-                          f"cocy_restrict_{level}")
+                          f"coarsening_{level}")
 
     else:
-        def update_with_exact_coarse_grid_correction(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator=None):
+        def exact_coarse_grid_correction_iteration(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator=None):
             if FAS:
                 approximation_c = base.mul(coarse_grid_solver, cycle.correction)
                 restricted_solution_FAS = base.mul(restriction_operator, cycle.approximation)
@@ -391,16 +391,16 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
                 cycle = apply(prolongation_operator, apply(coarse_grid_solver, cycle))
             return iterate(relaxation_factor_index, terminals.no_partitioning, cycle)
 
-        def prolongate_solve_restrict(relaxation_factor_index, prolongation_operator, coarse_grid_solver, restriction_operator, cycle):
+        def restrict_solve_prolongate(relaxation_factor_index, prolongation_operator, coarse_grid_solver, restriction_operator, cycle):
             cycle = restrict(restriction_operator, cycle)
-            return update_with_exact_coarse_grid_correction(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator)
+            return exact_coarse_grid_correction_iteration(relaxation_factor_index, prolongation_operator, coarse_grid_solver, cycle, restriction_operator)
 
-        pset.addPrimitive(prolongate_solve_restrict, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
+        pset.addPrimitive(restrict_solve_prolongate, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                           f'prolongate_solve_restrict_{level}')
-        pset.addPrimitive(prolongate_solve_restrict, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
+        pset.addPrimitive(restrict_solve_prolongate, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
-                          f'prolongate_solve_restrict{level}')
+                          f'restrict_solve_prolongate{level}')
 
         pset.addTerminal(terminals.coarse_grid_solver, types.CoarseGridSolver, f'CGS_{level}')
 
