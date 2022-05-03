@@ -397,7 +397,7 @@ def add_level(pset: gp.PrimitiveSetTyped, terminals: Terminals, types: Types, le
 
         pset.addPrimitive(restrict_solve_prolongate, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.NotFinished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
-                          f'prolongate_solve_restrict_{level}')
+                          f'restrict_solve_prolongate{level}')
         pset.addPrimitive(restrict_solve_prolongate, [TypeWrapper(int), types.Prolongation, types.CoarseGridSolver, types.Restriction, multiple.generate_type_list(types.Approximation, types.Correction, types.Finished)],
                           multiple.generate_type_list(types.Approximation, types.RHS, types.Finished),
                           f'restrict_solve_prolongate{level}')
