@@ -1,5 +1,5 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.evaluation.performance import PerformanceEvaluator
+from evostencils.model_based_prediction.performance import PerformanceEvaluator
 from evostencils.code_generation.exastencils import ProgramGenerator
 import matplotlib.pyplot as plt
 import pandas as pd

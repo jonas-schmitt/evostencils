@@ -71,13 +71,12 @@ def genGrow(pset, min_height, max_height, type_=None):
 
 
 class PrimitiveSetTyped(gp.PrimitiveSetTyped):
-
     def _add(self, prim):
         def addType(dict_, ret_type):
             if ret_type not in dict_:
                 new_list = []
                 for type_, list_ in dict_.items():
-                    if ret_type.issubtype(type_):
+                    if ret_type == type_:
                         for item in list_:
                             if item not in new_list:
                                 new_list.append(item)
@@ -96,7 +95,7 @@ class PrimitiveSetTyped(gp.PrimitiveSetTyped):
             dict_ = self.terminals
 
         for type_ in dict_:
-            if type_.issubtype(prim.ret):
+            if type_ == prim.ret:
                 dict_[type_].append(prim)
 
 

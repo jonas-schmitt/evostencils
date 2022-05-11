@@ -6,7 +6,6 @@ import os.path
 from evostencils.grammar import multigrid as multigrid_initialization
 from evostencils.ir import base, transformations, system
 from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
-from evostencils.types import level_control
 import math
 import numpy as np
 import time
@@ -89,8 +88,6 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         self._checkpoint_directory_path = checkpoint_directory_path
-        self._FinishedType = level_control.generate_finished_type()
-        self._NotFinishedType = level_control.generate_not_finished_type()
         self._init_creator()
         self._total_number_of_evaluations = 0
         self._failed_evaluations = 0
@@ -132,9 +129,7 @@ class Optimizer:
                                                             coarsening_factor, max_level, equations,
                                                             operators, fields,
                                                             maximum_local_system_size=maximum_block_size,
-                                                            depth=levels_per_run,
-                                                            LevelFinishedType=self._FinishedType,
-                                                            LevelNotFinishedType=self._NotFinishedType)
+                                                            depth=levels_per_run)
         self.program_generator.initialize_code_generation(min_level, max_level)
         storages = self._program_generator.generate_storage(min_level, max_level, finest_grid)
         self.toolbox.register('evaluate', evaluation_function, pset=pset,
@@ -830,8 +825,8 @@ class Optimizer:
                                                                 enable_partitioning=enable_partitioning,
                                                                 maximum_local_system_size=maximum_local_system_size,
                                                                 depth=levels_per_run,
-                                                                LevelFinishedType=self._FinishedType,
-                                                                LevelNotFinishedType=self._NotFinishedType,
+                                                                # LevelFinishedType=self._FinishedType,
+                                                                # LevelNotFinishedType=self._NotFinishedType,
                                                                 FAS=FAS)
             self._init_toolbox(pset, node_replacement_probability)
             tmp = None

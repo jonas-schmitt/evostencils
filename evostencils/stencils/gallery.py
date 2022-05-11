@@ -192,7 +192,7 @@ class MultilinearInterpolationGenerator:
 
     def generate_stencil(self, grid):
         import lfa_lab as lfa
-        from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
+        from evostencils.model_based_prediction.convergence import lfa_sparse_stencil_to_constant_stencil
         lfa_grid = lfa.Approximation(grid.dimension, grid.spacing)
         lfa_interpolation = lfa.gallery.ml_interpolation_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
         return lfa_sparse_stencil_to_constant_stencil(lfa_interpolation)
@@ -209,7 +209,7 @@ class FullWeightingRestrictionGenerator:
 
     def generate_stencil(self, grid):
         import lfa_lab as lfa
-        from evostencils.evaluation.convergence import lfa_sparse_stencil_to_constant_stencil
+        from evostencils.model_based_prediction.convergence import lfa_sparse_stencil_to_constant_stencil
         lfa_grid = lfa.Approximation(grid.dimension, grid.spacing)
         lfa_restriction = lfa.gallery.fw_restriction_stencil(lfa_grid, lfa_grid.coarse(self.coarsening_factor))
         return lfa_sparse_stencil_to_constant_stencil(lfa_restriction)

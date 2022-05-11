@@ -60,7 +60,7 @@ def main():
     model_based_estimation = False
     use_jacobi_prefix = True
     # Experimental and not recommended:
-    # Use model based estimation instead of code generation and evaluation
+    # Use model based estimation instead of code generation and model_based_prediction
     # model_based_estimation = True
     if model_based_estimation:
         # LFA based estimation inaccurate with jacobi prefix
@@ -94,8 +94,8 @@ def main():
         # Create convergence and performance evaluator objects
         # Only needed when a model-based estimation should be used within the optimization
         # (Not recommended due to the limitations, but useful for testing)
-        from evostencils.evaluation.convergence import ConvergenceEvaluator
-        from evostencils.evaluation.performance import PerformanceEvaluator
+        from evostencils.model_based_prediction.convergence import ConvergenceEvaluator
+        from evostencils.model_based_prediction.performance import PerformanceEvaluator
         convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
         # Peak FLOP performance of the machine
         peak_flops = 16 * 6 * 2.6 * 1e9
@@ -118,7 +118,7 @@ def main():
                           epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
     # Option to split the optimization into multiple runs,
     # where each run is only performed on a subrange of the discretization hierarchy starting at the top (finest grid)
-    # (Not recommended for code-generation based evaluation)
+    # (Not recommended for code-generation based model_based_prediction)
     levels_per_run = max_level - min_level
     if model_based_estimation:
         # Model-based estimation only feasible for up to 2 levels per run
@@ -139,8 +139,8 @@ def main():
     # Option to use random search instead of crossover and mutation to create new individuals
     use_random_search = False
 
-    mu_ = 32  # Population size
-    lambda_ = 32  # Number of offspring
+    mu_ = 8  # Population size
+    lambda_ = 8  # Number of offspring
     generations = 50  # Number of generations
     population_initialization_factor = 2  # Multiply mu_ by this factor to set the initial population size
 
@@ -151,7 +151,7 @@ def main():
     crossover_probability = 0.7
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1  # Probability to perform mutation by altering a single node in the tree
-    evaluation_samples = 3  # Number of evaluation samples
+    evaluation_samples = 3  # Number of model_based_prediction samples
     maximum_local_system_size = 4  # Maximum size of the local system solved within each step of a block smoother
     # Option to continue from the checkpoint of a previous optimization
     # Warning: So far no check is performed whether the checkpoint is compatible with the current optimization setting
