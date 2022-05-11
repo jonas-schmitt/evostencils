@@ -40,7 +40,7 @@ python scripts/optimize.py
 ## Publications
 To refer to EvoStencils, please cite the following publications.
 ```
-@article{schmitt2022evolving,
+@article{evostencils2022,
   title={Evolving Generalizable Multigrid-Based Helmholtz Preconditioners with Grammar-Guided Genetic Programming},
   author={Schmitt, Jonas and K{\"o}stler, Harald},
   journal={arXiv preprint arXiv:2204.12846},
