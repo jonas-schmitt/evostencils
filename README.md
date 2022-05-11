@@ -46,7 +46,8 @@ To refer to EvoStencils, please cite the following publications.
   journal={arXiv preprint arXiv:2204.12846},
   year={2022}
 }
-
+```
+```
 @article{evostencils2021,
   author={Schmitt, Jonas and Kuckuk, Sebastian and K{\"o}stler, Harald},
   title={EvoStencils: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
