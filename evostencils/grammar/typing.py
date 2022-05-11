@@ -11,7 +11,3 @@ class Type:
 
     def __hash__(self):
         return hash((self.identifier, self.guard))
-
-
-def generate_types(identifier):
-    return Type(identifier, guard=False), Type(identifier, guard=True)
