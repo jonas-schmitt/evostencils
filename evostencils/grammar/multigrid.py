@@ -193,46 +193,46 @@ class Terminals:
     def coarse_grid(self):
         return self.coarse_operator.grid
 
-
-# TODO Pass types from previous level
 class Types:
     @staticmethod
-    def _init_type(identifier, type_attribute, types, guard=False):
+    def _init_type(identifier, types, type_attribute=None, guard=False):
+        if type_attribute is None:
+            type_attribute = identifier
         if types is None:
             return Type(identifier, guard)
         else:
             return getattr(types, type_attribute)
 
-    def __init__(self, level, fine_grid_types=None, FAS=False):
+    def __init__(self, level, previous_types=None, FAS=False):
         # Fine-grid Types
-        self.S_h = self._init_type(f"S_{2 ** level}h", "S_2h", fine_grid_types)
-        self.S_h_guard = self._init_type(f"S_{2 ** level}h", "S_2h_guard", fine_grid_types, guard=True)
-        self.C_h = self._init_type(f"C_{2 ** level}h", "C_2h", fine_grid_types)
-        self.C_h_guard = self._init_type(f"C_{2 ** level}h", "C_2h_guard", fine_grid_types, guard=True)
-        self.x_h = self._init_type(f"x_{2 ** level}h", "x_2h", fine_grid_types)
-        # self.b_h = self._init_type(f"b_{2 ** level}h", "b_2h", fine_grid_types)
-        self.A_h = self._init_type(f"A_{2 ** level}h", "A_2h", fine_grid_types)
-        self.B_h = self._init_type(f"B_{2 ** level}h", "B_2h", fine_grid_types)
+        gen_id = lambda base: f"{base}_{2**level}h"
+        self.S_h = self._init_type(gen_id("S"), previous_types, "S_2h")
+        self.S_guard_h = self._init_type(gen_id("S_guard"), previous_types, "S_guard_2h", guard=True)
+        self.C_h = self._init_type(gen_id("C"), previous_types, "C_2h")
+        self.C_guard_h = self._init_type(gen_id("C_guard"), previous_types, "C_guard_2h", guard=True)
+        self.x_h = self._init_type(gen_id("x"), previous_types, "x_2h")
+        self.A_h = self._init_type(gen_id("A"), previous_types, "A_2h")
+        self.B_h = self._init_type(gen_id("A"), previous_types, "B_2h")
+        self.R_h = Type(f"R_{2**level}h")
 
         # Coarse-Grid Types
-        self.S_2h = Type(f"S_{2 ** (level + 1)}h")
-        self.S_2h_guard = Type(f"S_{2 ** (level + 1)}h", guard=True)
-        self.C_2h = Type(f"C_{2 ** (level + 1)}h")
-        self.C_2h_guard = Type(f"C_{2 ** (level + 1)}h", guard=True)
-        self.x_2h = Type(f"x_{2 ** (level + 1)}h")
-        # self.b_2h = Type(f"b_{2 ** (level + 1)}h")
-        self.A_2h = Type(f"A_{2 ** (level + 1)}h")
-        self.B_2h = Type(f"B_{2 ** (level + 1)}h")
-        self.R_h = Type(f"R_{2 ** level}h")
-        self.P_2h = Type(f"P_{2 ** (level + 1)}h")
-        self.CGS_2h = Type(f"CGS_{2 ** (level + 1)}h")
+        gen_id = lambda base: f"{base}_{2**level+1}h"
+        self.S_2h = Type(gen_id("S"))
+        self.S_guard_2h = Type(gen_id("S_guard"), guard=True)
+        self.C_2h = Type(gen_id("C"))
+        self.C_guard_2h = Type(gen_id("C_guard"), guard=True)
+        self.x_2h = Type(gen_id("x"))
+        self.A_2h = Type(gen_id("A"))
+        self.B_2h = Type(gen_id("B"))
+        self.P_2h = Type(gen_id("P"))
+        self.CGS_2h = Type(gen_id("CGC"))
 
         # General Types
-        self.Partitioning = self._init_type("Partitioning", "Partitioning", fine_grid_types)
-        self.RelaxationFactorIndex = self._init_type(int, "RelaxationFactorIndex", fine_grid_types)
-        self.BlockSize = self._init_type(tuple, "BlockSize", fine_grid_types)
+        self.Partitioning = self._init_type("Partitioning", previous_types)
+        self.RelaxationFactorIndex = self._init_type("RelaxationFactorIndex", previous_types)
+        self.BlockShape = self._init_type("BlockShape", previous_types)
         if FAS:
-            self.NewtonSteps = self._init_type("NewtonSteps", "NewtonSteps", fine_grid_types)
+            self.NewtonSteps = self._init_type("NewtonSteps", previous_types)
 
 
 def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_level, depth, relaxation_factor_samples=37,
@@ -316,9 +316,9 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
     def collective_jacobi(relaxation_factor_index, partitioning_, cycle):
         return smoothing(relaxation_factor_index, partitioning_, smoother.generate_collective_jacobi, cycle)
 
-    def collective_block_jacobi(relaxation_factor_index, block_size, cycle):
+    def collective_block_jacobi(relaxation_factor_index, block_shape, cycle):
         def generate_collective_block_jacobi_fixed(operator):
-            return smoother.generate_collective_block_jacobi(operator, block_size)
+            return smoother.generate_collective_block_jacobi(operator, block_shape)
 
         return smoothing(relaxation_factor_index, part.Single, generate_collective_block_jacobi_fixed, cycle)
 
@@ -346,24 +346,24 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
 
     # Productions
     pset.addPrimitive(residual, [types.S_h], types.C_h, f"residual_{level}")
-    pset.addPrimitive(residual, [types.S_h_guard], types.C_h_guard, f"residual_{level}")
+    pset.addPrimitive(residual, [types.S_guard_h], types.C_guard_h, f"residual_{level}")
 
     if not scalar_equation:
         pset.addPrimitive(decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"decoupled_jacobi_{level}")
-        pset.addPrimitive(decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h_guard], types.S_h_guard, f"decoupled_jacobi_{level}")
+        pset.addPrimitive(decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"decoupled_jacobi_{level}")
 
     # start: Exclude for FAS
     if not FAS:
         pset.addPrimitive(collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h_guard], types.S_h_guard, f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockSize, types.C_h], types.S_h, f"collective_block_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockSize, types.C_h_guard], types.S_h_guard, f"collective_block_jacobi_{level}")
+        pset.addPrimitive(collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"collective_jacobi_{level}")
+        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape, types.C_h], types.S_h, f"collective_block_jacobi_{level}")
+        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape, types.C_guard_h], types.S_guard_h, f"collective_block_jacobi_{level}")
     # end : Exclude for FAS
     if FAS:
         pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_h_guard], types.S_h_guard, f"jacobi_picard_{level}")
+        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"jacobi_picard_{level}")
         pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_h], types.S_h, f"jacobi_newton_{level}")
-        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_h_guard], types.S_h_guard, f"jacobi_newton_{level}")
+        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_guard_h], types.S_guard_h, f"jacobi_newton_{level}")
 
     if not coarsest:
         if FAS:
@@ -373,8 +373,8 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
                               f"update_with_coarse_grid_correction_{level}")
             if depth > 0:
                 pset.addPrimitive(update_with_coarse_grid_correction,
-                                  [types.RelaxationFactorIndex, types.P_2h, types.S_2h_guard, types.R_h],
-                                  types.S_h_guard,
+                                  [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h, types.R_h],
+                                  types.S_guard_h,
                                   f"update_with_coarse_grid_correction_{level}")
 
         else:
@@ -384,15 +384,15 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
                               f"update_with_coarse_grid_correction_{level}")
             if depth > 0:
                 pset.addPrimitive(update_with_coarse_grid_correction,
-                                  [types.RelaxationFactorIndex, types.P_2h, types.S_2h_guard], types.S_h_guard,
+                                  [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h], types.S_guard_h,
                                   f"update_with_coarse_grid_correction_{level}")
 
         pset.addPrimitive(coarsening, [types.A_2h, types.x_2h, types.R_h, types.C_h], types.C_2h, f"coarsening_{level}")
-        pset.addPrimitive(coarsening, [types.A_2h, types.x_2h, types.R_h, types.C_h_guard], types.C_2h_guard, f"coarsening_{level}")
+        pset.addPrimitive(coarsening, [types.A_2h, types.x_2h, types.R_h, types.C_guard_h], types.C_guard_2h, f"coarsening_{level}")
 
     else:
         pset.addPrimitive(correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h, types.C_h], types.S_h, f'correct_with_coarse_grid_solver_{level}')
-        pset.addPrimitive(correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h, types.C_h_guard], types.S_h, f'correct_with_coarse_grid_solver_{level}')
+        pset.addPrimitive(correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h, types.C_guard_h], types.S_h, f'correct_with_coarse_grid_solver_{level}')
 
         pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{level - 1}')
 
@@ -419,7 +419,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
     types = Types(0, FAS=FAS)
     pset = PrimitiveSetTyped("main", [], types.S_h)
-    pset.addTerminal((approximation, rhs), types.S_h_guard, 'u_and_f')
+    pset.addTerminal((approximation, rhs), types.S_guard_h, 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, terminals.no_partitioning.get_name())
     # Start: Exclude for FAS
     if enable_partitioning:
@@ -432,25 +432,25 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     # Block sizes
     # Start: not need for FAS
     if not FAS:
-        block_sizes = []
+        block_shapes = []
         for i in range(len(fields)):
-            block_sizes.append([])
+            block_shapes.append([])
 
-            def generate_block_size(block_size_, block_size_max, dimension_):
+            def generate_block_shape(block_shape_, block_shape_max, dimension_):
                 if dimension_ == 1:
-                    for k in range(1, block_size_max + 1):
-                        block_sizes[-1].append(block_size_ + (k,))
+                    for k in range(1, block_shape_max + 1):
+                        block_shapes[-1].append(block_shape_ + (k,))
                 else:
-                    for k in range(1, block_size_max + 1):
-                        generate_block_size(block_size_ + (k,), block_size_max, dimension_ - 1)
+                    for k in range(1, block_shape_max + 1):
+                        generate_block_shape(block_shape_ + (k,), block_shape_max, dimension_ - 1)
 
-            generate_block_size((), maximum_local_system_size, dimension)
-        for block_size_permutation in itertools.product(*block_sizes):
+            generate_block_shape((), maximum_local_system_size, dimension)
+        for block_shape_permutation in itertools.product(*block_shapes):
             number_of_terms = 0
-            for block_size in block_size_permutation:
-                number_of_terms += reduce(lambda x, y: x * y, block_size)
+            for block_shape in block_shape_permutation:
+                number_of_terms += reduce(lambda x, y: x * y, block_shape)
             if len(approximation.grid) < number_of_terms <= maximum_local_system_size:
-                pset.addTerminal(block_size_permutation, types.BlockSize)
+                pset.addTerminal(block_shape_permutation, types.BlockShape)
     # End: not need for FAS
     # Newton Steps
     if FAS:
@@ -482,7 +482,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
         terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
         types_old = types
-        types = Types(i, fine_grid_types=types_old, FAS=FAS)
+        types = Types(i, previous_types=types_old, FAS=FAS)
         add_level(pset, terminals, types, max_level, i, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
         terminal_list.append(terminals)
 
