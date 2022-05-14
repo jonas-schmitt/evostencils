@@ -235,7 +235,7 @@ class Types:
             self.NewtonSteps = self._init_type("NewtonSteps", previous_types)
 
 
-def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_level, depth, relaxation_factor_samples=37,
+def add_level(pset, terminals: Terminals, types: Types, max_level, depth, relaxation_factor_samples=37,
               coarsest=False, FAS=False):
     level = max_level - depth
     if not coarsest:
@@ -344,20 +344,20 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
             cycle = apply(prolongation_operator, apply(coarse_grid_solver, cycle))
         return update(relaxation_factor_index, terminals.no_partitioning, cycle)
 
+    def add_primitive(pset, f, fixed_types, input_types, output_types, name):
+        for t1, t2 in zip(input_types, output_types):
+            pset.addPrimitive(f, fixed_types + [t1], t2, name)
+
     # Productions
-    pset.addPrimitive(residual, [types.S_h], types.C_h, f"residual_{level}")
-    pset.addPrimitive(residual, [types.S_guard_h], types.C_guard_h, f"residual_{level}")
+    add_primitive(pset, residual, [], [types.S_h, types.S_guard_h], [types.C_h, types.C_guard_h], f"residual_{level}")
 
     if not scalar_equation:
-        pset.addPrimitive(decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"decoupled_jacobi_{level}")
-        pset.addPrimitive(decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"decoupled_jacobi_{level}")
+        add_primitive(pset, decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"decoupled_jacobi_{level}")
 
     # start: Exclude for FAS
     if not FAS:
-        pset.addPrimitive(collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"collective_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape, types.C_h], types.S_h, f"collective_block_jacobi_{level}")
-        pset.addPrimitive(collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape, types.C_guard_h], types.S_guard_h, f"collective_block_jacobi_{level}")
+        add_primitive(pset, collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_jacobi_{level}")
+        add_primitive(pset, collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_block_jacobi_{level}")
     # end : Exclude for FAS
     if FAS:
         pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"jacobi_picard_{level}")
@@ -387,13 +387,10 @@ def add_level(pset: PrimitiveSetTyped, terminals: Terminals, types: Types, max_l
                                   [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h], types.S_guard_h,
                                   f"update_with_coarse_grid_correction_{level}")
 
-        pset.addPrimitive(coarsening, [types.A_2h, types.x_2h, types.R_h, types.C_h], types.C_2h, f"coarsening_{level}")
-        pset.addPrimitive(coarsening, [types.A_2h, types.x_2h, types.R_h, types.C_guard_h], types.C_guard_2h, f"coarsening_{level}")
+        add_primitive(pset, coarsening, [types.A_2h, types.x_2h, types.R_h], [types.C_h, types.C_guard_h], [types.C_2h, types.C_guard_2h], f"coarsening_{level}")
 
     else:
-        pset.addPrimitive(correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h, types.C_h], types.S_h, f'correct_with_coarse_grid_solver_{level}')
-        pset.addPrimitive(correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h, types.C_guard_h], types.S_h, f'correct_with_coarse_grid_solver_{level}')
-
+        add_primitive(pset, correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h], [types.C_h, types.C_guard_h], [types.S_h, types.S_h], f'correct_with_coarse_grid_solver_{level}')
         pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{level - 1}')
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
