@@ -371,27 +371,42 @@ def add_level(pset, terminals: Terminals, types: Types, max_level, depth, relaxa
                               [types.RelaxationFactorIndex, types.P_2h, types.S_2h, types.R_h],
                               types.S_h,
                               f"update_with_coarse_grid_correction_{level}")
-            if depth > 0:
-                pset.addPrimitive(update_with_coarse_grid_correction,
-                                  [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h, types.R_h],
-                                  types.S_guard_h,
-                                  f"update_with_coarse_grid_correction_{level}")
+            pset.addPrimitive(update_with_coarse_grid_correction,
+                              [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h, types.R_h],
+                              types.S_guard_h,
+                              f"update_with_coarse_grid_correction_{level}")
 
         else:
 
-            pset.addPrimitive(update_with_coarse_grid_correction,
-                              [types.RelaxationFactorIndex, types.P_2h, types.S_2h], types.S_h,
-                              f"update_with_coarse_grid_correction_{level}")
-            if depth > 0:
-                pset.addPrimitive(update_with_coarse_grid_correction,
-                                  [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h], types.S_guard_h,
-                                  f"update_with_coarse_grid_correction_{level}")
+            add_primitive(pset, update_with_coarse_grid_correction, [types.RelaxationFactorIndex, types.P_2h], [types.S_2h, types.S_guard_2h], [types.S_h, types.S_guard_h], f"update_with_coarse_grid_correction_{level}")
 
         add_primitive(pset, coarsening, [types.A_2h, types.x_2h, types.R_h], [types.C_h, types.C_guard_h], [types.C_2h, types.C_guard_2h], f"coarsening_{level}")
 
     else:
         add_primitive(pset, correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h], [types.C_h, types.C_guard_h], [types.S_h, types.S_h], f'correct_with_coarse_grid_solver_{level}')
         pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{level - 1}')
+
+
+def add_block_shapes(pset, fields, approximation, types, dimension, maximum_local_system_size):
+    block_shapes = []
+    for i in range(len(fields)):
+        block_shapes.append([])
+
+        def generate_block_shape(block_shape_, block_shape_max, dimension_):
+            if dimension_ == 1:
+                for k in range(1, block_shape_max + 1):
+                    block_shapes[-1].append(block_shape_ + (k,))
+            else:
+                for k in range(1, block_shape_max + 1):
+                    generate_block_shape(block_shape_ + (k,), block_shape_max, dimension_ - 1)
+
+        generate_block_shape((), maximum_local_system_size, dimension)
+    for block_shape_permutation in itertools.product(*block_shapes):
+        number_of_terms = 0
+        for block_shape in block_shape_permutation:
+            number_of_terms += reduce(lambda x, y: x * y, block_shape)
+        if len(approximation.grid) < number_of_terms <= maximum_local_system_size:
+            pset.addTerminal(block_shape_permutation, types.BlockShape)
 
 def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, max_level, equations, operators, fields,
                            maximum_local_system_size=8, relaxation_factor_samples=37,
@@ -427,28 +442,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         pset.addTerminal(i, types.RelaxationFactorIndex)
 
     # Block sizes
-    # Start: not need for FAS
     if not FAS:
-        block_shapes = []
-        for i in range(len(fields)):
-            block_shapes.append([])
-
-            def generate_block_shape(block_shape_, block_shape_max, dimension_):
-                if dimension_ == 1:
-                    for k in range(1, block_shape_max + 1):
-                        block_shapes[-1].append(block_shape_ + (k,))
-                else:
-                    for k in range(1, block_shape_max + 1):
-                        generate_block_shape(block_shape_ + (k,), block_shape_max, dimension_ - 1)
-
-            generate_block_shape((), maximum_local_system_size, dimension)
-        for block_shape_permutation in itertools.product(*block_shapes):
-            number_of_terms = 0
-            for block_shape in block_shape_permutation:
-                number_of_terms += reduce(lambda x, y: x * y, block_shape)
-            if len(approximation.grid) < number_of_terms <= maximum_local_system_size:
-                pset.addTerminal(block_shape_permutation, types.BlockShape)
-    # End: not need for FAS
+        add_block_shapes(pset, fields, approximation, types, dimension, maximum_local_system_size)
     # Newton Steps
     if FAS:
         newton_steps = [1, 2, 3, 4]

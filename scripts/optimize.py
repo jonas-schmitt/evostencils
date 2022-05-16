@@ -74,7 +74,7 @@ def main():
         # Warning: FAS Support experimental, requires adaption of the symbol names provided to this class
         program_generator = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
                                                 'RestrictionNode', 'CorrectionNode',
-                                                'Laplace', 'gamSten', cycle_name, 'CGS', 'Smoother', mpi_rank=mpi_rank)
+                                                'Laplace', 'gamSten', cycle_name, 'CGS', mpi_rank=mpi_rank)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension  # Dimensionality of the problem
