@@ -5,7 +5,7 @@ import pickle
 import os.path
 from evostencils.grammar import multigrid as multigrid_initialization
 from evostencils.ir import base, transformations, system
-from evostencils.genetic_programming import genGrow, mutNodeReplacement, mutInsert, select_unique_best
+from evostencils.grammar.gp import genGrow, mutNodeReplacement, mutInsert, select_unique_best
 import math
 import numpy as np
 import time

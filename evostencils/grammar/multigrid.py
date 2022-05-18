@@ -4,7 +4,7 @@ from evostencils.ir import partitioning as part
 from evostencils.ir import smoother
 from evostencils.ir.base import ConstantStencilGenerator
 from evostencils.grammar.typing import Type
-from evostencils.genetic_programming import PrimitiveSetTyped
+from evostencils.grammar.gp import PrimitiveSetTyped
 import numpy as np
 import sympy
 from sympy.parsing.sympy_parser import parse_expr

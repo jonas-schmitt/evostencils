@@ -1,9 +1,9 @@
 import os
 
 from evostencils.ir import base, system
-from evostencils.ir.reference_cycles import generate_v_22_cycle_three_grid, generate_FAS_v_22_cycle_two_grid, generate_v_22_cycle_two_grid, generate_FAS_v_22_cycle_three_grid
+from evostencils.ir.reference_cycles import generate_FAS_v_22_cycle_three_grid
 from evostencils.grammar.multigrid import Terminals, generate_primitive_set
-from evostencils.ir.base import Grid, sub
+from evostencils.ir.base import Grid
 from evostencils.ir.base import Operator as baseOperator
 from evostencils.ir.base import Restriction as baseRestriction
 from evostencils.ir.base import Prolongation as baseProlongation
@@ -16,7 +16,7 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 from plot_computational_graph import get_sub, get_super
 from deap import creator, gp, tools
 from deap import base as deap_base
-from evostencils.genetic_programming import genGrow
+from evostencils.grammar.gp import genGrow
 from evostencils.code_generation.exastencils_FAS import ProgramGeneratorFAS
 import pandas as pd
 

@@ -30,43 +30,35 @@ def generate(pset, min_height, max_height, condition, type_=None):
     while len(stack) != 0:
         depth, type_ = stack.pop()
         max_depth = max(max_depth, depth)
-        is_primitive = True
+        if max_depth > 90:
+            return None
         terminals_available = len(pset.terminals[type_]) > 0
-        primitives_available = len(pset.primitives[type_]) > 0
         if condition(height, depth):
+            nodes = pset.terminals[type_] + pset.primitives[type_]
+        else:
             if terminals_available:
                 nodes = pset.terminals[type_]
-                is_primitive = False
-            elif primitives_available:
-                nodes = pset.primitives[type_]
             else:
-                raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
-        else:
-            if primitives_available:
                 nodes = pset.primitives[type_]
-            elif terminals_available:
-                nodes = pset.terminals[type_]
-                is_primitive = False
-            else:
-                raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
+        if len(nodes) == 0:
+            raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
         choice = random.choice(nodes)
-        if is_primitive:
+        if choice.arity > 0:
             for arg in reversed(choice.args):
                 stack.append((depth + 1, arg))
         else:
             if isclass(choice):
                 choice = choice()
         expression.append(choice)
-    return expression, max_depth
+    return expression
 
 
-def genGrow(pset, min_height, max_height, type_=None):
+def genGrow(pset, min_height, max_height, type_=None, size_limit=150):
     def condition(height, depth):
-        return depth >= height or \
-           (depth >= min_height and random.random() < pset.terminalRatio)
-    result, max_depth = generate(pset, min_height, max_height, condition, type_)
-    while max_depth > 90 or len(result) > 150: # Include size limit for individual as well
-        result, max_depth = generate(pset, min_height, max_height, condition, type_)
+        return depth < height
+    result = generate(pset, min_height, max_height, condition, type_)
+    while result is None or len(result) > size_limit: # Include size limit for individual as well
+        result = generate(pset, min_height, max_height, condition, type_)
     return result
 
 
