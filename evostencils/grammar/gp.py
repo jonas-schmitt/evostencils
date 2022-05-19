@@ -3,32 +3,22 @@ from inspect import isclass
 from deap import gp
 from operator import attrgetter
 
-
-def generate(pset, min_height, max_height, condition, type_=None):
-    """Generate a Tree as a list of list. The tree is build
-    from the root to the leaves, and it stop growing when the
-    condition is fulfilled.
-
-    :param pset: Primitive set from which primitives are selected.
-    :param min_height: Minimum height of the produced trees.
-    :param max_height: Maximum Height of the produced trees.
-    :param condition: The condition is a function that takes two arguments,
-                      the height of the tree to build and the current
-                      depth in the tree.
-    :param type_: The type that should return the tree when called, when
-                  :obj:`None` (default) the type of :pset: (pset.ret)
-                  is assumed.
-    :returns: A grown tree with leaves at possibly different depths
-              depending on the condition function.
-    """
-    if type_ is None:
+def generate(pset, min_height, max_height, condition, return_type=None, subtree=None):
+    if return_type is None:
         type_ = pset.ret
+    else:
+        type_ = return_type
     expression = []
     height = random.randint(min_height, max_height)
     stack = [(0, type_)]
     max_depth = 0
+    subtree_inserted = False
     while len(stack) != 0:
         depth, type_ = stack.pop()
+        if not subtree_inserted and type_ == return_type and len(expression) > 0:
+            expression.extend(subtree)
+            subtree_inserted = True
+            continue
         max_depth = max(max_depth, depth)
         if max_depth > 90:
             return None
@@ -119,70 +109,16 @@ def mutNodeReplacement(individual, pset):
 
 
 def mutInsert(individual, min_height, max_height, pset):
-    """Inserts a new branch at a random position in *individual*. The subtree
-    at the chosen position is used as child node of the created subtree, in
-    that way, it is really an insertion rather than a replacement. Note that
-    the original subtree will become one of the children of the new subtree
-    inserted, but not perforce the first (its position is randomly selected if
-    the new primitive has more than one child).
-
-    :param individual: The normal or typed tree to be mutated.
-    :returns: A tuple of one tree.
-    """
     index = random.randrange(len(individual))
     node = individual[index]
     slice_ = individual.searchSubtree(index)
 
-    # As we want to keep the current node as children of the new one,
-    # it must accept the return value of the current node
-
     def condition(height, depth):
-        return depth >= height
+        return depth < height
     subtree = individual[slice_]
-    new_subtree = generate_with_insertion(pset, min_height, max_height, condition, node.ret, subtree)
+    new_subtree = generate(pset, min_height, max_height, condition, node.ret, subtree)
     individual[slice_] = new_subtree
     return individual,
-
-
-def generate_with_insertion(pset, min_height, max_height, condition, return_type, subtree):
-    expression = []
-    height = random.randint(min_height, max_height)
-    stack = [(0, return_type)]
-    subtree_inserted = False
-    while len(stack) != 0:
-        depth, type_ = stack.pop()
-        if not subtree_inserted and type_ == return_type and len(expression) > 0:
-            expression.extend(subtree)
-            subtree_inserted = True
-            continue
-        is_primitive = True
-        terminals_available = len(pset.terminals[type_]) > 0
-        primitives_available = len(pset.primitives[type_]) > 0
-        if condition(height, depth):
-            if terminals_available:
-                nodes = pset.terminals[type_]
-                is_primitive = False
-            elif primitives_available:
-                nodes = pset.primitives[type_]
-            else:
-                raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
-        else:
-            if primitives_available:
-                nodes = pset.primitives[type_]
-            elif terminals_available:
-                nodes = pset.terminals[type_]
-                is_primitive = False
-            else:
-                raise RuntimeError(f"Neither terminal nor primitive available for {type_}")
-        choice = random.choice(nodes)
-        if is_primitive:
-            for arg in reversed(choice.args):
-                stack.append((depth + 1, arg))
-        else:
-            if isclass(choice):
-                choice = choice()
-        expression.append(choice)
-    return expression
 
 
 def select_unique_best(individuals, k, fit_attr="fitness"):
