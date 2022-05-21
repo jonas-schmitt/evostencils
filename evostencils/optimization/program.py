@@ -5,7 +5,7 @@ import pickle
 import os.path
 from evostencils.grammar import multigrid as multigrid_initialization
 from evostencils.ir import base, transformations, system
-from evostencils.grammar.gp import genGrow, mutNodeReplacement, mutInsert, select_unique_best
+from evostencils.grammar.gp import genGrow, mutNodeReplacement, mutate_subtree, select_unique_best
 import math
 import numpy as np
 import time
@@ -155,7 +155,7 @@ class Optimizer:
             if operator_choice < node_replacement_probability:
                 return mutNodeReplacement(individual, pset_)
             else:
-                return mutInsert(individual, 0, 10, pset_)
+                return mutate_subtree(individual, 0, 10, pset_)
 
         self._toolbox.register("mutate", mutate, pset_=pset)
 
