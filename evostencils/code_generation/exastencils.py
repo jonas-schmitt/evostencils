@@ -948,7 +948,7 @@ class ProgramGenerator:
                             tokens = line.split('=')
                             tmp = tokens[0].split(':')
                             lhs_tokens = tmp[0].split()
-                            if len(tokens) == 2 and lhs_tokens[0] == 'Var' and lhs_tokens[1] in global_variable_values:
+                            if len(tokens) == 2 and (lhs_tokens[0] == 'Var' or lhs_tokens[0] == 'Expr') and lhs_tokens[1] in global_variable_values:
                                 tmp = tokens[0] + ' = ' + str(global_variable_values[lhs_tokens[1]]) + '\n'
                                 output_file.write(tmp)
                             else:

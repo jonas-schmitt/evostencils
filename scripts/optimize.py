@@ -36,15 +36,11 @@ def main():
     # Hacky solution for now
     if "FAS" in knowledge_path or "FAS" in settings_path:
         FAS = True
-
-    # Example problem from L3
-    # Warning: Currently not working, due to a bug in the ExaStencils compiler!
-    # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
-    # knowledge_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.knowledge'
-    # cycle_name = "mgCycle"
-    # values = [80.0 * 2.0**i for i in range(100)]
-    # pde_parameter_values = {'k': values}
-    # solver_iteration_limit = 10000
+    # Special treatment of parameters for the Helmholtz example
+    if "Helmholtz" in knowledge_path or "Helmholtz" in settings_path:
+        values = [80.0 * 2.0**i for i in range(100)]
+        pde_parameter_values = {'k': values}
+        solver_iteration_limit = 10000
 
     # Set up MPI
     comm = MPI.COMM_WORLD
@@ -142,7 +138,7 @@ def main():
     mu_ = 8  # Population size
     lambda_ = 8  # Number of offspring
     generations = 50  # Number of generations
-    population_initialization_factor = 2  # Multiply mu_ by this factor to set the initial population size
+    population_initialization_factor = 4  # Multiply mu_ by this factor to set the initial population size
 
     # Number of generations after which a generalization is performed
     # This is achieved by incrementing min_level and max_level within the optimization
@@ -151,7 +147,7 @@ def main():
     crossover_probability = 0.7
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1  # Probability to perform mutation by altering a single node in the tree
-    evaluation_samples = 3  # Number of model_based_prediction samples
+    evaluation_samples = 3  # Number of evaluation samples
     maximum_local_system_size = 4  # Maximum size of the local system solved within each step of a block smoother
     # Option to continue from the checkpoint of a previous optimization
     # Warning: So far no check is performed whether the checkpoint is compatible with the current optimization setting

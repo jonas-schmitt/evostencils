@@ -101,6 +101,11 @@ class Optimizer:
         self._timeout_counter_limit = 10000
         self._total_evaluation_time = 0
         self._average_time_to_convergence = infinity
+        self._pset = None
+        self._pset_old = None
+        self._storages = None
+        self._maximum_local_system_size = 8
+        self._enable_partitioning = True
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, evaluation_samples=3,
                                      pde_parameter_values=None):
@@ -122,16 +127,19 @@ class Optimizer:
         rhs_entries = [base.RightHandSide(eq.rhs_name, g) for eq, g in zip(equations, finest_grid)]
         rhs = system.RightHandSide('b', rhs_entries)
         self.clear_individual_cache()
-        maximum_block_size = 8
         levels_per_run = max_level - min_level
+        self._pset_old = self._pset
         pset, _ = \
             multigrid_initialization.generate_primitive_set(approximation, rhs, dimension,
                                                             coarsening_factor, max_level, equations,
                                                             operators, fields,
-                                                            maximum_local_system_size=maximum_block_size,
+                                                            enable_partitioning=self._enable_partitioning,
+                                                            maximum_local_system_size=self._maximum_local_system_size,
                                                             depth=levels_per_run)
+        self._pset = pset
         self.program_generator.initialize_code_generation(min_level, max_level)
         storages = self._program_generator.generate_storage(min_level, max_level, finest_grid)
+        self._storages = storages
         self.toolbox.register('evaluate', evaluation_function, pset=pset,
                               storages=storages, min_level=min_level, max_level=max_level,
                               solver_program=program, evaluation_samples=evaluation_samples,
@@ -515,6 +523,7 @@ class Optimizer:
                 count = 0
                 if self.is_root():
                     print("Increasing problem size", flush=True)
+
                 if len(population[0].fitness.values) == 2:
                     self.reinitialize_code_generation(evaluation_min_level, evaluation_max_level, program,
                                                       self.evaluate_multiple_objectives, evaluation_samples=evaluation_samples, pde_parameter_values=next_pde_parameter_values)
@@ -763,6 +772,7 @@ class Optimizer:
                                   node_replacement_probability=0.1, optimization_method=None, use_random_search=False,
                                   levels_per_run=None, evaluation_samples=3, continue_from_checkpoint=False,
                                   maximum_local_system_size=8, model_based_estimation=False, pde_parameter_values=None):
+        self._maximum_local_system_size = maximum_local_system_size
         levels = self.max_level - self.min_level
         if levels_per_run is None:
             levels_per_run = levels
@@ -792,6 +802,7 @@ class Optimizer:
         logbooks = []
         hofs = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
+        self._storages = storages
         FAS = False
         if self._program_generator.uses_FAS:
             FAS = True
@@ -818,6 +829,7 @@ class Optimizer:
             if model_based_estimation:
                 print("Warning: Smoother partitioning not supported with model-based estimation")
                 enable_partitioning = False
+            self._enable_partitioning = enable_partitioning
             pset, terminal_list = \
                 multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
                                                                 self.coarsening_factors, max_level, self.equations,
@@ -825,10 +837,9 @@ class Optimizer:
                                                                 enable_partitioning=enable_partitioning,
                                                                 maximum_local_system_size=maximum_local_system_size,
                                                                 depth=levels_per_run,
-                                                                # LevelFinishedType=self._FinishedType,
-                                                                # LevelNotFinishedType=self._NotFinishedType,
                                                                 FAS=FAS)
             self._init_toolbox(pset, node_replacement_probability)
+            self._pset = pset
             tmp = None
             if pass_checkpoint:
                 tmp = checkpoint
@@ -874,12 +885,12 @@ class Optimizer:
                     print('Tree representation:', flush=True)
                     print(str(individual), flush=True)
 
-            expression, _ = self.compile_individual(best_individual, pset)
-            cycle_function = self.program_generator.generate_cycle_function(expression, storages, min_level, max_level,
-                                                                            self.max_level)
-            if self.is_root() and min_level == self.min_level:
+            expression, _ = self.compile_individual(best_individual, self._pset)
+            cycle_function = self.program_generator.generate_cycle_function(expression, self._storages, evaluation_min_level, evaluation_max_level,
+                                                                            max(self.max_level, evaluation_max_level))
+            if self.is_root():
                 average_runtime, average_convergence_factor, average_number_of_iterations = \
-                    self.program_generator.generate_and_evaluate(expression, storages, min_level, max_level, solver_program)
+                    self.program_generator.generate_and_evaluate(expression, self._storages, evaluation_min_level, evaluation_max_level, solver_program)
                 print(f'\nMeasurements for best individual - solving time: {average_runtime}, convergence factor: {average_convergence_factor}, '
                       f'number of iterations: {average_number_of_iterations}')
             solver_program += cycle_function
@@ -900,9 +911,7 @@ class Optimizer:
                                                             self.coarsening_factors, self.max_level, self.equations,
                                                             self.operators, self.fields,
                                                             maximum_local_system_size=maximum_block_size,
-                                                            depth=levels,
-                                                            LevelFinishedType=self._FinishedType,
-                                                            LevelNotFinishedType=self._NotFinishedType)
+                                                            depth=levels)
         self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
         expression, _ = eval(grammar_string, pset.context, {})
         # initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]

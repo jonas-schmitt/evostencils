@@ -120,7 +120,7 @@ def generate_operator_entries_from_equation(equation, operators: list, fields, g
 
 
 def generate_system_operator_from_l2_information(equations: [EquationInfo], operators: [OperatorInfo],
-                                                 fields: [sympy.Symbol], level, grid: [base.Grid]):
+                                                 fields: [sympy.Symbol], level, depth, grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
     equations_on_level = list(filter(lambda x: x.level == level, equations))
     system_operators = []
@@ -132,13 +132,13 @@ def generate_system_operator_from_l2_information(equations: [EquationInfo], oper
         row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, grid)
         entries.append(row_of_entries)
 
-    operator = system.Operator(f'A_{level}', entries)
+    operator = system.Operator(f'A_{depth}', entries)
 
     return operator
 
 
 def generate_operators_from_l2_information(equations: [EquationInfo], operators: [OperatorInfo],
-                                           fields: [sympy.Symbol], level, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
+                                           fields: [sympy.Symbol], level, depth, fine_grid: [base.Grid], coarse_grid: [base.Grid]):
     operators_on_level = list(filter(lambda x: x.level == level, operators))
     equations_on_level = list(filter(lambda x: x.level == level, equations))
     restriction_operators = []
@@ -157,18 +157,18 @@ def generate_operators_from_l2_information(equations: [EquationInfo], operators:
     assert len(prolongation_operators) == len(fields), 'The number of prolongation operators does not match with the number of fields'
     list_of_restriction_operators = [base.Restriction(op_info.name, fine_grid[i], coarse_grid[i], ConstantStencilGenerator(op_info.stencil))
                                      for i, op_info in enumerate(restriction_operators)]
-    restriction = system.Restriction(f'R_{level}', list_of_restriction_operators)
+    restriction = system.Restriction(f'R_{depth}', list_of_restriction_operators)
 
     list_of_prolongation_operators = [base.Prolongation(op_info.name, fine_grid[i], coarse_grid[i], ConstantStencilGenerator(op_info.stencil))
                                       for i, op_info in enumerate(prolongation_operators)]
-    prolongation = system.Prolongation(f'P_{level-1}', list_of_prolongation_operators)
+    prolongation = system.Prolongation(f'P_{depth+1}', list_of_prolongation_operators)
 
     entries = []
     for equation in equations_on_level:
         row_of_entries = generate_operator_entries_from_equation(equation, system_operators, fields, fine_grid)
         entries.append(row_of_entries)
 
-    operator = system.Operator(f'A_{level}', entries)
+    operator = system.Operator(f'A_{depth}', entries)
 
     return operator, restriction, prolongation
 
@@ -203,9 +203,9 @@ class Types:
         else:
             return getattr(types, type_attribute)
 
-    def __init__(self, level, previous_types=None, FAS=False):
+    def __init__(self, depth, previous_types=None, FAS=False):
         # Fine-grid Types
-        gen_id = lambda base: f"{base}_{2**level}h"
+        gen_id = lambda base: f"{base}_{depth}"
         self.S_h = self._init_type(gen_id("S"), previous_types, "S_2h")
         self.S_guard_h = self._init_type(gen_id("S_guard"), previous_types, "S_guard_2h", guard=True)
         self.C_h = self._init_type(gen_id("C"), previous_types, "C_2h")
@@ -213,10 +213,10 @@ class Types:
         self.x_h = self._init_type(gen_id("x"), previous_types, "x_2h")
         self.A_h = self._init_type(gen_id("A"), previous_types, "A_2h")
         self.B_h = self._init_type(gen_id("A"), previous_types, "B_2h")
-        self.R_h = Type(f"R_{2**level}h")
+        self.R_h = Type(f"R_{depth}")
 
         # Coarse-Grid Types
-        gen_id = lambda base: f"{base}_{2**level+1}h"
+        gen_id = lambda base: f"{base}_{depth+1}"
         self.S_2h = Type(gen_id("S"))
         self.S_guard_2h = Type(gen_id("S_guard"), guard=True)
         self.C_2h = Type(gen_id("C"))
@@ -235,13 +235,11 @@ class Types:
             self.NewtonSteps = self._init_type("NewtonSteps", previous_types)
 
 
-def add_level(pset, terminals: Terminals, types: Types, max_level, depth, relaxation_factor_samples=37,
-              coarsest=False, FAS=False):
-    level = max_level - depth
+def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, FAS=False):
     if not coarsest:
         coarse_zero_approximation = system.ZeroApproximation(terminals.coarse_grid)
-        pset.addTerminal(coarse_zero_approximation, types.x_2h, f'zero_{level - 1}')
-        pset.addTerminal(terminals.coarse_operator, types.A_2h, f'A_{level - 1}')
+        pset.addTerminal(coarse_zero_approximation, types.x_2h, f'zero_{depth + 1}')
+        pset.addTerminal(terminals.coarse_operator, types.A_2h, f'A_{depth + 1}')
     for prolongation in terminals.prolongation_operators:
         pset.addTerminal(prolongation, types.P_2h, prolongation.name)
     for restriction in terminals.restriction_operators:
@@ -349,42 +347,42 @@ def add_level(pset, terminals: Terminals, types: Types, max_level, depth, relaxa
             pset.addPrimitive(f, fixed_types + [t1], t2, name)
 
     # Productions
-    add_primitive(pset, residual, [], [types.S_h, types.S_guard_h], [types.C_h, types.C_guard_h], f"residual_{level}")
+    add_primitive(pset, residual, [], [types.S_h, types.S_guard_h], [types.C_h, types.C_guard_h], f"residual_{depth}")
 
     if not scalar_equation:
-        add_primitive(pset, decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"decoupled_jacobi_{level}")
+        add_primitive(pset, decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"decoupled_jacobi_{depth}")
 
     # start: Exclude for FAS
     if not FAS:
-        add_primitive(pset, collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_jacobi_{level}")
-        add_primitive(pset, collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_block_jacobi_{level}")
+        add_primitive(pset, collective_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_jacobi_{depth}")
+        add_primitive(pset, collective_block_jacobi, [types.RelaxationFactorIndex, types.BlockShape], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"collective_block_jacobi_{depth}")
     # end : Exclude for FAS
     if FAS:
-        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"jacobi_picard_{level}")
-        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_h], types.S_h, f"jacobi_newton_{level}")
-        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_guard_h], types.S_guard_h, f"jacobi_newton_{level}")
+        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_h], types.S_h, f"jacobi_picard_{depth}")
+        pset.addPrimitive(jacobi_picard, [types.RelaxationFactorIndex, types.Partitioning, types.C_guard_h], types.S_guard_h, f"jacobi_picard_{depth}")
+        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_h], types.S_h, f"jacobi_newton_{depth}")
+        pset.addPrimitive(jacobi_newton, [types.RelaxationFactorIndex, types.Partitioning, types.NewtonSteps, types.C_guard_h], types.S_guard_h, f"jacobi_newton_{depth}")
 
     if not coarsest:
         if FAS:
             pset.addPrimitive(update_with_coarse_grid_correction,
                               [types.RelaxationFactorIndex, types.P_2h, types.S_2h, types.R_h],
                               types.S_h,
-                              f"update_with_coarse_grid_correction_{level}")
+                              f"update_with_coarse_grid_correction_{depth}")
             pset.addPrimitive(update_with_coarse_grid_correction,
                               [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h, types.R_h],
                               types.S_guard_h,
-                              f"update_with_coarse_grid_correction_{level}")
+                              f"update_with_coarse_grid_correction_{depth}")
 
         else:
 
-            add_primitive(pset, update_with_coarse_grid_correction, [types.RelaxationFactorIndex, types.P_2h], [types.S_2h, types.S_guard_2h], [types.S_h, types.S_guard_h], f"update_with_coarse_grid_correction_{level}")
+            add_primitive(pset, update_with_coarse_grid_correction, [types.RelaxationFactorIndex, types.P_2h], [types.S_2h, types.S_guard_2h], [types.S_h, types.S_guard_h], f"update_with_coarse_grid_correction_{depth}")
 
-        add_primitive(pset, coarsening, [types.A_2h, types.x_2h, types.R_h], [types.C_h, types.C_guard_h], [types.C_2h, types.C_guard_2h], f"coarsening_{level}")
+        add_primitive(pset, coarsening, [types.A_2h, types.x_2h, types.R_h], [types.C_h, types.C_guard_h], [types.C_2h, types.C_guard_2h], f"coarsening_{depth}")
 
     else:
-        add_primitive(pset, correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h], [types.C_h, types.C_guard_h], [types.S_h, types.S_h], f'correct_with_coarse_grid_solver_{level}')
-        pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{level - 1}')
+        add_primitive(pset, correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h], [types.C_h, types.C_guard_h], [types.S_h, types.S_h], f'correct_with_coarse_grid_solver_{depth}')
+        pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{depth + 1}')
 
 
 def add_block_shapes(pset, fields, approximation, types, dimension, maximum_local_system_size):
@@ -418,9 +416,9 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     fine_grid = approximation.grid
     coarse_grid = system.get_coarse_grid(fine_grid, coarsening_factors)
     operator, restriction, prolongation, = \
-        generate_operators_from_l2_information(equations, operators, fields, max_level, fine_grid, coarse_grid)
+        generate_operators_from_l2_information(equations, operators, fields, max_level, 0, fine_grid, coarse_grid)
     coarse_operator, coarse_restriction, coarse_prolongation, = \
-        generate_operators_from_l2_information(equations, operators, fields, max_level - 1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
+        generate_operators_from_l2_information(equations, operators, fields, max_level - 1, 1, coarse_grid, system.get_coarse_grid(coarse_grid, coarsening_factors))
     # For now assumes that only one prolongation, restriction and partitioning operator is available
     # TODO: Extend in the future
     partitionings = [part.RedBlack]
@@ -450,7 +448,7 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         for i in newton_steps:
             pset.addTerminal(i, types.NewtonSteps)
 
-    add_level(pset, terminals, types, max_level, 0, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
+    add_level(pset, terminals, types, 0, coarsest=coarsest, FAS=FAS)
 
     terminal_list = [terminals]
     for i in range(1, depth):
@@ -464,18 +462,17 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
         if i == depth - 1:
             coarsest = True
             coarse_operator = \
-                generate_system_operator_from_l2_information(equations, operators, fields, max_level - i - 1,
-                                                             coarse_grid)
+                generate_system_operator_from_l2_information(equations, operators, fields, max_level - i - 1, i+1, coarse_grid)
         else:
             coarse_operator, coarse_restriction, coarse_prolongation = \
-                generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, coarse_grid,
+                generate_operators_from_l2_information(equations, operators, fields, max_level - i - 1, i + 1, coarse_grid,
                                                        system.get_coarse_grid(coarse_grid, coarsening_factors))
 
         coarse_grid_solver = base.CoarseGridSolver("Coarse-Grid Solver", coarse_operator, coarse_grid_solver_expression)
         terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
         types_old = types
         types = Types(i, previous_types=types_old, FAS=FAS)
-        add_level(pset, terminals, types, max_level, i, relaxation_factor_samples, coarsest=coarsest, FAS=FAS)
+        add_level(pset, terminals, types, i, coarsest=coarsest, FAS=FAS)
         terminal_list.append(terminals)
 
     return pset, terminal_list

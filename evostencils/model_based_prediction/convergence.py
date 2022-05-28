@@ -31,17 +31,17 @@ class ConvergenceEvaluator:
     def __init__(self, dimension, coarsening_factors, finest_grid):
         self._coarsening_factors = coarsening_factors
         self._dimension = dimension
-        self._lfa_grids = [lfa_lab.Approximation(dimension, g.spacing) for g in finest_grid]
+        self._lfa_grids = [lfa_lab.Grid(dimension, g.spacing) for g in finest_grid]
 
     @property
     def lfa_grids(self):
         return self._lfa_grids
 
-    def set_lfa_grids(self, new_lfa_grids: List[lfa_lab.Approximation]):
+    def set_lfa_grids(self, new_lfa_grids: List[lfa_lab.Grid]):
         self._lfa_grids = new_lfa_grids
 
     def reinitialize_lfa_grids(self, finest_grid: List[base.Grid]):
-        self._lfa_grids = [lfa_lab.Approximation(self.dimension, g.spacing) for g in finest_grid]
+        self._lfa_grids = [lfa_lab.Grid(self.dimension, g.spacing) for g in finest_grid]
 
     @property
     def coarsening_factors(self):
@@ -53,10 +53,10 @@ class ConvergenceEvaluator:
 
     def get_lfa_grid(self, grid: base.Grid, i: int):
         lfa_grid = self.lfa_grids[i]
-        step_size = lfa_grid.spacing()
+        step_size = lfa_grid.step_size()
         while step_size < grid.spacing:
             lfa_grid = lfa_grid.coarse(self.coarsening_factors[i])
-            step_size = lfa_grid.spacing()
+            step_size = lfa_grid.step_size()
         return lfa_grid
 
     def transform(self, expression: base.Expression):
