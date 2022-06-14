@@ -22,8 +22,6 @@ def generate(pset, min_height, max_height, condition, return_type=None, subtree=
             subtree_inserted = True
             continue
         max_depth = max(max_depth, depth)
-        if max_depth > 90:
-            return None
         terminals_available = len(pset.terminals[type_]) > 0
         if condition(height, depth):
             nodes = pset.terminals[type_] + pset.primitives[type_]
@@ -49,7 +47,7 @@ def genGrow(pset, min_height, max_height, type_=None, size_limit=150):
     def condition(height, depth):
         return depth < height
     result = generate(pset, min_height, max_height, condition, type_)
-    while result is None or len(result) > size_limit: # Include size limit for individual as well
+    while len(result) > size_limit: # Include size limit for individual as well
         result = generate(pset, min_height, max_height, condition, type_)
     return result
 
