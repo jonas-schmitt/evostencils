@@ -444,7 +444,7 @@ class Optimizer:
             # Use number of iteration
             # fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
             fitness = average_convergence_factor, average_time_to_convergence / average_number_of_iterations
-            if average_number_of_iterations >= self.infinity:
+            if average_number_of_iterations >= self.infinity or average_convergence_factor > 1:
                 fitness = average_convergence_factor, self.infinity
             self.add_individual_to_cache(individual, fitness)
             return fitness
