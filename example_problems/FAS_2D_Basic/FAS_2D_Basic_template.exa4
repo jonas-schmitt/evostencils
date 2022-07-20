@@ -148,7 +148,7 @@ Function Solve ( ) : Unit {
 		startTimer ( 'cycle' )
 		mgCycle@finest (  )
 		stopTimer ( 'cycle' )
-		t_sol += getTotalFromTimer('cycle')
+		t_sol = getTotalFromTimer('cycle')
 		if (getTotalFromTimer ( 'cycle' ) > 1200000 ) {
 			print ( 'Aborting solve after', getTotalFromTimer ( 'cycle' ), 'ms which exceeds the limit of', 1200000, 'ms' )
 			return
