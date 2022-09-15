@@ -82,7 +82,6 @@ To refer to EvoStencils, please cite the following publications.
   booktitle = {Proceedings of the 2020 Genetic and Evolutionary Computation Conference},
   pages = {1012–1020},
   numpages = {9},
-  keywords = {geometric multigrid, context-free grammar, genetic programming, local fourier analysis, code generation},
   location = {Canc\'{u}n, Mexico},
   series = {GECCO '20}
 }
