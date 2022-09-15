@@ -41,21 +41,19 @@ python scripts/optimize.py
 To refer to EvoStencils, please cite the following publications.
 ```
 @inproceedings{evostencils2022,
-author = {Schmitt, Jonas and K\"{o}stler, Harald},
-title = {Evolving Generalizable Multigrid-Based Helmholtz Preconditioners with Grammar-Guided Genetic Programming},
-year = {2022},
-isbn = {9781450392372},
-publisher = {Association for Computing Machinery},
-address = {New York, NY, USA},
-url = {https://doi.org/10.1145/3512290.3528688},
-doi = {10.1145/3512290.3528688},
-abstract = {Solving the indefinite Helmholtz equation is not only crucial for the understanding of many physical phenomena but also represents an outstandingly-difficult benchmark problem for the successful application of numerical methods. Here we introduce a new approach for evolving eficient preconditioned iterative solvers for Helmholtz problems with multi-objective grammar-guided genetic programming. Our approach is based on a novel context-free grammar, which enables the construction of multigrid preconditioners that employ a tailored sequence of operations on each discretization level. To find solvers that generalize well over the given domain, we propose a custom method of successive problem difficulty adaption, in which we evaluate a preconditioner's efficiency on increasingly ill-conditioned problem instances. We demonstrate our approach's effectiveness by evolving multigrid-based preconditioners for a two-dimensional indefinite Helmholtz problem that outperform several human-designed methods for different wavenumbers up to systems of linear equations with more than a million unknowns.},
-booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference},
-pages = {1009–1018},
-numpages = {10},
-keywords = {preconditioning, grammar-based, shifted laplacian, partial differential equations, genetic programming, multiobjective, helmholtz equation, generalization, multigrid, artificial intelligence},
-location = {Boston, Massachusetts},
-series = {GECCO '22}
+  author = {Schmitt, Jonas and K\"{o}stler, Harald},
+  title = {Evolving Generalizable Multigrid-Based Helmholtz Preconditioners with Grammar-Guided Genetic Programming},
+  year = {2022},
+  isbn = {9781450392372},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  url = {https://doi.org/10.1145/3512290.3528688},
+  doi = {10.1145/3512290.3528688},
+  booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference},
+  pages = {1009–1018},
+  numpages = {10},
+  location = {Boston, Massachusetts},
+  series = {GECCO '22}
 }
 ```
 ```
