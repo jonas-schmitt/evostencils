@@ -1,5 +1,4 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.code_generation.exastencils_FAS import ProgramGeneratorFAS
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import sys
@@ -10,7 +9,7 @@ from mpi4py import MPI
 def main():
     cwd = f'{os.getcwd()}'
     # Path to the ExaStencils compiler
-    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    compiler_path = f'/local/ja42rica/ExaStencils/Compiler/Compiler.jar'
     # Path to base folder
     base_path = f'{cwd}/example_problems'
     # Relative path to platform file (from base folder)
@@ -32,11 +31,7 @@ def main():
     pde_parameter_values = None
     # The maximum number of iterations considered acceptable for a solver
     solver_iteration_limit = 500
-    FAS = False
     # Hacky solution for now
-    if "FAS" in knowledge_path or "FAS" in settings_path:
-        FAS = True
-    # Special treatment of parameters for the Helmholtz example
     if "Helmholtz" in knowledge_path or "Helmholtz" in settings_path:
         values = [80.0 * 2.0**i for i in range(100)]
         pde_parameter_values = {'k': values}
@@ -53,7 +48,7 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
-    model_based_estimation = False
+    model_based_estimation = True
     use_jacobi_prefix = True
     # Experimental and not recommended:
     # Use model based estimation instead of code generation and model_based_prediction
@@ -62,15 +57,9 @@ def main():
         # LFA based estimation inaccurate with jacobi prefix
         use_jacobi_prefix = False
     # Create program generator object
-    if not FAS:
-        program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, mpi_rank,
-                                             cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
-                                             solver_iteration_limit=solver_iteration_limit)
-    else:
-        # Warning: FAS Support experimental, requires adaption of the symbol names provided to this class
-        program_generator = ProgramGeneratorFAS('FAS_2D_Basic', 'Solution', 'RHS', 'Residual', 'Approximation',
-                                                'RestrictionNode', 'CorrectionNode',
-                                                'Laplace', 'gamSten', cycle_name, 'CGS', mpi_rank=mpi_rank)
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, mpi_rank,
+                                         cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
+                                         solver_iteration_limit=solver_iteration_limit)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension  # Dimensionality of the problem
