@@ -10,7 +10,7 @@ from mpi4py import MPI
 def main():
     cwd = f'{os.getcwd()}'
     # Path to the ExaStencils compiler
-    compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
+    compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder
     base_path = f'{cwd}/example_problems'
     # Relative path to platform file (from base folder)
@@ -53,7 +53,7 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
-    model_based_estimation = False
+    model_based_estimation = True
     use_jacobi_prefix = True
     # Experimental and not recommended:
     # Use model based estimation instead of code generation and model_based_prediction
@@ -118,7 +118,7 @@ def main():
     levels_per_run = max_level - min_level
     if model_based_estimation:
         # Model-based estimation only feasible for up to 2 levels per run
-        levels_per_run = 1
+        levels_per_run = 2
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     # Choose optimization method
     optimization_method = optimizer.NSGAII
@@ -158,7 +158,7 @@ def main():
     # pops: Populations at the end of each optimization run on the respective subrange of the discretization hierarchy
     # stats: Statistics structure (data structure provided by the DEAP framework)
     # hofs: Hall-of-fames at the end of each optimization run on the respective subrange of the discretization hierarchy
-    program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
+    program, dsl_code, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      use_random_search=use_random_search,
                                                                      mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
