@@ -12,7 +12,7 @@ import shutil
 
 
 class CycleStorage:
-    def __init__(self, equations: [multigrid.EquationInfo], fields: [sympy.Symbol], grids: List[base.Grid]):
+    def __init__(self, equations: List[multigrid.EquationInfo], fields: List[sympy.Symbol], grids: List[base.Grid]):
         self.grid = grids
         self.solution = [Field(f'{symbol.name}', g.level, self) for g, symbol in zip(grids, fields)]
         rhs = []
@@ -39,7 +39,7 @@ class Field:
 class ProgramGenerator:
     def __init__(self, absolute_compiler_path: str, base_path: str, settings_path: str, knowledge_path: str,
                  platform_path: str, mpi_rank=0, solution_equations=None, cycle_name="gen_mgCycle",
-                 use_jacobi_prefix=True, evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120,
+                 model_based_estimation=False, evaluation_timeout=300, code_generation_timeout=300, c_compiler_timeout=120,
                  solver_iteration_limit=None):
         if isinstance(solution_equations, str):
             solution_equations = [solution_equations]
@@ -61,7 +61,13 @@ class ProgramGenerator:
         self._mpi_rank = mpi_rank
         self._platform_path = platform_path
         self._cycle_name = cycle_name
-        self._use_jacobi_prefix = use_jacobi_prefix
+        if model_based_estimation:
+            # Due to the inaccuracy of the model-based prediction, 
+            # we do not use the jacobi prefix when generating smoothers
+            # TODO: Investigate in the future
+            self._use_jacobi_prefix = False
+        else:
+            self._use_jacobi_prefix = True
         self._knowledge_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.knowledge'
         self._settings_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.settings'
         self._layer3_path_generated = f'{self._base_path_prefix}/{self.problem_name}_{mpi_rank}.exa3'

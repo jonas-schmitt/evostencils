@@ -771,7 +771,8 @@ class Optimizer:
                                   generalization_interval=50, crossover_probability=0.7, mutation_probability=0.3,
                                   node_replacement_probability=0.1, optimization_method=None, use_random_search=False,
                                   levels_per_run=None, evaluation_samples=3, continue_from_checkpoint=False,
-                                  maximum_local_system_size=8, model_based_estimation=False, pde_parameter_values=None):
+                                  maximum_local_system_size=8, model_based_estimation=False, pde_parameter_values=None,
+                                  verbose=False):
         self._maximum_local_system_size = maximum_local_system_size
         levels = self.max_level - self.min_level
         if levels_per_run is None:
@@ -827,7 +828,8 @@ class Optimizer:
             rhs = right_hand_sides[i]
             enable_partitioning = True
             if model_based_estimation:
-                print("Warning: Smoother partitioning not supported with model-based estimation")
+                if verbose:
+                    print("Warning: Smoother partitioning not supported with model-based estimation")
                 enable_partitioning = False
             self._enable_partitioning = enable_partitioning
             pset, terminal_list = \
@@ -873,7 +875,7 @@ class Optimizer:
             pops.append(pop)
             hofs.append(hof)
             best_individual = hof[0]
-            if self.is_root():
+            if self.is_root() and verbose:
                 for individual in hof:
                     if len(individual.fitness.values) == 2:
                         print(f'\nExecution time until convergence: '
@@ -897,7 +899,7 @@ class Optimizer:
             self.barrier()
 
         self.barrier()
-        return str(best_individual), pops, logbooks, hofs
+        return str(best_individual), solver_program, pops, logbooks, hofs
 
     def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
         solver_program = ''

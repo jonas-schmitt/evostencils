@@ -9,7 +9,7 @@ from mpi4py import MPI
 def main():
     cwd = f'{os.getcwd()}'
     # Path to the ExaStencils compiler
-    compiler_path = f'/local/ja42rica/ExaStencils/Compiler/Compiler.jar'
+    compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder
     base_path = f'{cwd}/example_problems'
     # Relative path to platform file (from base folder)
@@ -19,6 +19,7 @@ def main():
     settings_path = f'Poisson/2D_FD_Poisson_fromL2.settings'
     # settings_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.settings'
     # settings_path = f'Helmholtz/2D_FD_Helmholtz_fromL3.settings'
+    # settings_path = f'FAS_2D_Basic/FAS_2D_Basic.settings'
     # Relative path to knowledge file (from base folder)
     knowledge_path = f'Poisson/2D_FD_Poisson_fromL2.knowledge'
     # knowledge_path = f'LinearElasticity/2D_FD_LinearElasticity_fromL2.knowledge'
@@ -46,20 +47,16 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
-    model_based_estimation = False
-    use_jacobi_prefix = True
-    # Experimental and not recommended:
+    # Only recommended for testing:
     # Use model based estimation instead of code generation and model_based_prediction
-    # model_based_estimation = True
-    if model_based_estimation:
-        # LFA based estimation inaccurate with jacobi prefix
-        use_jacobi_prefix = False
-    # Create program generator object
+    model_based_estimation = True
+
+    # model_based_estimation = False
     program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, platform_path, mpi_rank,
-                                         cycle_name=cycle_name, use_jacobi_prefix=use_jacobi_prefix,
+                                         cycle_name=cycle_name, model_based_estimation=model_based_estimation,
                                          solver_iteration_limit=solver_iteration_limit)
 
-    # Obtain extracted information from program generator
+   # Obtain extracted information from program generator
     dimension = program_generator.dimension  # Dimensionality of the problem
     finest_grid = program_generator.finest_grid  # Representation of the finest grid
     coarsening_factors = program_generator.coarsening_factor
@@ -68,8 +65,6 @@ def main():
     equations = program_generator.equations  # System of PDEs in SymPy
     operators = program_generator.operators  # Discretized differential operators
     fields = program_generator.fields  # Variables that occur within system of PDEs
-    infinity = 1e100  # Upper limit that is considered infinite
-    epsilon = 1e-12  # Lower limit that is considered zero
     problem_name = program_generator.problem_name
     convergence_evaluator = None
     performance_evaluator = None
@@ -77,8 +72,8 @@ def main():
         # Create convergence and performance evaluator objects
         # Only needed when a model-based estimation should be used within the optimization
         # (Not recommended due to the limitations, but useful for testing)
-        from evostencils.model_based_prediction.convergence import ConvergenceEvaluator
-        from evostencils.model_based_prediction.performance import PerformanceEvaluator
+        from evostencils.model_based_estimation.convergence import ConvergenceEvaluator
+        from evostencils.model_based_estimation.performance import PerformanceEvaluator
         convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
         # Peak FLOP performance of the machine
         peak_flops = 16 * 6 * 2.6 * 1e9
@@ -98,14 +93,14 @@ def main():
                           program_generator=program_generator,
                           convergence_evaluator=convergence_evaluator,
                           performance_evaluator=performance_evaluator,
-                          epsilon=epsilon, infinity=infinity, checkpoint_directory_path=checkpoint_directory_path)
+                          checkpoint_directory_path=checkpoint_directory_path)
     # Option to split the optimization into multiple runs,
     # where each run is only performed on a subrange of the discretization hierarchy starting at the top (finest grid)
     # (Not recommended for code-generation based model_based_prediction)
     levels_per_run = max_level - min_level
     if model_based_estimation:
         # Model-based estimation only feasible for up to 2 levels per run
-        levels_per_run = 1
+        levels_per_run = 2
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     # Choose optimization method
     optimization_method = optimizer.NSGAII
@@ -145,7 +140,7 @@ def main():
     # pops: Populations at the end of each optimization run on the respective subrange of the discretization hierarchy
     # stats: Statistics structure (data structure provided by the DEAP framework)
     # hofs: Hall-of-fames at the end of each optimization run on the respective subrange of the discretization hierarchy
-    program, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
+    program, dsl_code, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      use_random_search=use_random_search,
                                                                      mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
@@ -162,6 +157,7 @@ def main():
                                                                      continue_from_checkpoint=continue_from_checkpoint)
     # Print the outcome of the optimization and store the data and statistics
     if mpi_rank == 0:
+        print(f'\nExaSlang Code:\n{dsl_code}\n', flush=True)
         print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
             os.makedirs(f'./{problem_name}')
