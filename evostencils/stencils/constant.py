@@ -71,7 +71,7 @@ def diagonal(stencil):
     import numpy as np
 
     def is_diagonal(offset, _):
-        return (np.array(offset, np.int) == 0).all()
+        return (np.array(offset, np.int64) == 0).all()
 
     return filter_stencil(stencil, is_diagonal)
 
