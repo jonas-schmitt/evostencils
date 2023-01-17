@@ -1,89 +1,73 @@
-# EvoStencils
-EvoStencils is an open source tool for the grammar-based design of geometric multigrid methods for solving partial differential equations (PDEs) with stencil-based discretizations. 
-With the use of grammar-guided genetic programming (GGGP) it can alter a multigrid cycle's components on each discretization level individually and is, therefore, capable of evolving algorithms whose construction has been previously impossible.
+# Installation
 
-EvoStencils is purely written in [Python](https://www.python.org/) and utilizes the [DEAP](https://github.com/DEAP/deap) framework as genetic programming backend. To automatically generate efficient implementations of a multigrid solver, EvoStencils builds upon the [ExaStencils](https://www.exastencils.fau.de/) framework, which is capable of generating highly optimized and scalable solver code that utilizes the hardware resources of recent supercomputers.
+EvoStencils requires a working installation of the message-passing interface `MPI` and depends on the Python packages `numpy`, `sympy`, `deap`, `mpi4py`, which can be installed using the following command.
 
-EvoStencils has been developed at the Chair for System Simulation of Friedrich-Alexander University Erlangen-Nürnberg (FAU).
-In case you run into any troubles using EvoStencils, please contact [jonas.schmitt@fau.de](https://www.cs10.tf.fau.de/person/jonas-schmitt/).
-
-
-## Installation
-#### Requirements: Python >= 3.6, sbt (for ExaStencils), MPI
-1. Clone and build the ExaStencils framework
 ```
-git clone https://i10git.cs.fau.de/exastencils/release exastencils
+pip install -e .
+```
+
+EvoStencils uses the [ExaStencils](https://www.exastencils.fau.de/), which requires a working installation of `java` (at least version 11) and `g++`. Under Linux these packages can be installed with the package manager. To clone and build ExaStencils in the current directory, you can use the following commands. 
+
+```
+wget -nc https://github.com/lssfau/ExaStencils/archive/refs/tags/v1.1.zip
+wget -nc https://github.com/sbt/sbt/releases/download/v1.8.0/sbt-1.8.0.zip
+unzip -n v1.1.zip && mv -vn ExaStencils-1.1 exastencils
+unzip -n sbt-1.8.0.zip
 cd exastencils
-sbt compile
-sbt assembly
-```
-2. Install required Python packages
-```
-pip install deap sympy mpi4py
-```
-3. Install LFA Lab (optional)
-  Follow these instructions: https://hrittich.github.io/lfa-lab/install.html 
-4. Clone EvoStencils
-```
-git clone https://github.com/jonas-schmitt/evostencils
-```
-5. Set up the environment
-```
-cd evostencils
-source ./setup.sh
-```
-## Running
-An example script for running an optimization can be found in the scripts folder.
-```
-python scripts/optimize.py
-```
-## Publications
-To refer to EvoStencils, please cite the following publications.
-```
-@inproceedings{evostencils2022,
-  author = {Schmitt, Jonas and K\"{o}stler, Harald},
-  title = {Evolving Generalizable Multigrid-Based Helmholtz Preconditioners with Grammar-Guided Genetic Programming},
-  year = {2022},
-  isbn = {9781450392372},
-  publisher = {Association for Computing Machinery},
-  address = {New York, NY, USA},
-  url = {https://doi.org/10.1145/3512290.3528688},
-  doi = {10.1145/3512290.3528688},
-  booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference},
-  pages = {1009–1018},
-  numpages = {10},
-  location = {Boston, Massachusetts},
-  series = {GECCO '22}
-}
-```
-```
-@article{evostencils2021,
-  author={Schmitt, Jonas and Kuckuk, Sebastian and K{\"o}stler, Harald},
-  title={EvoStencils: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
-  journal={Genetic Programming and Evolvable Machines},
-  year={2021},
-  month={Sep},
-  day={03},
-  issn={1573-7632},
-  doi={10.1007/s10710-021-09412-w},
-  url={https://doi.org/10.1007/s10710-021-09412-w}
-}
-```
-```
-@inproceedings{evostencils2020,
-  author = {Schmitt, Jonas and Kuckuk, Sebastian and K\"{o}stler, Harald},
-  title = {Constructing Efficient Multigrid Solvers with Genetic Programming},
-  year = {2020},
-  isbn = {9781450371285},
-  publisher = {Association for Computing Machinery},
-  address = {New York, NY, USA},
-  url = {https://doi.org/10.1145/3377930.3389811},
-  doi = {10.1145/3377930.3389811},
-  booktitle = {Proceedings of the 2020 Genetic and Evolutionary Computation Conference},
-  pages = {1012–1020},
-  numpages = {9},
-  location = {Canc\'{u}n, Mexico},
-  series = {GECCO '20}
-}
+../sbt/bin/sbt compile
+../sbt/bin/sbt assembly
+cd ..
 ```
 
+# Introduction
+
+EvoStencils is a library for the automated design of **Multigrid (MG)** methods with grammar-guided genetic programming (G3P). By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithm structure. The following diagram provides an overview of EvoStencils' software architecture.
+
+Results that have been achieved with EvoStencils have been awarded with the [19th Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
+
+EvoStencils is currently developed and maintained by [Jonas Schmitt](jonas.schmitt@fau.de).
+
+Examples of use can be found in [`notebooks`](https://github.com/jonas-schmitt/evostencils/notebooks).
+
+# Citing
+
+If you use or refer to EvoStencils in your work, please consider including the following citations:
+
+<pre>
+@InProceedings{evostencils1,
+  location    = {Boston Massachusetts},
+  title        = {Evolving generalizable multigrid-based helmholtz preconditioners with grammar-guided genetic programming},
+  url        = {https://dl.acm.org/doi/10.1145/3512290.3528688},
+  doi        = {10.1145/3512290.3528688},
+  eventtitle    = {{GECCO} '22: Genetic and Evolutionary Computation Conference},
+  pages        = {1009--1018},
+  booktitle    = {Proceedings of the Genetic and Evolutionary Computation Conference},
+  publisher    = {{ACM}},
+  author    = {Schmitt, Jonas and Köstler, Harald}
+}
+</pre>
+
+<pre>
+@Article{evostencils2,
+  title        = {{EvoStencils}: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
+  volume    = {22},
+  issn        = {1389-2576, 1573-7632},
+  url        = {https://link.springer.com/10.1007/s10710-021-09412-w},
+  doi        = {10.1007/s10710-021-09412-w},
+  shorttitle    = {{EvoStencils}},
+  pages        = {511--537},
+  number    = {4},
+  journaltitle    = {Genetic Programming and Evolvable Machines},
+  shortjournal    = {Genet Program Evolvable Mach},
+  author    = {Schmitt, Jonas and Kuckuk, Sebastian and Köstler, Harald},
+}
+</pre>
+
+# How to get Started
+
+- Look at the [Tutorial](https://github.com/jonas-schmitt/notebooks/tutorial.ipynb)
+- Read our [Journal Paper](https://link.springer.com/10.1007/s10710-021-09412-w)
+
+# What is G3P and how is it related to Multigrid?
+
+Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that aims to construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations. By imposing local changes on a certain derivation tree G3P, can alter the corresponding method's individual algorithmic steps without affecting its global structure, which comprises the potential of discovering novel and potentially superior sequences of MG operations.
