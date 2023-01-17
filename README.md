@@ -29,7 +29,7 @@ Results that have been achieved with EvoStencils have been awarded with the [19t
 
 EvoStencils is currently developed and maintained by [Jonas Schmitt](https://github.com/jonas-schmitt).
 
-Examples of use can be found in [`notebooks`](https://github.com/jonas-schmitt/evostencils/notebooks).
+Examples of use can be found in [`notebooks`](https://github.com/jonas-schmitt/evostencils/tree/master/notebooks).
 
 # Citing
 
@@ -67,7 +67,7 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 # Getting Started
 
-- Look at the [Tutorial](https://github.com/jonas-schmitt/evostencils/notebooks/tutorial.ipynb)
+- Look at the [Tutorial](https://github.com/jonas-schmitt/evostencils/blob/master/notebooks/tutorial.ipynb)
 - Read our [Journal Paper](https://link.springer.com/10.1007/s10710-021-09412-w)
 
 # What is G3P and how is it related to Multigrid?
