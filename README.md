@@ -69,7 +69,8 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 - Look at the [Tutorial](https://github.com/jonas-schmitt/evostencils/blob/master/notebooks/tutorial.ipynb)
 - The folder [example_problems](https://github.com/jonas-schmitt/evostencils/blob/master/example_problems) contains a number of examples implemented in ExaStencils' DSL, which can be used as a drop in replacement for the two-dimensional Poisson problem covered in this tutorial.
-- Read our [Journal Paper](https://link.springer.com/10.1007/s10710-021-09412-w)
+- If you want to run EvoStencils directly, you can use the [optimize](https://github.com/jonas-schmitt/evostencils/blob/master/scripts/optimize.py) script as a starting point.
+- Read our [Journal Paper](https://link.springer.com/10.1007/s10710-021-09412-w) which provides a good overview of EvoStencils' theoretical foundations.
 
 # What is G3P and how is it related to Multigrid?
 
