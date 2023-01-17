@@ -6,7 +6,7 @@ EvoStencils requires a working installation of the message-passing interface `MP
 pip install -e .
 ```
 
-EvoStencils uses the [ExaStencils](https://www.exastencils.fau.de/), which requires a working installation of `java` (at least version 11) and `g++`. Under Linux these packages can be installed with the package manager. To clone and build ExaStencils in the current directory, you can use the following commands. 
+EvoStencils uses the [ExaStencils](https://www.exastencils.fau.de/) framework as a code generation backend, which requires a working installation of `java` (at least version 11) and `g++`. Under Linux these packages can be installed with the package manager. To clone and build ExaStencils in the current directory, you can use the following commands. 
 
 ```
 wget -nc https://github.com/lssfau/ExaStencils/archive/refs/tags/v1.1.zip
@@ -21,7 +21,7 @@ cd ..
 
 # Introduction
 
-EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithm structure. The following diagram provides an overview of EvoStencils' software architecture.
+EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithm structure. To implement G3P EvoStencils relies on [DEAP](https://github.com/DEAP/deap), while it utilizes the [ExaStencils](https://www.exastencils.fau.de) framework to automatically generate parallel C++ implementations based on an algorithmic representation of each MG-based solver specified in the form of a custom DSL. The following diagram provides an overview of EvoStencils' software architecture.
 
 <img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="1000">
 
