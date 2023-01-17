@@ -25,7 +25,7 @@ EvoStencils is a library for the automated design of **Multigrid (MG)** methods 
 
 <img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="1000">
 
-Results that were achieved using EvoStencils have been awarded with the [19th Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
+Results that were achieved using EvoStencils have been awarded with the [19th Annual Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
 
 EvoStencils is currently developed and maintained by [Jonas Schmitt](https://github.com/jonas-schmitt).
 
