@@ -75,5 +75,5 @@ Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms 
 ![](https://github.com/jonas-schmitt/evostencils/files/10436585/three_grid_method_grammar_tree.pdf)
 
 By imposing local changes on a certain derivation tree G3P, can alter the corresponding method's individual algorithmic steps without affecting its global structure, which comprises the potential of discovering novel and potentially superior sequences of MG operations.
-<img src="[https://your-image-url.type](https://user-images.githubusercontent.com/5746840/212941118-971352f4-67b2-47b0-9cf3-ad3870dd7f1e.svg)" width="100">
+<img src="[https://your-image-url.type](https://user-images.githubusercontent.com/5746840/212941118-971352f4-67b2-47b0-9cf3-ad3870dd7f1e.svg)" width="100" height="100">
 
