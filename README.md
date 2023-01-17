@@ -67,7 +67,7 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 # Getting Started
 
-- Look at the [Tutorial](https://github.com/jonas-schmitt/notebooks/tutorial.ipynb)
+- Look at the [Tutorial](https://github.com/jonas-schmitt/evostencils/notebooks/tutorial.ipynb)
 - Read our [Journal Paper](https://link.springer.com/10.1007/s10710-021-09412-w)
 
 # What is G3P and how is it related to Multigrid?
