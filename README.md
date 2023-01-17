@@ -1,6 +1,6 @@
 # Installation
 
-EvoStencils requires a working installation of the message-passing interface `MPI` and depends on the Python packages `numpy`, `sympy`, `deap`, `mpi4py`, which can be installed using the following command.
+EvoStencils requires a working installation of the message-passing interface `MPI` and depends on the Python packages `numpy`, `sympy`, `deap`, `mpi4py`. The install EvoStencils together with all required Python packages, you can invoke the following command.
 
 ```
 pip install -e .
