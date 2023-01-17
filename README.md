@@ -72,9 +72,9 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 # What is G3P and how is it related to Multigrid?
 
-Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that aims to construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations. 
+Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that aims to construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations.
 
-<img src="https://user-images.githubusercontent.com/5746840/212943789-b3f72011-e0d6-4d1f-ab8c-b3a3f1b76971.svg" width="1000">
+<img src="https://user-images.githubusercontent.com/5746840/212945869-6ec1ae10-3b34-4f25-b3ee-33c83c733429.svg" width="800">
 
 By imposing local changes on a certain derivation tree G3P, can alter the corresponding method's individual algorithmic steps without affecting its global structure, which comprises the potential of discovering novel and potentially superior sequences of MG operations.
 
