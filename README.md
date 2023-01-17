@@ -1,4 +1,16 @@
-# Installation
+# EvoStencils
+
+EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithmic structure. To implement G3P, EvoStencils relies on [DEAP](https://github.com/DEAP/deap), while it utilizes the [ExaStencils](https://www.exastencils.fau.de) framework to automatically generate parallel C++ implementations based on an algorithmic representation of each MG-based solver specified in the form of a custom DSL. The following diagram provides an overview of EvoStencils' software architecture.
+
+<img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="1000">
+
+Results that were achieved using EvoStencils have been awarded with the [19th Annual Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
+
+EvoStencils is currently developed and maintained by [Jonas Schmitt](https://github.com/jonas-schmitt).
+
+Examples of use can be found in [`notebooks`](https://github.com/jonas-schmitt/evostencils/tree/master/notebooks).
+
+## Installation
 
 EvoStencils requires a working installation of the message-passing interface `MPI` and depends on the Python packages `numpy`, `sympy`, `deap`, `mpi4py`. To install EvoStencils together with all required Python packages, invoke the following command:
 
@@ -19,19 +31,7 @@ cd exastencils
 cd ..
 ```
 
-# Introduction
-
-EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithmic structure. To implement G3P, EvoStencils relies on [DEAP](https://github.com/DEAP/deap), while it utilizes the [ExaStencils](https://www.exastencils.fau.de) framework to automatically generate parallel C++ implementations based on an algorithmic representation of each MG-based solver specified in the form of a custom DSL. The following diagram provides an overview of EvoStencils' software architecture.
-
-<img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="1000">
-
-Results that were achieved using EvoStencils have been awarded with the [19th Annual Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
-
-EvoStencils is currently developed and maintained by [Jonas Schmitt](https://github.com/jonas-schmitt).
-
-Examples of use can be found in [`notebooks`](https://github.com/jonas-schmitt/evostencils/tree/master/notebooks).
-
-# Citing
+## Citing
 
 If you use or refer to EvoStencils in your work, please consider including the following citations:
 
@@ -65,14 +65,14 @@ If you use or refer to EvoStencils in your work, please consider including the f
 }
 </pre>
 
-# Getting Started
+## Getting Started
 
 - Look at the [tutorial](https://github.com/jonas-schmitt/evostencils/blob/master/notebooks/tutorial.ipynb).
 - The folder [example_problems](https://github.com/jonas-schmitt/evostencils/blob/master/example_problems) contains a number of examples implemented in ExaStencils' DSL, which can be used as a drop in replacement for the two-dimensional Poisson problem covered in this tutorial.
 - If you want to run EvoStencils directly, you can use the [optimize](https://github.com/jonas-schmitt/evostencils/blob/master/scripts/optimize.py) script as a starting point.
 - Read our [journal paper](https://link.springer.com/10.1007/s10710-021-09412-w), which provides a good overview of EvoStencils' theoretical foundations.
 
-# What is G3P and how is it related to Multigrid?
+## What is G3P and how is it related to Multigrid?
 
 Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations.
 
