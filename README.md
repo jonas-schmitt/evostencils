@@ -74,7 +74,7 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that aims to construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations.
 
-<img src="https://user-images.githubusercontent.com/5746840/212945869-6ec1ae10-3b34-4f25-b3ee-33c83c733429.svg" width="800">
+<img src="https://user-images.githubusercontent.com/5746840/212946312-8d8ff9a5-2999-4f20-8914-ac679bd6ce9e.svg" width="1000">
 
 By imposing local changes on a certain derivation tree G3P, can alter the corresponding method's individual algorithmic steps without affecting its global structure, which comprises the potential of discovering novel and potentially superior sequences of MG operations.
 
