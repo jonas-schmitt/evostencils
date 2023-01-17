@@ -2,7 +2,7 @@
 
 EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithmic structure. To implement G3P, EvoStencils relies on [DEAP](https://github.com/DEAP/deap), while it utilizes the [ExaStencils](https://www.exastencils.fau.de) framework to automatically generate parallel C++ implementations based on an algorithmic representation of each MG-based solver specified in the form of a custom DSL. The following diagram provides an overview of EvoStencils' software architecture.
 
-<img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="1000">
+<img src="https://user-images.githubusercontent.com/5746840/212943618-23a53af2-59b9-4e55-8756-4dc5af49e5b5.svg" width="100%">
 
 Results that were achieved using EvoStencils have been awarded with the [19th Annual Humies Gold Award](https://www.human-competitive.org/awards) for Human-Competitive Results.
 
@@ -76,9 +76,9 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms that construct programs based on the principle of natural evolution. G3P represents each program as a derivation tree, whose structure adheres to the rules of a formal grammar. To utilize G3P for the automated design of MG, EvoStencils formulates the rules of constructing a MG method in the form of a context-free grammar. Each derivation tree that results from the application of these rules thus represents a unique sequence of MG operations that operates on the given hierarchy of discretizations.
 
-<img src="https://user-images.githubusercontent.com/5746840/212946312-8d8ff9a5-2999-4f20-8914-ac679bd6ce9e.svg" width="1000">
+<img src="https://user-images.githubusercontent.com/5746840/212946312-8d8ff9a5-2999-4f20-8914-ac679bd6ce9e.svg" width="100%">
 
 By imposing local changes on a certain derivation tree, G3P can alter the corresponding method's individual algorithmic steps without affecting its global structure, which offers the potential of discovering novel and potentially superior sequences of MG operations.
 
-<img src="https://user-images.githubusercontent.com/5746840/212941118-971352f4-67b2-47b0-9cf3-ad3870dd7f1e.svg" width="1000">
+<img src="https://user-images.githubusercontent.com/5746840/212941118-971352f4-67b2-47b0-9cf3-ad3870dd7f1e.svg" width="100%">
 
