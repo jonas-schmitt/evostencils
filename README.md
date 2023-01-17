@@ -18,7 +18,7 @@ EvoStencils requires a working installation of the message-passing interface `MP
 pip install -e .
 ```
 
-EvoStencils uses the [ExaStencils](https://www.exastencils.fau.de/) framework as a code generation backend, which requires a working installation of `java` (at least version 11) and `g++`. Under Linux these packages can be installed with the package manager. To clone and build ExaStencils in the current directory, you can use the following commands. 
+EvoStencils uses the [ExaStencils](https://www.exastencils.fau.de/) framework as a code generation backend, which requires a working installation of `java` (at least version 11) and `g++`. Under Linux (or WSL) these packages can be installed with the package manager. To clone and build ExaStencils in the current directory, you can use the following commands. 
 
 ```
 wget -nc https://github.com/lssfau/ExaStencils/archive/refs/tags/v1.1.zip
