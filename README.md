@@ -37,31 +37,31 @@ If you use or refer to EvoStencils in your work, please consider including the f
 
 <pre>
 @InProceedings{evostencils1,
-  location    = {Boston Massachusetts},
-  title        = {Evolving generalizable multigrid-based helmholtz preconditioners with grammar-guided genetic programming},
-  url        = {https://dl.acm.org/doi/10.1145/3512290.3528688},
-  doi        = {10.1145/3512290.3528688},
-  eventtitle    = {{GECCO} '22: Genetic and Evolutionary Computation Conference},
-  pages        = {1009--1018},
-  booktitle    = {Proceedings of the Genetic and Evolutionary Computation Conference},
-  publisher    = {{ACM}},
-  author    = {Schmitt, Jonas and Köstler, Harald}
+  location = {Boston Massachusetts},
+  title = {Evolving generalizable multigrid-based helmholtz preconditioners with grammar-guided genetic programming},
+  url = {https://dl.acm.org/doi/10.1145/3512290.3528688},
+  doi = {10.1145/3512290.3528688},
+  eventtitle = {{GECCO} '22: Genetic and Evolutionary Computation Conference},
+  pages = {1009--1018},
+  booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference},
+  publisher = {{ACM}},
+  author = {Schmitt, Jonas and Köstler, Harald}
 }
 </pre>
 
 <pre>
 @Article{evostencils2,
-  title        = {{EvoStencils}: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
-  volume    = {22},
-  issn        = {1389-2576, 1573-7632},
-  url        = {https://link.springer.com/10.1007/s10710-021-09412-w},
-  doi        = {10.1007/s10710-021-09412-w},
-  shorttitle    = {{EvoStencils}},
-  pages        = {511--537},
-  number    = {4},
-  journaltitle    = {Genetic Programming and Evolvable Machines},
-  shortjournal    = {Genet Program Evolvable Mach},
-  author    = {Schmitt, Jonas and Kuckuk, Sebastian and Köstler, Harald},
+  title = {{EvoStencils}: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
+  volume = {22},
+  issn = {1389-2576, 1573-7632},
+  url = {https://link.springer.com/10.1007/s10710-021-09412-w},
+  doi = {10.1007/s10710-021-09412-w},
+  shorttitle = {{EvoStencils}},
+  pages = {511--537},
+  number = {4},
+  journaltitle = {Genetic Programming and Evolvable Machines},
+  shortjournal = {Genet Program Evolvable Mach},
+  author = {Schmitt, Jonas and Kuckuk, Sebastian and Köstler, Harald},
 }
 </pre>
 
