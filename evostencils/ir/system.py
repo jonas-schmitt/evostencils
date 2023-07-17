@@ -1,13 +1,13 @@
 from evostencils.ir import base
 from typing import List, Tuple
 
-
 class System(base.Expression):
 
     def __init__(self, name, entries, shape):
         self._name = name
         self._entries = entries
         self._shape = shape
+        self.smoother_type=None
         super().__init__()
 
     @property
