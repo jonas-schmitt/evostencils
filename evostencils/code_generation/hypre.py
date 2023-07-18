@@ -44,6 +44,16 @@ class ProgramGenerator:
     def uses_FAS(self):
         return False
 
+    def reset(self):
+        self.list_states.clear()
+        self.cycle_objs.clear()
+        self.intergrid_ops.clear()
+        self.smoothers.clear()
+        self.num_sweeps.clear()
+        self.relaxation_weights.clear()
+        self.cgc_weights.clear()
+        self.amgcycle = ""
+
     def traverse_graph(self, expression): 
         expr_type = type(expression).__name__
         cur_lvl = expression.grid[0].level
@@ -90,9 +100,40 @@ class ProgramGenerator:
                     self.relaxation_weights.append(0)
                 cur_lvl -=1
             if state['correction_type']==1: # smoothing correction
-                self.smoothers.append(state['component'])
-                self.relaxation_weights.append(state['relaxation_factor'])
-                self.num_sweeps.append(1)
+                if state['component'] is Smoothers.Gauss_Elimination and state_lvl > 0:
+                    if len(self.smoothers) < len(self.intergrid_ops):
+                        self.smoothers.append(Smoothers.NoSmoothing)
+                        self.relaxation_weights.append(0)
+                        self.num_sweeps.append(1)
+                    cycle_up = False
+                    cur_lvl = state_lvl
+                    while cur_lvl<=state_lvl:
+                        if cur_lvl == 0:
+                            self.smoothers.append(Smoothers.Gauss_Elimination)
+                            self.num_sweeps.append(1)
+                            self.relaxation_weights.append(1)
+                            self.intergrid_ops.append(InterGridOperations.Interpolation)
+                            self.cgc_weights.append(1)
+                            cycle_up = True
+                            cur_lvl+=1
+                        elif not cycle_up:
+                            self.smoothers.append(Smoothers.GS_Forward)
+                            self.num_sweeps.append(1)
+                            self.relaxation_weights.append(1)
+                            self.intergrid_ops.append(InterGridOperations.Restriction)
+                            self.cgc_weights.append(1)
+                            cur_lvl-=1
+                        elif cycle_up:
+                            self.smoothers.append(Smoothers.GS_Backward)
+                            self.num_sweeps.append(1)
+                            self.relaxation_weights.append(1)
+                            self.intergrid_ops.append(InterGridOperations.Interpolation)
+                            self.cgc_weights.append(1)
+                            cur_lvl+=1
+                else:
+                    self.smoothers.append(state['component'])
+                    self.relaxation_weights.append(state['relaxation_factor'])
+                    self.num_sweeps.append(1)
                 if len(self.intergrid_ops) + 1 < len(self.smoothers):
                     self.intergrid_ops.append(InterGridOperations.AltSmoothing)
                     self.cgc_weights.append(0)
@@ -167,33 +208,34 @@ class ProgramGenerator:
             file.writelines(c_file_contents)
 
     def compile_code(self):
+        subprocess.run(['make','clean'],cwd=self.build_path)
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self):
         output = subprocess.run([self.build_path + "/" + self.problem], capture_output=True, text=True)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
-        run_time = None
-        n_iterations = None
-        convergence_factor = None
+        run_time = 1e10
+        n_iterations = 1e10
+        convergence_factor = 1e10
         solve_phase = True
         for line in output_lines:
             if "Solve phase" in line:
                 solve_phase=True
-            
-            if solve_phase:
-                if "Convergence Factor" in line:
-                    match = re.search(r'\d+\.\d+', line)
-                    if match:
-                        convergence_factor = float(match.group())
-                elif "wall clock time" in line:
-                    match = re.search(r'\d+\.\d+', line)
-                    if match:
-                        run_time = float(match.group())
-                elif "Iterations" in line:
-                    match = re.search(r'\d+', line)
-                    if match:
-                        n_iterations = int(match.group())
-
+            if "Convergence Factor" in line:
+                match = re.search(r'\d+\.\d+', line)
+                if match:
+                    convergence_factor = float(match.group())
+            elif "wall clock time" in line and solve_phase:
+                match = re.search(r'\d+\.\d+', line)
+                if match:
+                    run_time = float(match.group())
+            elif "Iterations" in line:
+                match = re.search(r'\d+', line)
+                if match:
+                    n_iterations = int(match.group())
+        
+        if convergence_factor > 1:
+            n_iterations = 1e10
         return run_time, convergence_factor, n_iterations
     
     def generate_and_evaluate(self, *args, **kwargs):
@@ -208,7 +250,8 @@ class ProgramGenerator:
 
         if 'evaluation_samples' in kwargs:
             evaluation_samples = kwargs['evaluation_samples']
-
+        
+        self.reset()
         self.list_states = self.traverse_graph(expression)
    
         # fill in the AMG parameter list based on the sequence of AMG states visited in the GP tree.
