@@ -270,6 +270,17 @@ class ProgramGenerator:
 
         return mean(time_solution_list), mean(convergence_factor_list), mean(n_iterations_list)
     
+    def generate_cycle_function(self, *args):
+        expression = None
+        for arg in args:
+            if type(arg).__name__ == 'Cycle':
+                expression = arg
+
+        self.reset()
+        self.list_states = self.traverse_graph(expression)
+        self.generate_code()
+        return self.amgcycle
+
     # dummy functions to maintain compatibility in the optimisation pipeline
     def generate_storage(self, *args):
         empty_list = []
