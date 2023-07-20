@@ -1,5 +1,7 @@
 import subprocess,re
 from statistics import mean
+import os
+import shutil
 
 from enum import Enum
 class InterGridOperations(Enum):
@@ -15,16 +17,27 @@ class Smoothers(Enum):
     NoSmoothing = -1
 
 class ProgramGenerator:
-    def __init__(self,min_level, max_level) -> None:
+    def __init__(self,min_level, max_level, mpi_rank=0) -> None:
         
         # INPUT
         self.min_level = min_level
         self.max_level = max_level
+        self.mpi_rank = mpi_rank
 
         # HYPRE FILES
-        self.build_path = "../hypre/src/evo_test"
+        self.template_path = "../hypre/src/evo_test"
         self.problem = "ij"
-        self.c_file_path= self.build_path + f"/{self.problem}.c"
+        # generate build path 
+        self.build_path = f"{self.template_path}_{self.mpi_rank}/"
+        os.makedirs(self.build_path,exist_ok=True)
+        # i. Get a list of all files in the template directory
+        files = os.listdir(self.template_path) 
+        files = [file for file in files if os.path.isfile(os.path.join(self.template_path, file))]
+        for file in files:
+            source_path = os.path.join(self.template_path,file)
+            destination_path = os.path.join(self.build_path,file)
+            shutil.copy(source_path,destination_path) # copy from source to destination
+        self.c_file_path= self.build_path + f"{self.problem}.c"
 
         # TEMP OBJECTS
         self.list_states = []
@@ -211,7 +224,7 @@ class ProgramGenerator:
         subprocess.run(['make','clean'],cwd=self.build_path)
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self):
-        output = subprocess.run([self.build_path + "/" + self.problem], capture_output=True, text=True)
+        output = subprocess.run([self.build_path + self.problem], capture_output=True, text=True)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
         run_time = 1e10
