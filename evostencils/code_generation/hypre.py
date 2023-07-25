@@ -224,7 +224,7 @@ class ProgramGenerator:
         subprocess.run(['make','clean'],cwd=self.build_path)
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self):
-        output = subprocess.run([self.build_path + self.problem], capture_output=True, text=True)
+        output = subprocess.run([self.build_path + self.problem, "-rhszero", "-x0rand", "-pout","0"], capture_output=True, text=True)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
         run_time = 1e10
