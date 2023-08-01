@@ -37,8 +37,6 @@ class ProgramGenerator:
             source_path = os.path.join(self.template_path,file)
             destination_path = os.path.join(self.build_path,file)
             shutil.copy(source_path,destination_path) # copy from source to destination
-        self.c_file_path= self.build_path + f"{self.problem}.c"
-
         # TEMP OBJECTS
         self.list_states = []
         self.cycle_objs = []
@@ -51,7 +49,7 @@ class ProgramGenerator:
         self.cgc_weights = [] # sequence of relaxations weights at intergrid transfer steps (meant for correction steps, weights in restriction steps is typically set to 1)
 
         #OUTPUT
-        self.amgcycle= "" # the C expressions for the AMG specification i n hypre.
+        self.amgcycle= "" # the command line arguments for AMG specification in hypre.
 
     @property
     def uses_FAS(self):
@@ -163,68 +161,32 @@ class ProgramGenerator:
             self.num_sweeps.append(0)
             self.relaxation_weights.append(0)
 
-    def generate_code(self):
-
-        # 1. Read contents from the input/template file, identify where to print.
-        # i. Specify the comment substrings
-        comment_start = "USER_INPUTS"
-        comment_end = "END_USER_INPUTS"
-
-        # ii. Read the contents of the C file
-        with open(self.c_file_path, 'r') as file:
-            c_file_contents = file.readlines()
-
-        # iii. Find the line numbers where the comments appear
-        start_line = next(i for i, line in enumerate(c_file_contents) if comment_start in line)
-        end_line = next(i for i, line in enumerate(c_file_contents) if comment_end in line)
-
-
-        # 2. generate c expressions of the amg cycle. 
-        # i. cycle structure
-        self.amgcycle += f"cycle_num_nodes={len(self.smoothers)};\n"
-        self.amgcycle +="HYPRE_Int icycling[]={"
-        for ops in self.intergrid_ops:
-            self.amgcycle+=f"{ops.value},"
-        self.amgcycle=self.amgcycle[:-1] # remove the last comma.
-        self.amgcycle+="};\n"
-        # ii. relaxation types
-        self.amgcycle += "HYPRE_Int irelaxtypes[]={"
-        for smoother in self.smoothers:
-            self.amgcycle+=f"{smoother.value},"
-        self.amgcycle=self.amgcycle[:-1] # remove the last comma.
-        self.amgcycle+="};\n"
-        # iii. number of smoothing sweeps
-        self.amgcycle += "HYPRE_Int inumsweeps[]={"
-        for num_sweep in self.num_sweeps:
-            self.amgcycle+=f"{num_sweep},"
-        self.amgcycle=self.amgcycle[:-1] # remove the last comma.
-        self.amgcycle+="};\n"
-        # iv. relaxation weights
-        self.amgcycle += "HYPRE_Real irelaxwts[]={"
-        for relax_wts in self.relaxation_weights:
-            self.amgcycle+=f"{relax_wts},"
-        self.amgcycle=self.amgcycle[:-1] # remove the last comma.
-        self.amgcycle+="};\n"
-        # v. cgc weights
-        self.amgcycle += "HYPRE_Real iedgewts[]={"
-        for cgc_wts in self.cgc_weights:
-            self.amgcycle+=f"{cgc_wts},"
-        self.amgcycle=self.amgcycle[:-1] # remove the last comma.
-        self.amgcycle+="};\n"
-
-        # 3. append and print to file.
-        # i. Modify the contents to replace the existing lines with the Python-generated C code snippet
-        c_file_contents = c_file_contents[:start_line+1] + self.amgcycle.split('/n') + c_file_contents[end_line:]
-
-        # ii. Write the modified contents back to the C file
-        with open(self.c_file_path, 'w') as file:
-            file.writelines(c_file_contents)
+    def generate_cmdline_args(self):
+        # list to comma separated string
+        def list_to_string(list):
+            string = ""
+            for item in list:
+                # check if item is an enum
+                if type(item).__name__ == 'Smoothers' or type(item).__name__ == 'InterGridOperations':
+                    string += str(item.value) + ","
+                else:
+                    string += str(item) + ","
+            return string[:-1]
+        
+        # generate the AMG cycle string
+        self.amgcycle = f"{len(self.intergrid_ops) + 1}/{list_to_string(self.intergrid_ops)}/{list_to_string(self.smoothers)}/{list_to_string(self.num_sweeps)}/{list_to_string(self.relaxation_weights)}/{list_to_string(self.cgc_weights)}"
 
     def compile_code(self):
         subprocess.run(['make','clean'],cwd=self.build_path)
         subprocess.run(['make',self.problem],cwd=self.build_path)
-    def execute_code(self):
-        output = subprocess.run([self.build_path + self.problem, "-rhszero", "-x0rand", "-pout","0"], capture_output=True, text=True)
+    def execute_code(self, cmd_args=[]):
+        # run the code and pass the command line arguments from the input list
+        output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+        # check if the code ran successfully
+        if output.returncode != 0:
+            print(output.stderr)
+            raise Exception("Error in code execution")
+        
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
         run_time = 1e10
@@ -256,6 +218,7 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
+        cmdline_args = ["-rhszero", "-x0rand", "-pout","0","-amgusrinputs","1"]
         evaluation_samples = 1
         for arg in args:
             if type(arg).__name__ == 'Cycle':
@@ -270,13 +233,13 @@ class ProgramGenerator:
         # fill in the AMG parameter list based on the sequence of AMG states visited in the GP tree.
         self.set_amginputs()
         
-        # generate c code to set amg inputs
-        self.generate_code()
+        # generate cmd line arguments to set amg inputs
+        self.generate_cmdline_args()
+        cmdline_args.append(self.amgcycle)
 
-        # compile and run
-        self.compile_code()
+        # run the code and pass the command line arguments from the list
         for _ in range(evaluation_samples):
-            run_time, convergence, n_iterations = self.execute_code()
+            run_time, convergence, n_iterations = self.execute_code(cmdline_args)
             time_solution_list.append(run_time)
             convergence_factor_list.append(convergence)
             n_iterations_list.append(n_iterations)
