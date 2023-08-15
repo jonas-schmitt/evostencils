@@ -2,15 +2,18 @@ import subprocess,re
 from statistics import mean
 import os
 import shutil
+import numpy as np
 
 from enum import Enum
 class InterGridOperations(Enum):
     Restriction = -1
     Interpolation = 1
     AltSmoothing = 0
-
+class CorrectionTypes(Enum):
+    Smoothing = 1
+    CoarseGridCorrection = 0
 class Smoothers(Enum):
-    Gauss_Elimination=9
+    CGS_GE = 9
     Jacobi = 0
     GS_Forward = 13
     GS_Backward = 14
@@ -40,6 +43,7 @@ class ProgramGenerator:
         # TEMP OBJECTS
         self.list_states = []
         self.cycle_objs = []
+        self.n_individuals = 0
 
         # AMG PARAMETERS
         self.intergrid_ops = [] # sequence of inter-grid operations in the multigrid solver -> describes the cycle structure. 
@@ -75,11 +79,11 @@ class ProgramGenerator:
             list_states = self.traverse_graph(expression.approximation) + self.traverse_graph(expression.correction)
             correction_expr_type = type(expression.correction.operand1).__name__
             if correction_expr_type  == "Prolongation":
-                cur_state['correction_type']=0
+                cur_state['correction_type']= CorrectionTypes.CoarseGridCorrection
                 cur_state['component'] = -1
             elif correction_expr_type == "Inverse" :
                 smoothing_operator = expression.correction.operand1.operand
-                cur_state['correction_type']=1
+                cur_state['correction_type']= CorrectionTypes.Smoothing
                 cur_state['component'] = smoothing_operator.smoother_type
             cur_state['relaxation_factor']=expression.relaxation_factor
             list_states.append(cur_state)
@@ -88,8 +92,8 @@ class ProgramGenerator:
             list_states = self.traverse_graph(expression.operand2)
             op_type = type(expression.operand1).__name__
             if op_type == "CoarseGridSolver":
-                cur_state['correction_type'] = 1
-                cur_state['component'] = Smoothers.Gauss_Elimination
+                cur_state['correction_type'] = CorrectionTypes.Smoothing
+                cur_state['component'] = Smoothers.CGS_GE
                 cur_state['relaxation_factor'] = 1
                 list_states.append(cur_state)
             return list_states
@@ -98,70 +102,94 @@ class ProgramGenerator:
             return list_states
         else:
             return list_states
+        
     def set_amginputs(self):
-        cur_lvl = self.max_level
-        for state in self.list_states:
+        cur_lvl = self.max_level # finest level
+        first_state_lvl = self.list_states[0]['level']
+        # restrict from the finest level until first_state_lvl is reached
+        while cur_lvl > first_state_lvl:
+            self.smoothers.append(Smoothers.NoSmoothing)
+            self.relaxation_weights.append(0)
+            self.num_sweeps.append(0)
+            self.intergrid_ops.append(InterGridOperations.Restriction)
+            self.cgc_weights.append(1)
+            cur_lvl -=1
+        # loop through list_states
+        for index,state in enumerate(self.list_states):
             state_lvl = state['level']
-            while cur_lvl > state_lvl: # restrict and go down the grid hierarchy until state_lvl is reached.
-                self.intergrid_ops.append(InterGridOperations.Restriction)
-                self.cgc_weights.append(1)
-                if len(self.intergrid_ops)>len(self.smoothers): # no smoothing for the finer node.
-                    self.smoothers.append(Smoothers.NoSmoothing)
-                    self.num_sweeps.append(0)
-                    self.relaxation_weights.append(0)
-                cur_lvl -=1
-            if state['correction_type']==1: # smoothing correction
-                if state['component'] is Smoothers.Gauss_Elimination and state_lvl > 0:
-                    if len(self.smoothers) < len(self.intergrid_ops):
-                        self.smoothers.append(Smoothers.NoSmoothing)
-                        self.relaxation_weights.append(0)
+            assert state_lvl >= cur_lvl
+            if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
+                if state['component'] == Smoothers.CGS_GE:
+                    while cur_lvl > 0:
+                        self.smoothers.append(Smoothers.GS_Forward)
                         self.num_sweeps.append(1)
-                    cycle_up = False
-                    cur_lvl = state_lvl
-                    while cur_lvl<=state_lvl:
-                        if cur_lvl == 0:
-                            self.smoothers.append(Smoothers.Gauss_Elimination)
-                            self.num_sweeps.append(1)
-                            self.relaxation_weights.append(1)
-                            self.intergrid_ops.append(InterGridOperations.Interpolation)
-                            self.cgc_weights.append(1)
-                            cycle_up = True
-                            cur_lvl+=1
-                        elif not cycle_up:
-                            self.smoothers.append(Smoothers.GS_Forward)
-                            self.num_sweeps.append(1)
-                            self.relaxation_weights.append(1)
-                            self.intergrid_ops.append(InterGridOperations.Restriction)
-                            self.cgc_weights.append(1)
-                            cur_lvl-=1
-                        elif cycle_up:
-                            self.smoothers.append(Smoothers.GS_Backward)
-                            self.num_sweeps.append(1)
-                            self.relaxation_weights.append(1)
-                            self.intergrid_ops.append(InterGridOperations.Interpolation)
-                            self.cgc_weights.append(1)
-                            cur_lvl+=1
+                        self.relaxation_weights.append(1)
+                        self.intergrid_ops.append(InterGridOperations.Restriction)
+                        self.cgc_weights.append(1)
+                        cur_lvl -=1
+                    self.smoothers.append(Smoothers.CGS_GE)
+                    self.num_sweeps.append(1)
+                    self.relaxation_weights.append(1)
+                    while cur_lvl < state_lvl:
+                        self.relaxation_weights.append(1)
+                        self.intergrid_ops.append(InterGridOperations.Interpolation)
+                        self.cgc_weights.append(1)
+                        self.smoothers.append(Smoothers.GS_Backward)
+                        self.num_sweeps.append(1)
+                        cur_lvl +=1
                 else:
                     self.smoothers.append(state['component'])
                     self.relaxation_weights.append(state['relaxation_factor'])
                     self.num_sweeps.append(1)
-                if len(self.intergrid_ops) + 1 < len(self.smoothers):
-                    self.intergrid_ops.append(InterGridOperations.AltSmoothing)
-                    self.cgc_weights.append(0)
-            elif state['correction_type'] == 0: # coarse grid correction
-                if len(self.intergrid_ops) + 1 >len(self.smoothers): # no smoothing for the coarser node.
+            elif state['correction_type']==CorrectionTypes.CoarseGridCorrection: # coarse grid correction
+                self.intergrid_ops.append(InterGridOperations.Interpolation)
+                self.cgc_weights.append(state['relaxation_factor'])
+            cur_lvl = state_lvl
+            if index+1 < len(self.list_states):
+                next_state_lvl = self.list_states[index+1]['level']
+                next_state_correction_type = self.list_states[index+1]['correction_type']
+                if next_state_lvl < cur_lvl:
+                    if state['correction_type']==CorrectionTypes.CoarseGridCorrection:
+                        self.smoothers.append(Smoothers.NoSmoothing)
+                        self.num_sweeps.append(0)
+                        self.relaxation_weights.append(0)
+                    while cur_lvl > next_state_lvl: # restrict and go down the grid hierarchy until next_state_lvl is reached.
+                        self.intergrid_ops.append(InterGridOperations.Restriction)
+                        self.cgc_weights.append(1)
+                        self.smoothers.append(Smoothers.NoSmoothing)
+                        self.num_sweeps.append(0)
+                        self.relaxation_weights.append(0)
+                        cur_lvl -=1
+                    self.smoothers.pop()
+                    self.num_sweeps.pop()
+                    self.relaxation_weights.pop()
+                # if consecutive coarse grid corrections are performed 
+                elif next_state_lvl > cur_lvl and state['correction_type']==next_state_correction_type==CorrectionTypes.CoarseGridCorrection:
                     self.smoothers.append(Smoothers.NoSmoothing)
                     self.num_sweeps.append(0)
                     self.relaxation_weights.append(0)
-                self.intergrid_ops.append(InterGridOperations.Interpolation)
-                self.cgc_weights.append(state['relaxation_factor'])
-            cur_lvl=state_lvl
-        if len(self.smoothers)<len(self.intergrid_ops)+1:
-            self.smoothers.append(Smoothers.NoSmoothing)
-            self.num_sweeps.append(0)
-            self.relaxation_weights.append(0)
-
+                # if consecutive smoothing steps are performed at the same level. 
+                elif next_state_lvl == cur_lvl and state['correction_type']==next_state_correction_type==CorrectionTypes.Smoothing:
+                    self.intergrid_ops.append(InterGridOperations.AltSmoothing)
+                    self.cgc_weights.append(0) 
+            elif index == len(self.list_states)-1:
+                if state['correction_type']==CorrectionTypes.CoarseGridCorrection:
+                    self.smoothers.append(Smoothers.NoSmoothing)
+                    self.num_sweeps.append(0)
+                    self.relaxation_weights.append(0)
+ 
     def generate_cmdline_args(self):
+        # assert checks
+        # sum of elements in intergrid_ops is zero, converting the enum to int
+        assert sum([i.value for i in self.intergrid_ops]) == 0, "The sum of intergrid operations should be zero"
+        # the grid hierarchy should be for self.max_level levels.
+        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level ==0, "The grid hierarchy should be for self.max_level levels"
+        # length of intergrid_ops is one less than length of smoothers
+        assert len(self.intergrid_ops) == len(self.smoothers) - 1, "The number of intergrid operations should be one less than the number of nodes in the amg cycle"
+        # length of smoothing weights is equal to length of smoothers and num_sweeps
+        assert len(self.smoothers) == len(self.relaxation_weights) == len(self.num_sweeps), "The number of smoothing weights should be equal to the number of nodes in the amg cycle"
+        # length of cgc weights is equal to length of intergrid_ops
+        assert len(self.intergrid_ops) == len(self.cgc_weights), "The number of coarse grid correction weights should be equal to the number of intergrid operations in the amg cycle"
         # list to comma separated string
         def list_to_string(list):
             string = ""
@@ -184,58 +212,69 @@ class ProgramGenerator:
         output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
         # check if the code ran successfully
         if output.returncode != 0:
-            print(output.stderr)
-            raise Exception("Error in code execution")
-        
+            output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+            print("error")
+            print(output.args)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
-        run_time = 1e10
-        n_iterations = 1e10
-        convergence_factor = 1e10
-        solve_phase = True
+        run_time = [1e100] * self.n_individuals
+        n_iterations =[1e100] * self.n_individuals
+        convergence_factor = [1e100] *  self.n_individuals
+        solve_phase = False
+        i = 0 
         for line in output_lines:
-            if "Solve phase" in line:
+            if "Solve phase times" in line:
                 solve_phase=True
             if "Convergence Factor" in line:
                 match = re.search(r'\d+\.\d+', line)
                 if match:
-                    convergence_factor = float(match.group())
+                    convergence_factor[i] = float(match.group())
+                i +=1 
             elif "wall clock time" in line and solve_phase:
                 match = re.search(r'\d+\.\d+', line)
                 if match:
-                    run_time = float(match.group())
+                    run_time[i]=float(match.group())*1000 # convert to milliseconds
+                solve_phase=False
             elif "Iterations" in line:
                 match = re.search(r'\d+', line)
                 if match:
-                    n_iterations = int(match.group())
+                    n_iterations[i] = int(match.group())
         
-        if convergence_factor > 1:
-            n_iterations = 1e10
+        # if convergence factor is greater than 1, set n_iterations to 1e10
+
+        n_iterations = [1e10 if cf > 1 else ni for cf, ni in zip(convergence_factor, n_iterations)]
         return run_time, convergence_factor, n_iterations
-    
     def generate_and_evaluate(self, *args, **kwargs):
-        expression = None
+        expression_list = []
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        cmdline_args = ["-rhszero", "-x0rand", "-pout","0","-amgusrinputs","1"]
+        cmdline_args = ["-rhszero", "-x0rand","-pout","0","n","100","100","10","-c","0.001","1","1","-amgusrinputs","1"]
         evaluation_samples = 1
         for arg in args:
-            if type(arg).__name__ == 'Cycle':
-                expression = arg
+            # get expression list from the input arguments
+            if type(arg).__name__ == 'list':
+                for cycle in arg:
+                    if type(cycle).__name__ == 'Cycle':
+                        expression_list.append(cycle)
+            elif type(arg).__name__ == 'Cycle':
+                expression_list.append(arg)
 
         if 'evaluation_samples' in kwargs:
             evaluation_samples = kwargs['evaluation_samples']
         
-        self.reset()
-        self.list_states = self.traverse_graph(expression)
-   
-        # fill in the AMG parameter list based on the sequence of AMG states visited in the GP tree.
-        self.set_amginputs()
-        
-        # generate cmd line arguments to set amg inputs
-        self.generate_cmdline_args()
-        cmdline_args.append(self.amgcycle)
+        self.n_individuals = len(expression_list)
+        cmdline_args[-1]=str(self.n_individuals)
+        for expression in expression_list:
+            self.reset()
+            self.list_states = self.traverse_graph(expression)
+    
+            # fill in the AMG parameter list based on the sequence of AMG states visited in the GP tree.
+            self.set_amginputs()
+            
+            # generate cmd line arguments to set amg inputs
+            self.generate_cmdline_args()
+            cmdline_args.append(self.amgcycle)
 
         # run the code and pass the command line arguments from the list
         for _ in range(evaluation_samples):
@@ -244,7 +283,12 @@ class ProgramGenerator:
             convergence_factor_list.append(convergence)
             n_iterations_list.append(n_iterations)
 
-        return mean(time_solution_list), mean(convergence_factor_list), mean(n_iterations_list)
+        array_mean_time = np.mean(np.array(time_solution_list),axis=0)
+        array_mean_convergence = np.mean(np.array(convergence_factor_list),axis=0)
+        array_mean_iterations = np.mean(np.array(n_iterations_list),axis=0)
+        
+        assert (array_mean_time.shape == array_mean_convergence.shape == array_mean_iterations.shape), "The shape of the output arrays with solver metrics (runtime, convergence, n_iterations) should be the same"
+        return array_mean_time, array_mean_convergence, array_mean_iterations
     
     def generate_cycle_function(self, *args):
         expression = None
@@ -254,7 +298,8 @@ class ProgramGenerator:
 
         self.reset()
         self.list_states = self.traverse_graph(expression)
-        self.generate_code()
+        self.set_amginputs()
+        self.generate_cmdline_args()
         return self.amgcycle
 
     # dummy functions to maintain compatibility in the optimisation pipeline
