@@ -51,6 +51,12 @@ class ProgramGenerator:
         self.num_sweeps = [] # number of sweeps for each smoother.
         self.relaxation_weights = [] # sequence of relaxation factors for each smoother. 
         self.cgc_weights = [] # sequence of relaxations weights at intergrid transfer steps (meant for correction steps, weights in restriction steps is typically set to 1)
+        self.nx = 100
+        self.ny = 100
+        self.nz = 10
+        self.cx = 0.001
+        self.cy = 1
+        self.cz = 1
 
         #OUTPUT
         self.amgcycle= "" # the command line arguments for AMG specification in hypre.
@@ -249,7 +255,7 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        cmdline_args = ["-rhszero", "-x0rand","-pout","0","n","100","100","10","-c","0.001","1","1","-amgusrinputs","1"]
+        cmdline_args = ["-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
         evaluation_samples = 1
         for arg in args:
             # get expression list from the input arguments
