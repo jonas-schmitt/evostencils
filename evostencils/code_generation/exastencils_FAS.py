@@ -400,7 +400,11 @@ class ProgramGeneratorFAS:
         evaluation_samples = 1
 
         for arg in args:
-            if type(arg).__name__ == 'Cycle':
+            if type(arg).__name__ == 'list':
+                for cycle in arg:
+                    if type(cycle).__name__ == 'Cycle':
+                        expression = cycle
+            elif type(arg).__name__ == 'Cycle':
                 expression = arg
 
         if 'evaluation_samples' in kwargs:

@@ -482,8 +482,10 @@ class ProgramGenerator:
         except subprocess.TimeoutExpired:
             return infinity_result
 
-    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+    def generate_and_evaluate(self, expression: List[base.Expression], storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str, infinity=1e100, evaluation_samples=3, global_variable_values=None):
+        
+        expression = expression[0]
         if global_variable_values is None:
             global_variable_values = {}
         # print("Generate and evaluate", flush=True)
