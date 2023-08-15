@@ -10,6 +10,7 @@ import sympy
 
 def main():
     cwd = f'{os.getcwd()}'
+    eval_software = "hypre"
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder
@@ -54,7 +55,7 @@ def main():
     model_based_estimation = False
 
     # model_based_estimation = False
-    program_generator = ProgramGenerator(6,10,mpi_rank)
+    program_generator = ProgramGenerator(5,9 ,mpi_rank)
 
    # Obtain extracted information from program generator
     dimension = 2#program_generator.dimension  # Dimensionality of the problem
@@ -129,15 +130,15 @@ def main():
     # Option to use random search instead of crossover and mutation to create new individuals
     use_random_search = False
 
-    mu_ = 8  # Population size
-    lambda_ = 8  # Number of offspring
-    generations = 50  # Number of generations
-    population_initialization_factor = 4  # Multiply mu_ by this factor to set the initial population size
+    mu_ = 256 # Population size
+    lambda_ = 4 # Number of offspring
+    generations = 150  # Number of generations
+    population_initialization_factor = 8  # Multiply mu_ by this factor to set the initial population size
 
     # Number of generations after which a generalization is performed
     # This is achieved by incrementing min_level and max_level within the optimization
     # Such that a larger (and potentially more difficult) instance of the same problem is considered in subsequent generations
-    generalization_interval = 50
+    generalization_interval = 150
     crossover_probability = 0.7
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1  # Probability to perform mutation by altering a single node in the tree
@@ -169,7 +170,7 @@ def main():
                                                                      continue_from_checkpoint=continue_from_checkpoint)
     # Print the outcome of the optimization and store the data and statistics
     if mpi_rank == 0:
-        print(f'\nExaSlang Code:\n{dsl_code}\n', flush=True)
+        print(f'\n{eval_software} specifications:\n{dsl_code}\n', flush=True)
         print(f'\nGrammar representation:\n{program}\n', flush=True)
         if not os.path.exists(f'./{problem_name}'):
             os.makedirs(f'./{problem_name}')
