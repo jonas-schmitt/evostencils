@@ -631,7 +631,7 @@ class Optimizer:
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 for ind in offspring:
                     if not self.individual_in_cache(ind):
-                        self.add_individual_to_cache(ind, ind.fitness.values)
+                        self.add_individual_to_cache([ind], [ind.fitness.values])
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
