@@ -106,6 +106,7 @@ class Optimizer:
         self._storages = None
         self._maximum_local_system_size = 8
         self._enable_partitioning = True
+        self.all_fitnesses = []
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, evaluation_samples=3,
                                      pde_parameter_values=None):
@@ -532,6 +533,8 @@ class Optimizer:
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
+        self.all_fitnesses.append(self.allgather(fitnesses))
+
         population = self.allgather(population)
         population = self.toolbox.select(population, mu_)
         hof.update(population)
@@ -657,6 +660,8 @@ class Optimizer:
             self._average_time_to_convergence = total_time_to_convergence / len(population)
             count += 1
             record = mstats.compile(population)
+            fitnesses = [(ind.fitness.values[0],ind.fitness.values[1]) for ind in population]
+            self.all_fitnesses.append(self.allgather(fitnesses))
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(offspring), **record)
             if self.is_root():
@@ -665,7 +670,7 @@ class Optimizer:
         if self.is_root():
             print("Optimization finished", flush=True)
 
-        return population, logbook, hof, evaluation_min_level, evaluation_max_level
+        return population, logbook, hof, evaluation_min_level, evaluation_max_level,self.all_fitnesses
 
     def SOGP(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
@@ -845,6 +850,7 @@ class Optimizer:
         pops = []
         logbooks = []
         hofs = []
+        fitnesses = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         self._storages = storages
         FAS = False
@@ -903,7 +909,7 @@ class Optimizer:
                     return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
                 else:
                     return convergence_factor * math.sqrt(self.infinity) * execution_time
-            pop, log, hof, evaluation_min_level, evaluation_max_level = \
+            pop, log, hof, evaluation_min_level, evaluation_max_level,fitnesses = \
                 optimization_method(pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                                     crossover_probability, mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, evaluation_samples, logbooks,
@@ -942,7 +948,7 @@ class Optimizer:
             self.barrier()
 
         self.barrier()
-        return str(best_individual), solver_program, pops, logbooks, hofs
+        return str(best_individual), solver_program, pops, logbooks, hofs,fitnesses
 
     def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
         solver_program = ''
