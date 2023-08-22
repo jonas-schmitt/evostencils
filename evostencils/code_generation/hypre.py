@@ -246,9 +246,9 @@ class ProgramGenerator:
                 if match:
                     n_iterations[i] = int(match.group())
         
-        # if convergence factor is greater than 1, set n_iterations to 1e10
+        # if convergence factor is greater than 1, set n_iterations to 1e100
 
-        n_iterations = [1e10 if cf > 1 else ni for cf, ni in zip(convergence_factor, n_iterations)]
+        n_iterations = [1e100 if cf > 1 else ni for cf, ni in zip(convergence_factor, n_iterations)]
         return run_time, convergence_factor, n_iterations
     def generate_and_evaluate(self, *args, **kwargs):
         expression_list = []
