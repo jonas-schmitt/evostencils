@@ -153,7 +153,7 @@ def main():
     # pops: Populations at the end of each optimization run on the respective subrange of the discretization hierarchy
     # stats: Statistics structure (data structure provided by the DEAP framework)
     # hofs: Hall-of-fames at the end of each optimization run on the respective subrange of the discretization hierarchy
-    program, dsl_code, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
+    program, dsl_code, pops, stats, hofs, fitnesses = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      use_random_search=use_random_search,
                                                                      mu_=mu_, lambda_=lambda_,
                                                                      population_initialization_factor=population_initialization_factor,
@@ -190,6 +190,7 @@ def main():
             for j, ind in enumerate(hof):
                 with open(f'{hof_dir}/individual_{j}.txt', 'w') as grammar_file:
                     grammar_file.write(str(ind) + '\n')
+        optimizer.dump_data_structure(fitnesses, f"{log_dir_name}/fitnesses.p")
 
 
 if __name__ == "__main__":
