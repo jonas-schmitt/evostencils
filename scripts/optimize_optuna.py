@@ -1,6 +1,5 @@
 import optuna, subprocess,re, pickle, sys, argparse
 exec_path = "/Users/dinesh/Documents/code/hypre/src/test/ij"
-nsweeps_max = 6
 def generate_cmdline_args(trial):
     # suggest int for kappa from 1 to max_level
     kappa = trial.suggest_int('kappa', 1, max_level)
@@ -13,8 +12,10 @@ def generate_cmdline_args(trial):
     ns_down = trial.suggest_int('ns_down', 0, nsweeps_max)
     ns_up = trial.suggest_int('ns_up', 0, nsweeps_max)
 
-    cmd_args = ["-rhszero", "-x0rand","-n",str(nx),str(ny),str(nz),"-c",str(cx),str(cy),str(cz),"-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
-
+    if problem=="poisson":
+        cmd_args = ["-rhszero", "-x0rand","-n",str(nx),str(ny),str(nz),"-c",str(cx),str(cy),str(cz),"-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
+    elif problem=="ares":
+        cmd_args = ["-solver", "1","-fromfile", "$HOME/ares_matrices/ares_matrix_8","-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
     return cmd_args
 
 def single_objective(trial):
@@ -66,12 +67,12 @@ def multi_objective(trial):
 
 def single_objective_study(n_trials=10):
     study = optuna.create_study(direction='minimize')
-    study.optimize(single_objective, n_trials=10)
+    study.optimize(single_objective, n_trials)
     return study
 
 def multi_objective_study(n_trials=10):
     study = optuna.create_study(directions=['minimize', 'minimize'])
-    study.optimize(multi_objective, n_trials=10)
+    study.optimize(multi_objective, n_trials)
     return study
 
 
@@ -90,6 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_trials', type=int, default=10, help='number of trials')
     parser.add_argument('--study_type', type=str, default="single", help='single or multi objective study')
     parser.add_argument('--save_path', type=str, default="single_objective_study.pkl", help='path to save the study object')
+    parser.add_argument('--problem',type=str, default="poisson", help='problem type')
     args = parser.parse_args()
     exec_path = args.exec_path
     max_level = args.max_level
@@ -103,12 +105,14 @@ if __name__ == "__main__":
     n_trials = args.n_trials
     save_path = args.save_path
     study_type = args.study_type
+    problem = args.problem
 
     if study_type == "single":
         study = single_objective_study(n_trials)
+        print(study.best_params)
     elif study_type == "multi":
         study = multi_objective_study(n_trials)
-    print(study.best_params)
+        print(study.best_trials)
     pickle.dump(study, open(save_path, "wb"))
 
 
