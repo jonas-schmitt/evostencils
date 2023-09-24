@@ -1,4 +1,4 @@
-import optuna, subprocess,re, pickle, sys, argparse
+import optuna, subprocess,re, pickle , argparse
 exec_path = "/Users/dinesh/Documents/code/hypre/src/test/ij"
 def generate_cmdline_args(trial):
     # suggest int for kappa from 1 to max_level
@@ -8,6 +8,14 @@ def generate_cmdline_args(trial):
     rlx_down = trial.suggest_categorical('rlx_down', [0,13,14])
     rlx_up = trial.suggest_categorical('rlx_up', [0,13,14])
 
+    # suggest rlxwts between 0.1 and 1.9 for each level
+    rlxwts = []
+    for i in range(max_level+1):
+        rlxwts.append(trial.suggest_uniform('rlxwt_lvl'+str(i), 0.1, 1.9))
+    rlxwts_cmdline_args = ["-wls",str(len(rlxwts))]
+    for i, rlxwt in enumerate(rlxwts):
+        rlxwts_cmdline_args.append(str(rlxwt))
+        rlxwts_cmdline_args.append(str(i))
     # suggest number of sweeps between 0 and NSWEEPS
     ns_down = trial.suggest_int('ns_down', 0, nsweeps_max)
     ns_up = trial.suggest_int('ns_up', 0, nsweeps_max)
@@ -16,6 +24,7 @@ def generate_cmdline_args(trial):
         cmd_args = ["-rhszero", "-x0rand","-n",str(nx),str(ny),str(nz),"-c",str(cx),str(cy),str(cz),"-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
     elif problem=="ares":
         cmd_args = ["-solver", "1","-fromfile", "$HOME/ares_matrices/ares_matrix_8","-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
+    cmd_args += rlxwts_cmdline_args
     return cmd_args
 
 def single_objective(trial):
