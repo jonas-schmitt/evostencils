@@ -8,14 +8,16 @@ def generate_cmdline_args(trial):
     rlx_down = trial.suggest_categorical('rlx_down', [0,13,14])
     rlx_up = trial.suggest_categorical('rlx_up', [0,13,14])
 
-    # suggest rlxwts between 0.1 and 1.9 for each level
-    rlxwts = []
-    for i in range(max_level+1):
-        rlxwts.append(trial.suggest_uniform('rlxwt_lvl'+str(i), 0.1, 1.9))
-    rlxwts_cmdline_args = ["-wls",str(len(rlxwts))]
-    for i, rlxwt in enumerate(rlxwts):
-        rlxwts_cmdline_args.append(str(rlxwt))
-        rlxwts_cmdline_args.append(str(i))
+    rlxwts_cmdline_args = []
+    if rlxbool:
+        # suggest rlxwts between 0.1 and 1.9 for each level
+        rlxwts = []
+        for i in range(max_level+1):
+            rlxwts.append(trial.suggest_uniform('rlxwt_lvl'+str(i), 0.1, 1.9))
+        rlxwts_cmdline_args = ["-wls",str(len(rlxwts))]
+        for i, rlxwt in enumerate(rlxwts):
+            rlxwts_cmdline_args.append(str(rlxwt))
+            rlxwts_cmdline_args.append(str(i))
     # suggest number of sweeps between 0 and NSWEEPS
     ns_down = trial.suggest_int('ns_down', 0, nsweeps_max)
     ns_up = trial.suggest_int('ns_up', 0, nsweeps_max)
@@ -23,7 +25,7 @@ def generate_cmdline_args(trial):
     if problem=="poisson":
         cmd_args = ["-rhszero", "-x0rand","-n",str(nx),str(ny),str(nz),"-c",str(cx),str(cy),str(cz),"-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
     elif problem=="ares":
-        cmd_args = ["-solver", "1","-fromfile", "$HOME/ares_matrices/ares_matrix_8","-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
+        cmd_args = ["-solver", "1","-fromfile", "/g/g91/parthasa/ares_matrices/ares_matrix_8","-kappacycle", str(kappa), "-rlx_down", str(rlx_down), "-rlx_up", str(rlx_up),"-ns_down", str(ns_down), "-ns_up", str(ns_up)]
     cmd_args += rlxwts_cmdline_args
     return cmd_args
 
@@ -86,7 +88,7 @@ def multi_objective_study(n_trials=10):
 
 
 if __name__ == "__main__":
-    # command line arguments with argparse : exec_path, max_level, nx, ny, nz, cx, cy, cz, nsweeps_max, n_trials, study_type, save_path
+    # command line arguments with argparse : exec_path, max_level, nx, ny, nz, cx, cy, cz, nsweeps_max, n_trials, study_type, save_path, rlxbool
     parser = argparse.ArgumentParser(description='Optimize Hypre')
     parser.add_argument('--exec_path', type=str, default=exec_path, help='path to the executable')
     parser.add_argument('--max_level', type=int, default=10, help='maximum level of the multigrid hierarchy')
@@ -97,6 +99,7 @@ if __name__ == "__main__":
     parser.add_argument('--cy', type=float, default=1, help='coefficient in y direction')
     parser.add_argument('--cz', type=float, default=1, help='coefficient in z direction')
     parser.add_argument('--nsweeps_max', type=int, default=6, help='maximum number of sweeps')
+    parser.add_argument('--rlxbool', type=int, default=0, help='whether to optimize rlxwts or not')
     parser.add_argument('--n_trials', type=int, default=10, help='number of trials')
     parser.add_argument('--study_type', type=str, default="single", help='single or multi objective study')
     parser.add_argument('--save_path', type=str, default="single_objective_study.pkl", help='path to save the study object')
@@ -110,6 +113,7 @@ if __name__ == "__main__":
     cx = args.cx
     cy = args.cy
     cz = args.cz
+    rlxbool = args.rlxbool
     nsweeps_max = args.nsweeps_max
     n_trials = args.n_trials
     save_path = args.save_path
