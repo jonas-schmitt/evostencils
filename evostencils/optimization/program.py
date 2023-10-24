@@ -529,7 +529,7 @@ class Optimizer:
         if use_hypre:
             fitnesses = self.toolbox.evaluate(invalid_ind)
         else:
-            fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
+            fitnesses = list(self.toolbox.map(self.toolbox.evaluate, invalid_ind))
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
