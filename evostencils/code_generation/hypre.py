@@ -28,7 +28,7 @@ class ProgramGenerator:
         self.mpi_rank = mpi_rank
 
         # HYPRE FILES
-        self.template_path = "../hypre/src/evo_test"
+        self.template_path = "../../hypre/src/evo_test"
         self.problem = "ij"
         # generate build path 
         self.build_path = f"{self.template_path}_{self.mpi_rank}/"
@@ -289,9 +289,9 @@ class ProgramGenerator:
             convergence_factor_list.append(convergence)
             n_iterations_list.append(n_iterations)
 
-        array_mean_time = np.mean(np.array(time_solution_list),axis=0)
-        array_mean_convergence = np.mean(np.array(convergence_factor_list),axis=0)
-        array_mean_iterations = np.mean(np.array(n_iterations_list),axis=0)
+        array_mean_time = np.atleast_1d(np.mean(time_solution_list,axis=0))
+        array_mean_convergence = np.atleast_1d(np.mean(convergence_factor_list,axis=0))
+        array_mean_iterations = np.atleast_1d(np.mean(n_iterations_list,axis=0))
         
         assert (array_mean_time.shape == array_mean_convergence.shape == array_mean_iterations.shape), "The shape of the output arrays with solver metrics (runtime, convergence, n_iterations) should be the same"
         return array_mean_time, array_mean_convergence, array_mean_iterations
