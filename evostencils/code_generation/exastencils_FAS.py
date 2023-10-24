@@ -6,7 +6,7 @@ import subprocess
 import math
 from evostencils.grammar import multigrid as initialization
 import sympy
-
+import numpy as np
 
 class ProgramGeneratorFAS:
     def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation, op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0):
@@ -427,7 +427,7 @@ class ProgramGeneratorFAS:
             n_iterations_list.append(n_iterations)
 
         # average evaluated metrics over all samples and return
-        return mean(time_solution_list), mean(convergence_factor_list), mean(n_iterations_list)
+        return np.atleast_1d(mean(time_solution_list)), np.atleast_1d(mean(convergence_factor_list)), np.atleast_1d(mean(n_iterations_list))
 
     def generate_cycle_function(self, *args):
         expression = None
