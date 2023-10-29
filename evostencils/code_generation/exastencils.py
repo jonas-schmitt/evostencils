@@ -9,6 +9,7 @@ import sympy
 import time
 from typing import List
 import shutil
+import numpy as np
 
 
 class CycleStorage:
@@ -482,8 +483,11 @@ class ProgramGenerator:
         except subprocess.TimeoutExpired:
             return infinity_result
 
-    def generate_and_evaluate(self, expression: base.Expression, storages: List[CycleStorage], min_level: int,
+    def generate_and_evaluate(self, expression: List[base.Expression], storages: List[CycleStorage], min_level: int,
                               max_level: int, solver_program: str, infinity=1e100, evaluation_samples=3, global_variable_values=None):
+        
+        if type(expression).__name__ == 'list':
+            expression = expression[0]
         if global_variable_values is None:
             global_variable_values = {}
         # print("Generate and evaluate", flush=True)
@@ -527,14 +531,14 @@ class ProgramGenerator:
             average_convergence_factor += convergence_factor
             average_number_of_iterations += number_of_iterations
             if number_of_iterations >= infinity or convergence_factor > 1:
-                return average_runtime, average_convergence_factor, average_number_of_iterations
+                return np.atleast_1d(average_runtime), np.atleast_1d(average_convergence_factor), np.atleast_1d(average_number_of_iterations)
             if n > 1:
                 mapping['k'] *= 2
         average_runtime /= n
         average_convergence_factor /= n
         average_number_of_iterations /= n
         # print("Runtime:", runtime, "Convergence factor:", convergence_factor, "Iterations:", number_of_iterations, flush=True)
-        return average_runtime, average_convergence_factor, average_number_of_iterations
+        return np.atleast_1d(average_runtime), np.atleast_1d(average_convergence_factor), np.atleast_1d(average_number_of_iterations)
 
     @staticmethod
     def parse_output(output: str, infinity: float, solver_iteration_limit=None):

@@ -12,7 +12,7 @@ import time
 import os
 # from mpi4py import MPI
 
-
+use_hypre=True
 def flatten(lst: list):
     return [item for sublist in lst for item in sublist]
 
@@ -106,6 +106,7 @@ class Optimizer:
         self._storages = None
         self._maximum_local_system_size = 8
         self._enable_partitioning = True
+        self.all_fitnesses = []
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, evaluation_samples=3,
                                      pde_parameter_values=None):
@@ -189,8 +190,9 @@ class Optimizer:
         self.individual_cache.clear()
 
     def add_individual_to_cache(self, individual, values):
-        if len(self.individual_cache) < self._individual_cache_size:
-            self.individual_cache[str(individual)] = values
+        for i,ind in enumerate(individual):
+            if len(self.individual_cache) < self._individual_cache_size:
+                self.individual_cache[str(ind)] = values[i]
 
     def individual_in_cache(self, individual):
         tmp = str(individual) in self.individual_cache
@@ -417,39 +419,75 @@ class Optimizer:
             return fitness
 
     def evaluate_multiple_objectives(self, individual, pset, storages, min_level, max_level, solver_program,
-                                     evaluation_samples=3, pde_parameter_values=None):
+                                     evaluation_samples=3, pde_parameter_values=None): 
+        def is_list_of_lists(obj):
+            if not isinstance(obj, list):
+                return False
+            for item in obj:
+                if not isinstance(item, list):
+                    return False
+            return True
+        # check if an individual should/can be compiled to a gp expression. 
+        def get_fitness(individual):
+            if len(individual) > 150:
+                return self.infinity, self.infinity
+            if self.individual_in_cache(individual):
+                return self.get_cached_fitness(individual)
+            return None
+
+        # check if there are a list of individuals
+        if not is_list_of_lists(individual):
+            individual = [individual]
+
+        # define a expression and fitness list for input individual list
+        fitness = [None] * len(individual)
+        expression = [None] * len(individual)
+
+        # assign fitness if already cached or for very large individuals.
+        for i,ind in enumerate(individual):
+            out = get_fitness(ind)
+            if out is not None:
+                fitness[i] = out
+   
         if pde_parameter_values is None:
             pde_parameter_values = {}
-        if len(individual) > 150:
-            return self.infinity, self.infinity
-        if self.individual_in_cache(individual):
-            return self.get_cached_fitness(individual)
-        with suppress_output():
-        # with do_nothing():
+        for i, ind in enumerate(individual):
+            if fitness[i] is not None:
+                continue 
             try:
-                expression1, expression2 = self.compile_individual(individual, pset)
+                expression1, expression2 = self.compile_individual(ind, pset)
             except MemoryError:
                 self._failed_evaluations += 1
-                fitness = self.infinity, self.infinity
-                self.add_individual_to_cache(individual, fitness)
+                fitness[i] = self.infinity, self.infinity
+                continue
+            expression[i] = expression1
+        
+        non_none_indices = [i for i, value in enumerate(expression) if value is not None]
+        if len(non_none_indices)==0:
+            if len(fitness) == 1:
+                return fitness[0]
+            else:
                 return fitness
-            expression = expression1
-            start = time.time()
-            average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
-                self._program_generator.generate_and_evaluate(expression, storages, min_level, max_level,
-                                                              solver_program,
-                                                              infinity=self.infinity,
-                                                              evaluation_samples=evaluation_samples,
-                                                              global_variable_values=pde_parameter_values)
-            end = time.time()
-            self._total_number_of_evaluations += 1
-            self._total_evaluation_time += end - start
-            # Use number of iteration
-            # fitness = average_number_of_iterations, average_time_to_convergence / average_number_of_iterations
-            fitness = average_convergence_factor, average_time_to_convergence / average_number_of_iterations
-            if average_number_of_iterations >= self.infinity:
-                fitness = average_convergence_factor, self.infinity
-            self.add_individual_to_cache(individual, fitness)
+        start = time.time()
+        average_time_to_convergence, average_convergence_factor, average_number_of_iterations = \
+            self._program_generator.generate_and_evaluate([e for e in expression if e is not None], storages, min_level, max_level,
+                                                            solver_program,
+                                                            infinity=self.infinity,
+                                                            evaluation_samples=evaluation_samples,
+                                                            global_variable_values=pde_parameter_values)
+        end = time.time()
+        self._total_number_of_evaluations += len(individual)
+        self._total_evaluation_time += end - start
+        fitness_calc = list(average_convergence_factor), list(average_time_to_convergence / average_number_of_iterations)
+        fitness_calc = list(zip(*fitness_calc))
+        for i, fit in zip(non_none_indices, fitness_calc):
+            if fit[0]>=1:
+                fit = fit[0], self.infinity
+            fitness[i] = fit
+        self.add_individual_to_cache(individual, fitness)
+        if len(fitness) == 1:
+            return fitness[0]
+        else:
             return fitness
 
     def ea_mu_plus_lambda(self, initial_population_size, generations, generalization_interval, mu_, lambda_,
@@ -488,9 +526,14 @@ class Optimizer:
             logbooks.append(logbook)
 
         invalid_ind = [ind for ind in population]
-        fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
+        if use_hypre:
+            fitnesses = self.toolbox.evaluate(invalid_ind)
+        else:
+            fitnesses = list(self.toolbox.map(self.toolbox.evaluate, invalid_ind))
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+
+        self.all_fitnesses.append(self.allgather(fitnesses))
 
         population = self.allgather(population)
         population = self.toolbox.select(population, mu_)
@@ -574,7 +617,10 @@ class Optimizer:
 
             # Evaluate the individuals with an invalid fitness
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
+            if use_hypre:
+                fitnesses = self.toolbox.evaluate(invalid_ind)
+            else:
+                fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
             self._total_evaluation_time = self.allreduce(self.total_evaluation_time)
@@ -585,7 +631,7 @@ class Optimizer:
             if self.mpi_comm is not None and self.number_of_mpi_processes > 1:
                 for ind in offspring:
                     if not self.individual_in_cache(ind):
-                        self.add_individual_to_cache(ind, ind.fitness.values)
+                        self.add_individual_to_cache([ind], [ind.fitness.values])
 
             if gen % checkpoint_frequency == 0:
                 if solver is not None:
@@ -614,6 +660,8 @@ class Optimizer:
             self._average_time_to_convergence = total_time_to_convergence / len(population)
             count += 1
             record = mstats.compile(population)
+            fitnesses = [(ind.fitness.values[0],ind.fitness.values[1]) for ind in population]
+            self.all_fitnesses.append(self.allgather(fitnesses))
             # Update the statistics with the new population
             logbook.record(gen=gen, nevals=len(offspring), **record)
             if self.is_root():
@@ -622,7 +670,7 @@ class Optimizer:
         if self.is_root():
             print("Optimization finished", flush=True)
 
-        return population, logbook, hof, evaluation_min_level, evaluation_max_level
+        return population, logbook, hof, evaluation_min_level, evaluation_max_level,self.all_fitnesses
 
     def SOGP(self, pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
              crossover_probability, mutation_probability, min_level, max_level,
@@ -802,6 +850,7 @@ class Optimizer:
         pops = []
         logbooks = []
         hofs = []
+        fitnesses = []
         storages = self._program_generator.generate_storage(self.min_level, self.max_level, self.finest_grid)
         self._storages = storages
         FAS = False
@@ -860,7 +909,7 @@ class Optimizer:
                     return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
                 else:
                     return convergence_factor * math.sqrt(self.infinity) * execution_time
-            pop, log, hof, evaluation_min_level, evaluation_max_level = \
+            pop, log, hof, evaluation_min_level, evaluation_max_level,fitnesses = \
                 optimization_method(pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                                     crossover_probability, mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, evaluation_samples, logbooks,
@@ -899,7 +948,7 @@ class Optimizer:
             self.barrier()
 
         self.barrier()
-        return str(best_individual), solver_program, pops, logbooks, hofs
+        return str(best_individual), solver_program, pops, logbooks, hofs,fitnesses
 
     def generate_and_evaluate_program_from_grammar_representation(self, grammar_string: str, maximum_block_size):
         solver_program = ''
