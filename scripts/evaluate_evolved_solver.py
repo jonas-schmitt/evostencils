@@ -13,10 +13,10 @@ def main():
 
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
-
+    platform_path = f'lib/linux.platform'
     cycle_name= "gen_mgCycle"
 
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name)
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name, platform_path=platform_path)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -40,13 +40,18 @@ def main():
     maximum_block_size = 8
     path_to_individual = "" # TODO insert path to individuals
     # with open(path_to_individual, 'r') as file:
-    with open(f'../gpem-21-results/{problem_name}/data_0/hof_0/individual_0.txt', 'r') as file:
-        grammar_string = file.read()
-    # print(f"Individual {j}")
-    solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
-    print(f'Solving Time: {solving_time}, '
-          f'Convergence factor: {convergence_factor}, '
-          f'Number of Iterations: {number_of_iterations}', flush=True)
+    for i in range(3):
+        for j in range(30):
+            # try:
+                with open(f'/home/algo/gode/gode/evostencils/scripts/2D_FD_Poisson_fromL2/data_0/hof_{i}/individual_{j}.txt', 'r') as file:
+                    grammar_string = file.read()
+                # print(f"Individual {j}")
+                solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
+                print(f'Solving Time: {solving_time}, '
+                      f'Convergence factor: {convergence_factor}, '
+                      f'Number of Iterations: {number_of_iterations}', flush=True)
+            # except:
+            #     pass
 
 
 if __name__ == "__main__":

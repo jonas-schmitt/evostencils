@@ -12,6 +12,7 @@ def main():
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
     path_to_executable = f"{base_path}/generated/{problem_name}"
+    platform_path = f'lib/linux.platform'
     nruns = 20
     current_path = os.getcwd()
     os.chdir(base_path)

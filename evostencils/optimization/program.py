@@ -914,7 +914,11 @@ class Optimizer:
                                                             self.operators, self.fields,
                                                             maximum_local_system_size=maximum_block_size,
                                                             depth=levels)
-        self.program_generator.initialize_code_generation(self.min_level, self.max_level, iteration_limit=10000)
+        self.program_generator.initialize_code_generation(self.min_level, self.max_level) #, iteration_limit=10000)
+        # pset.context['__builtins__'] = 'None'
+        del pset.context['__builtins__']
+        pset.context.pop(next(reversed(pset.context.keys())), 'default value') 
+        # print((pset.context))
         expression, _ = eval(grammar_string, pset.context, {})
         # initial_weights = [1 for _ in relaxation_factor_optimization.obtain_relaxation_factors(expression)]
         # relaxation_factor_optimization.set_relaxation_factors(expression, initial_weights)
