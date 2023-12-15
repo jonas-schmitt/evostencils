@@ -6,22 +6,24 @@ import subprocess
 import math
 from evostencils.grammar import multigrid as initialization
 import sympy
-
+import os
 
 
 class ProgramGeneratorFAS:
-    def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation, op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0):
+    def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation,
+                 op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0,
+                 platform_file=None, build_path=None, exastencils_compiler=None):
         # ExaStencils configuration
         self.problem_name = problem_name
-        self.platform_file = "/home/algo/gode/gode/evostencils/example_problems/lib/linux.platform"
-        self.build_path = "/home/algo/gode/gode/evostencils/example_problems/"
-        self.exastencils_compiler = "/home/algo/gode/gode/evostencils/exastencils/Compiler/Compiler.jar"
-        self.layer3_file = f"{problem_name}/{problem_name}_fromL2.exa3"
-        self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
-        self.settings_file_generated = f"{problem_name}/{problem_name}_froml4_{mpi_rank}.settings"
-        self.knowledge_file = f"{problem_name}/{problem_name}.knowledge"
-        self.exa_file_template = f"{problem_name}/{problem_name}_template.exa4"
-        self.exa_file_out = f"{problem_name}/{problem_name}_{mpi_rank}.exa4"
+        self.platform_file = platform_file or "/home/algo/gode/gode/evostencils/example_problems/lib/linux.platform"
+        self.build_path = build_path or "/home/algo/gode/gode/evostencils/example_problems/"
+        self.exastencils_compiler = exastencils_compiler or "/home/algo/gode/gode/evostencils/exastencils/Compiler/Compiler.jar"
+        self.layer3_file = os.path.join(problem_name, f"{problem_name}_fromL2.exa3")
+        self.settings_file = os.path.join(problem_name, f"{problem_name}_froml4.settings")
+        self.settings_file_generated = os.path.join(problem_name, f"{problem_name}_froml4_{mpi_rank}.settings")
+        self.knowledge_file = os.path.join(problem_name, f"{problem_name}.knowledge")
+        self.exa_file_template = os.path.join(problem_name, f"{problem_name}_template.exa4")
+        self.exa_file_out = os.path.join(problem_name, f"{problem_name}_{mpi_rank}.exa4")
         self.min_level = 0
         self.max_level = 0
         self.dimension = 0
@@ -325,17 +327,17 @@ class ProgramGeneratorFAS:
     def generate_code(self):
         def create_l4_file():
             # read contents from the template file
-            with open(self.build_path + self.exa_file_template, 'r') as f:
+            with open(os.path.join(self.build_path, self.exa_file_template), 'r') as f:
                 file_contents = f.read()
 
             # append generated mg cycle and write to output file
             file_contents += "\n" + print_exa(self.fct_mgcycle)
-            with open(self.build_path + self.exa_file_out, 'w') as f:
+            with open(os.path.join(self.build_path, self.exa_file_out), 'w') as f:
                 f.write(file_contents)
 
         def modify_settings_file():
-            with open(self.build_path + self.settings_file, 'r') as input_file:
-                with open(self.build_path + self.settings_file_generated, 'w') as output_file:
+            with open(os.path.join(self.build_path, self.settings_file), 'r') as input_file:
+                with open(os.path.join(self.build_path, self.settings_file_generated), 'w') as output_file:
                     for line in input_file:
                         tokens = line.split('=')
                         lhs = tokens[0].strip(' \n\t')
@@ -359,11 +361,15 @@ class ProgramGeneratorFAS:
                                   stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
 
     def compile_code(self):
-        with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
-            subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        # with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
+        #     subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}'))
+        result = subprocess.run(['make', '-j10', '-s', '-C', os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}')],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+        return result.returncode
+
 
     def execute_code(self):
-        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=self.build_path + "generated/" + f'{self.problem_name}_{self.mpi_rank}')
+        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}'))
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):
