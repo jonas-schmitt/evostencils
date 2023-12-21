@@ -40,7 +40,7 @@ def main():
     maximum_block_size = 8
     path_to_individual = "" # TODO insert path to individuals
     # with open(path_to_individual, 'r') as file:
-    with open(f'{problem_name}/data_0/hof_0/individual_0.txt', 'r') as file:
+    with open(f'../gpem-21-results/{problem_name}/data_0/hof_0/individual_0.txt', 'r') as file:
         grammar_string = file.read()
     # print(f"Individual {j}")
     solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
@@ -51,4 +51,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
