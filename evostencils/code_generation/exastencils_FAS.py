@@ -8,16 +8,14 @@ from evostencils.grammar import multigrid as initialization
 import sympy
 import os
 
-
 class ProgramGeneratorFAS:
-    def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation,
-                 op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0,
-                 platform_file=None, build_path=None, exastencils_compiler=None):
-        # ExaStencils configuration
+    def __init__(self, problem_name, solution, rhs, residual, FASApproximation, restriction, prolongation, op_linear, op_nonlinear, fct_name_mgcycle, fct_cgs, fct_smoother=None, mpi_rank=0,
+                 platform_file=None, build_path=None, exastencils_compiler=None): # ExaStencils configuration
+        # TODO pass paths as argument as in original code generator
         self.problem_name = problem_name
-        self.platform_file = platform_file or "/home/algo/gode/gode/evostencils/example_problems/lib/linux.platform"
-        self.build_path = build_path or "/home/algo/gode/gode/evostencils/example_problems/"
-        self.exastencils_compiler = exastencils_compiler or "/home/algo/gode/gode/evostencils/exastencils/Compiler/Compiler.jar"
+        self.platform_file = platform_file
+        self.build_path = build_path
+        self.exastencils_compiler = exastencils_compiler
         self.layer3_file = os.path.join(problem_name, f"{problem_name}_fromL2.exa3")
         self.settings_file = os.path.join(problem_name, f"{problem_name}_froml4.settings")
         self.settings_file_generated = os.path.join(problem_name, f"{problem_name}_froml4_{mpi_rank}.settings")
@@ -361,15 +359,11 @@ class ProgramGeneratorFAS:
                                   stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
 
     def compile_code(self):
-        # with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
-        #     subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}'))
-        result = subprocess.run(['make', '-j10', '-s', '-C', os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}')],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
-        return result.returncode
-
+        with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
+            subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=os.path.join(self.build_path, "generated/" + f'{self.problem_name}_{self.mpi_rank}'))
 
     def execute_code(self):
-        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=os.path.join(self.build_path, "generated/", f'{self.problem_name}_{self.mpi_rank}'))
+        result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=os.path.join(self.build_path, "generated/" + f'{self.problem_name}_{self.mpi_rank}'))
         return result.stdout.decode('utf8')
 
     def generate_and_evaluate(self, *args, **kwargs):

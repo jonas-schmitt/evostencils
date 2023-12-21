@@ -3,11 +3,11 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import sys
 from mpi4py import MPI
-
+import evostencils
 
 
 def main():
-    cwd = f'/home/algo/gode/gode/evostencils/'
+    cwd = os.path.dirname(os.path.dirname(evostencils.__file__))
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder

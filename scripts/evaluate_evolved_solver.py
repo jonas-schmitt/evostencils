@@ -1,13 +1,13 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-
+import evostencils
 
 def main():
     # TODO adapt to actual path to exastencils project
     dir_name = 'Poisson'
     problem_name = f'2D_FD_{dir_name}_fromL2'
-    cwd = os.getcwd()
+    cwd = os.path.dirname(evostencils.__file__)
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
 
@@ -40,18 +40,13 @@ def main():
     maximum_block_size = 8
     path_to_individual = "" # TODO insert path to individuals
     # with open(path_to_individual, 'r') as file:
-    for i in range(3):
-        for j in range(30):
-            # try:
-                with open(f'/home/algo/gode/gode/evostencils/scripts/2D_FD_Poisson_fromL2/data_0/hof_{i}/individual_{j}.txt', 'r') as file:
-                    grammar_string = file.read()
-                # print(f"Individual {j}")
-                solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
-                print(f'Solving Time: {solving_time}, '
-                      f'Convergence factor: {convergence_factor}, '
-                      f'Number of Iterations: {number_of_iterations}', flush=True)
-            # except:
-            #     pass
+    with open(f'{problem_name}/data_0/hof_0/individual_0.txt', 'r') as file:
+        grammar_string = file.read()
+    # print(f"Individual {j}")
+    solving_time, convergence_factor, number_of_iterations = optimizer.generate_and_evaluate_program_from_grammar_representation(grammar_string, maximum_block_size)
+    print(f'Solving Time: {solving_time}, '
+          f'Convergence factor: {convergence_factor}, '
+          f'Number of Iterations: {number_of_iterations}', flush=True)
 
 
 if __name__ == "__main__":
