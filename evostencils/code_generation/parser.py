@@ -25,7 +25,7 @@ def parse_stencil_offsets(string: str, is_prolongation=False):
 def extract_l2_information(file_path: str, dimension: int, solution_equations=None):
     equations = []
     operators = []
-    fields = []
+    fields = []   
     with open(file_path, 'r') as file:
         line = file.readline()
         while line:
@@ -82,6 +82,7 @@ def extract_l2_information(file_path: str, dimension: int, solution_equations=No
             elif symbol not in fields:
                 fields.append(symbol)
     fields.sort(key=lambda s: s.name)
+
     for eq_info in equations:
         rhs_name = eq_info.rhs_name
         tmp = rhs_name.split('_')

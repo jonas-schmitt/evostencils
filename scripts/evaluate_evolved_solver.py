@@ -1,22 +1,22 @@
 from evostencils.optimization.program import Optimizer
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
-
+import evostencils
 
 def main():
     # TODO adapt to actual path to exastencils project
     dir_name = 'Poisson'
     problem_name = f'2D_FD_{dir_name}_fromL2'
-    cwd = os.getcwd()
+    cwd = os.path.dirname(evostencils.__file__)
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
 
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
-
+    platform_path = f'lib/linux.platform'
     cycle_name= "gen_mgCycle"
 
-    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name)
+    program_generator = ProgramGenerator(compiler_path, base_path, settings_path, knowledge_path, cycle_name=cycle_name, platform_path=platform_path)
 
     # Obtain extracted information from program generator
     dimension = program_generator.dimension
@@ -51,4 +51,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

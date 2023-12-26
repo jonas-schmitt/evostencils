@@ -3,11 +3,11 @@ from evostencils.code_generation.exastencils import ProgramGenerator
 import os
 import sys
 from mpi4py import MPI
-
+import evostencils
 
 
 def main():
-    cwd = f'{os.getcwd()}'
+    cwd = os.path.dirname(os.path.dirname(evostencils.__file__))
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder
@@ -72,8 +72,8 @@ def main():
         # Create convergence and performance evaluator objects
         # Only needed when a model-based estimation should be used within the optimization
         # (Not recommended due to the limitations, but useful for testing)
-        from evostencils.model_based_estimation.convergence import ConvergenceEvaluator
-        from evostencils.model_based_estimation.performance import PerformanceEvaluator
+        from evostencils.model_based_prediction.convergence import ConvergenceEvaluator
+        from evostencils.model_based_prediction.performance import PerformanceEvaluator
         convergence_evaluator = ConvergenceEvaluator(dimension, coarsening_factors, finest_grid)
         # Peak FLOP performance of the machine
         peak_flops = 16 * 6 * 2.6 * 1e9
@@ -100,7 +100,7 @@ def main():
     levels_per_run = max_level - min_level
     if model_based_estimation:
         # Model-based estimation only feasible for up to 2 levels per run
-        levels_per_run = 2
+        levels_per_run = 1
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     # Choose optimization method
     optimization_method = optimizer.NSGAII

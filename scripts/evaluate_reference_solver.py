@@ -1,17 +1,18 @@
 import subprocess
 import os
-
+import evostencils
 
 def main():
     dir_name = 'Poisson'
     problem_name = f'2D_FD_{dir_name}_fromL2'
-    cwd = os.getcwd()
+    cwd = os.path.dirname(evostencils.__file__)
     platform = "linux"
     compiler_path = f'{cwd}/../exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/../exastencils/Examples'
     settings_path = f'{dir_name}/{problem_name}.settings'
     knowledge_path = f'{dir_name}/{problem_name}.knowledge'
     path_to_executable = f"{base_path}/generated/{problem_name}"
+    platform_path = f'lib/linux.platform'
     nruns = 20
     current_path = os.getcwd()
     os.chdir(base_path)
