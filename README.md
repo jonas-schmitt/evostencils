@@ -41,9 +41,19 @@ cd ..
 ## Citing
 
 If you use or refer to EvoStencils in your work, please consider including the following citations:
+<pre>
+@misc{evostencils1,
+      title={Automating the Design of Multigrid Methods with Evolutionary Program Synthesis}, 
+      author={Jonas Schmitt},
+      year={2023},
+      eprint={2312.14875},
+      archivePrefix={arXiv},
+      primaryClass={math.NA}
+}
+</pre>
 
 <pre>
-@InProceedings{evostencils1,
+@InProceedings{evostencils2,
   location = {Boston Massachusetts},
   title = {Evolving generalizable multigrid-based helmholtz preconditioners with grammar-guided genetic programming},
   url = {https://dl.acm.org/doi/10.1145/3512290.3528688},
@@ -57,7 +67,7 @@ If you use or refer to EvoStencils in your work, please consider including the f
 </pre>
 
 <pre>
-@Article{evostencils2,
+@Article{evostencils3,
   title = {{EvoStencils}: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
   volume = {22},
   issn = {1389-2576, 1573-7632},
