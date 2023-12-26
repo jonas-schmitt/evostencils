@@ -43,12 +43,12 @@ cd ..
 If you use or refer to EvoStencils in your work, please consider including the following citations:
 <pre>
 @misc{evostencils1,
-      title={Automating the Design of Multigrid Methods with Evolutionary Program Synthesis}, 
-      author={Jonas Schmitt},
-      year={2023},
-      eprint={2312.14875},
-      archivePrefix={arXiv},
-      primaryClass={math.NA}
+  title={Automating the Design of Multigrid Methods with Evolutionary Program Synthesis}, 
+  author={Jonas Schmitt},
+  year={2023},
+  eprint={2312.14875},
+  archivePrefix={arXiv},
+  primaryClass={math.NA}
 }
 </pre>
 
