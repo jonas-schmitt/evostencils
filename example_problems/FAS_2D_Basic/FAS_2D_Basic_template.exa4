@@ -146,7 +146,7 @@ Function Solve ( ) : Unit {
 	repeat until (res_0 < ( 1.0E-10 * resStart_0 ) || numIt >= 300) {
 		numIt += 1
 		startTimer ( 'cycle' )
-		gen_mgCycle@finest (  )
+		gen_mgCycle@5 (  ) // useless comment
 		stopTimer ( 'cycle' )
 		t_sol += getTotalFromTimer('cycle')
 		if (getTotalFromTimer ( 'cycle' ) > 1200000 ) {
@@ -201,7 +201,7 @@ Function Application ( ) : Unit {
 	apply bc to Solution<1>@9
 	apply bc to Solution<0>@10
 	apply bc to Solution<1>@10
-	
+
 	Solve ( )
 	destroyGlobals ( )
 }

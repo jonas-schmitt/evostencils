@@ -356,11 +356,11 @@ class ProgramGeneratorFAS:
         with open(f"{self.build_path}/debug_FAS/generate_output_{self.mpi_rank}.txt", "w") as f:
             subprocess.check_call(["java", "-cp", self.exastencils_compiler, "Main",
                                    self.settings_file_generated, self.knowledge_file, self.platform_file],
-                                  stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
+                                   stdout=f, stderr=subprocess.STDOUT, cwd=self.build_path)
 
     def compile_code(self):
         with open(f"{self.build_path}/debug_FAS/build_output_{self.mpi_rank}.txt", "w") as f:
-            subprocess.check_call(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=os.path.join(self.build_path, "generated/" + f'{self.problem_name}_{self.mpi_rank}'))
+            subprocess.run(["make"], stdout=f, stderr=subprocess.STDOUT, cwd=os.path.join(self.build_path, "generated/" + f'{self.problem_name}_{self.mpi_rank}'))
 
     def execute_code(self):
         result = subprocess.run(["likwid-pin", "./exastencils"], stdout=subprocess.PIPE, cwd=os.path.join(self.build_path, "generated/" + f'{self.problem_name}_{self.mpi_rank}'))
