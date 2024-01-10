@@ -14,8 +14,8 @@ class ProgramGeneratorFAS:
         # TODO pass paths as argument as in original code generator
         self.problem_name = problem_name
         self.platform_file = "lib/linux.platform"
-        self.build_path = "example_problems/"
-        self.exastencils_compiler = "../../exastencils/Compiler/Compiler.jar"
+        self.build_path = "/home/algo/gode/gode/evostencils/example_problems"
+        self.exastencils_compiler = "/home/algo/gode/gode/evostencils/exastencils/Compiler/Compiler.jar"
         # self.layer3_file = f"{problem_name}/2D_FD_Poisson_fromL2.exa3"
         self.settings_file = f"{problem_name}/{problem_name}_froml4.settings"
         self.settings_file_generated = f"{problem_name}/{problem_name}_froml4_{mpi_rank}.settings"
