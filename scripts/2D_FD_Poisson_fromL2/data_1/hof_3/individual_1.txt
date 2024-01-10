@@ -1,0 +1,1 @@
+collective_jacobi_0(23, single, residual_0(collective_jacobi_0(10, single, residual_0(correct_with_coarse_grid_solver_0(24, P_1, CGS_1, R_0, residual_0(u_and_f))))))
