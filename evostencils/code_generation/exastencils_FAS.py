@@ -309,7 +309,7 @@ class ProgramGeneratorFAS:
             return self.rhs[cur_lvl]
 
         elif expr_type == "Prolongation":
-            self.update_rhs[cur_lvl - 1] = True  # rhs at 'cur_lvl-1' needs to be updated
+            self.update_rhs[cur_lvl - 1] = True  # rhs at 'cur_lvl-1' needs to be updated key error when cur_lvl = 6 
             return self.prolongation[cur_lvl - 1]
 
         elif expr_type == "Restriction":
