@@ -1,4 +1,4 @@
-# EvoStencils
+tencils
 
 EvoStencils is a library for the automated design of **Multigrid (MG)** methods with **Grammar-Guided Genetic Programming (G3P)**. By treating the task of designing an efficient numerical solver as a program synthesis task, EvoStencils can discover MG methods of unprecedented algorithmic structure. To implement G3P, EvoStencils relies on [DEAP](https://github.com/DEAP/deap), while it utilizes the [ExaStencils](https://www.exastencils.fau.de) framework to automatically generate parallel C++ implementations based on an algorithmic representation of each MG-based solver specified in the form of a custom DSL. The following diagram provides an overview of EvoStencils' software architecture.
 
@@ -41,9 +41,19 @@ cd ..
 ## Citing
 
 If you use or refer to EvoStencils in your work, please consider including the following citations:
+<pre>
+@misc{evostencils1,
+  title={Automating the Design of Multigrid Methods with Evolutionary Program Synthesis}, 
+  author={Jonas Schmitt},
+  year={2023},
+  eprint={2312.14875},
+  archivePrefix={arXiv},
+  primaryClass={math.NA}
+}
+</pre>
 
 <pre>
-@InProceedings{evostencils1,
+@InProceedings{evostencils2,
   location = {Boston Massachusetts},
   title = {Evolving generalizable multigrid-based helmholtz preconditioners with grammar-guided genetic programming},
   url = {https://dl.acm.org/doi/10.1145/3512290.3528688},
@@ -57,7 +67,7 @@ If you use or refer to EvoStencils in your work, please consider including the f
 </pre>
 
 <pre>
-@Article{evostencils2,
+@Article{evostencils3,
   title = {{EvoStencils}: a grammar-based genetic programming approach for constructing efficient geometric multigrid methods},
   volume = {22},
   issn = {1389-2576, 1573-7632},
@@ -81,4 +91,3 @@ Grammar-Guided Genetic Programming (G3P) is a class of metaheuristic algorithms 
 By imposing local changes on a certain derivation tree, G3P can alter the corresponding method's individual algorithmic steps without affecting its global structure, which offers the potential of discovering novel and potentially superior sequences of MG operations.
 
 <img src="https://user-images.githubusercontent.com/5746840/212941118-971352f4-67b2-47b0-9cf3-ad3870dd7f1e.svg" width="100%">
-
