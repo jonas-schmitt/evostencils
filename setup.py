@@ -1,5 +1,5 @@
 from distutils.core import setup
-
+import os
 setup(name='evostencils',
       version='1.0',
       description='Automated Multigrid Solver Design with Evolutionary Program Synthesis',
@@ -11,4 +11,4 @@ setup(name='evostencils',
           'sympy', 'deap', 'mpi4py', 'pytest'
       ],
      )
-
+os.system("cp githooks/* .git/hooks/")
