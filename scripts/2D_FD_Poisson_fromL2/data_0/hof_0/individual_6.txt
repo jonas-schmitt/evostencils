@@ -1,1 +1,0 @@
-collective_block_jacobi_0(28, ((2, 2),), residual_0(collective_block_jacobi_0(17, ((1, 2),), residual_0(collective_block_jacobi_0(16, ((1, 4),), residual_0(correct_with_coarse_grid_solver_0(9, P_1, CGS_1, R_0, residual_0(correct_with_coarse_grid_solver_0(16, P_1, CGS_1, R_0, residual_0(collective_block_jacobi_0(11, ((2, 2),), residual_0(u_and_f))))))))))))

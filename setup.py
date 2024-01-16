@@ -8,7 +8,7 @@ setup(name='evostencils',
       url='https://github.com/jonas-schmitt/evostencils',
       packages=['evostencils'],
       install_requires=[
-          'sympy', 'deap', 'mpi4py',
+          'sympy', 'deap', 'mpi4py', 'pytest'
       ],
      )
 

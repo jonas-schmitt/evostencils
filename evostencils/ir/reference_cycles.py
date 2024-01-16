@@ -185,7 +185,6 @@ def generate_FAS_v_22_cycle_three_grid(terminals_fine_level: mg.Terminals, termi
     R_u = R  # TODO: Include operators for restricting solution within Terminals class
     partitioning = terminals_fine_level.partitionings #red_black_partitioning
     omega = 1.0
-    print(A)
     L = smoother.generate_collective_jacobi(A)
     # Pre-Smoothing step 1
     residual = base.Residual(A, u, f)
