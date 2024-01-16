@@ -6,7 +6,8 @@ from mpi4py import MPI
 import evostencils
 
 
-def main():
+# def main():
+for jklm in [1]:
     cwd = os.path.dirname(os.path.dirname(evostencils.__file__))
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
@@ -180,5 +181,5 @@ def main():
                     grammar_file.write(str(ind) + '\n')
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
