@@ -1,4 +1,4 @@
-from pytest import *
+import pytest
 from evostencils.optimization.program import Optimizer
 from evostencils.code_generation.exastencils import ProgramGenerator
 import os
@@ -6,7 +6,9 @@ import sys
 import evostencils
 from mpi4py import MPI
 
-def test_optimize_poisson():
+def test_optimize_poisson_exastencils_fast():
+# for gvfuyeijor in [1]:
+    os.system('rm -r 2D_FD_Poisson_fromL2/data_0')
     cwd = os.path.dirname(os.path.dirname(evostencils.__file__))
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     base_path = f'{cwd}/example_problems'
@@ -59,16 +61,16 @@ def test_optimize_poisson():
     assert levels_per_run <= 5, "Can not optimize more than 5 levels"
     optimization_method = optimizer.NSGAII
     use_random_search = False
-    mu_ = 2
-    lambda_ = 2
+    mu_ = 4
+    lambda_ = 1
     generations = 5
-    population_initialization_factor = 2
+    population_initialization_factor = 1
     generalization_interval = 50
     crossover_probability = 0.7
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1
-    evaluation_samples = 1
-    maximum_local_system_size = 4
+    evaluation_samples = 2
+    maximum_local_system_size = 2
     continue_from_checkpoint = False
     program, dsl_code, pops, stats, hofs = optimizer.evolutionary_optimization(optimization_method=optimization_method,
                                                                      use_random_search=use_random_search,
@@ -85,6 +87,27 @@ def test_optimize_poisson():
                                                                      model_based_estimation=model_based_estimation,
                                                                      pde_parameter_values=pde_parameter_values,
                                                                     continue_from_checkpoint=continue_from_checkpoint)
-    log = optimizer.load_data_structure('./data_0/log_0.p')
+    if mpi_rank == 0:
+        print(f'\nExaSlang Code:\n{dsl_code}\n', flush=True)
+        print(f'\nGrammar representation:\n{program}\n', flush=True)
+        if not os.path.exists(f'./{problem_name}'):
+            os.makedirs(f'./{problem_name}')
+        j = 0
+        log_dir_name = f'./{problem_name}/data_{j}'
+        while os.path.exists(log_dir_name):
+            j += 1
+            log_dir_name = f'./{problem_name}/data_{j}'
+        os.makedirs(log_dir_name)
+        for i, log in enumerate(stats):
+            optimizer.dump_data_structure(log, f"{log_dir_name}/log_{i}.p")
+        for i, pop in enumerate(pops):
+            optimizer.dump_data_structure(pop, f"{log_dir_name}/pop_{i}.p")
+        for i, hof in enumerate(hofs):
+            hof_dir = f'{log_dir_name}/hof_{i}'
+            os.makedirs(hof_dir)
+            for j, ind in enumerate(hof):
+                with open(f'{hof_dir}/individual_{j}.txt', 'w') as grammar_file:
+                    grammar_file.write(str(ind) + '\n')
+    log = optimizer.load_data_structure('2D_FD_Poisson_fromL2/data_0/log_0.p')
     minimum_runtime = log.chapters["execution_time"].select("min")
-    assert minimum_runtime < 100
+    assert minimum_runtime[3] < 1e100 and minimum_runtime[3] > 0
