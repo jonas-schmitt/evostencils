@@ -11,7 +11,8 @@ from sympy.parsing.sympy_parser import parse_expr
 import itertools
 from functools import reduce
 
-use_hypre = True
+use_hypre = False
+use_hyteg = True
 class OperatorInfo:
     def __init__(self, name, level, stencil, operator_type=base.Operator):
         self._name = name
@@ -337,6 +338,10 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
     def GS_backward(relaxation_factor_index, partitioning_, cycle):
         return smoothing(relaxation_factor_index, partitioning_, smoother.generate_GS_backward, cycle)
     
+    # smoothers in hyteg
+    def sor(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_sor, cycle)
+    
     def correct_with_coarse_grid_solver(relaxation_factor_index, prolongation_operator, coarse_grid_solver,
                                         restriction_operator, cycle):
         cycle = restrict(restriction_operator, cycle)
@@ -364,6 +369,8 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
         add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
         add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
+    elif use_hyteg:
+        add_primitive(pset, sor, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
     else:
         # start: Exclude for FAS
         if not FAS:

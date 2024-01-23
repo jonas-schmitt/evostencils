@@ -1,6 +1,7 @@
 from evostencils.ir import base, system
 from evostencils.stencils import multiple
-from evostencils.code_generation.hypre import Smoothers
+from evostencils.code_generation.hypre import Smoothers as hypre_smoothers
+from evostencils.code_generation.hyteg import Smoothers as hyteg_smoothers
 
 def generate_decoupled_jacobi(operator: system.Operator):
     return system.Diagonal(operator)
@@ -48,15 +49,20 @@ def generate_jacobi_newton(operator: system.Operator, n_newton_steps: int):
 # hypre smoothers
 def generate_jacobi(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
-    op.smoother_type = Smoothers.Jacobi
+    op.smoother_type = hypre_smoothers.Jacobi
     return op
 def generate_GS_forward(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
-    op.smoother_type = Smoothers.GS_Forward
+    op.smoother_type = hypre_smoothers.GS_Forward
     return op
 def generate_GS_backward(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
-    op.smoother_type = Smoothers.GS_Backward
+    op.smoother_type = hypre_smoothers.GS_Backward
     return op
 
 
+# hyteg smoothers
+def generate_sor(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.sor
+    return op

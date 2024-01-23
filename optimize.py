@@ -1,5 +1,5 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.code_generation.hypre import ProgramGenerator
+from evostencils.code_generation.hyteg import ProgramGenerator
 from evostencils.grammar import multigrid as initialization
 from evostencils.ir import base
 import os
@@ -55,7 +55,7 @@ def main():
     model_based_estimation = False
 
     # model_based_estimation = False
-    program_generator = ProgramGenerator(5,9 ,mpi_rank)
+    program_generator = ProgramGenerator(0,4 ,mpi_rank)
 
    # Obtain extracted information from program generator
     dimension = 2#program_generator.dimension  # Dimensionality of the problem
@@ -78,7 +78,7 @@ def main():
     tmp = tuple([2] * dimension)
     coarsening_factors = [tmp for _ in range(len(fields))]
     finest_grid = [base.Grid(grid_size, step_size, max_level) for _ in range(len(fields))]
-    problem_name = "test_anisotropic"#program_generator.problem_name
+    problem_name = "2dpoisson"#program_generator.problem_name
     convergence_evaluator = None
     performance_evaluator = None
     if model_based_estimation:

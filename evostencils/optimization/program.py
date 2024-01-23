@@ -12,7 +12,7 @@ import time
 import os
 # from mpi4py import MPI
 
-use_hypre=True
+use_hypre=False
 def flatten(lst: list):
     return [item for sublist in lst for item in sublist]
 
@@ -105,7 +105,7 @@ class Optimizer:
         self._pset_old = None
         self._storages = None
         self._maximum_local_system_size = 8
-        self._enable_partitioning = True
+        self._enable_partitioning = False
         self.all_fitnesses = []
 
     def reinitialize_code_generation(self, min_level, max_level, program, evaluation_function, evaluation_samples=3,
@@ -875,17 +875,15 @@ class Optimizer:
                 self.performance_evaluator.set_runtime_of_coarse_grid_solver(0.0)
 
             rhs = right_hand_sides[i]
-            enable_partitioning = True
             if model_based_estimation:
                 if verbose:
                     print("Warning: Smoother partitioning not supported with model-based estimation")
                 enable_partitioning = False
-            self._enable_partitioning = enable_partitioning
             pset, terminal_list = \
                 multigrid_initialization.generate_primitive_set(approximation, rhs, self.dimension,
                                                                 self.coarsening_factors, max_level, self.equations,
                                                                 self.operators, self.fields,
-                                                                enable_partitioning=enable_partitioning,
+                                                                enable_partitioning=self._enable_partitioning,
                                                                 maximum_local_system_size=maximum_local_system_size,
                                                                 depth=levels_per_run,
                                                                 FAS=FAS)
