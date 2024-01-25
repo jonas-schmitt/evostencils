@@ -14,9 +14,11 @@ class CorrectionTypes(Enum):
     Smoothing = 1
     CoarseGridCorrection = 0
 class Smoothers(Enum):
-    sor = 6
+    SOR = 7
+    WeightedJacobi = 12
+    SymmtericSOR = 10 # implemented only for 3D
     CGS_GE = 9
-    NoSmoothing = -1
+    NoSmoothing = 0
 
 class ProgramGenerator:
     def __init__(self,min_level, max_level, mpi_rank=0) -> None:
@@ -125,7 +127,7 @@ class ProgramGenerator:
             assert state_lvl >= cur_lvl
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
-                    while cur_lvl > 0:
+                    while cur_lvl > self.min_level:
                         self.smoothers.append(Smoothers.GS_Forward)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
@@ -210,6 +212,8 @@ class ProgramGenerator:
         self.mgcycle = []
         self.mgcycle.append("-cycleStructure")
         self.mgcycle.append(list_to_string(self.intergrid_ops))
+        self.mgcycle.append("-smootherTypes")
+        self.mgcycle.append(list_to_string(self.smoothers))
         self.mgcycle.append("-smootherWeights")
         self.mgcycle.append(list_to_string(self.relaxation_weights))
 
@@ -218,10 +222,10 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+        output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
         # check if the code ran successfully
         if output.returncode != 0:
-            output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+            output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
             print("error")
             print(output.args)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 

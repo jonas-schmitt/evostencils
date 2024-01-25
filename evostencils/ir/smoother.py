@@ -64,5 +64,13 @@ def generate_GS_backward(operator: system.Operator):
 # hyteg smoothers
 def generate_sor(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
-    op.smoother_type = hyteg_smoothers.sor
+    op.smoother_type = hyteg_smoothers.SOR
+    return op
+def generate_weightedjacobi(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.WeightedJacobi
+    return op
+def generate_symmetricsor(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.SymmtericSOR
     return op
