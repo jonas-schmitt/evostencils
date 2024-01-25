@@ -222,10 +222,9 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
+        output = subprocess.run([f"./{self.problem}"] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
         # check if the code ran successfully
         if output.returncode != 0:
-            output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
             print("error")
             print(output.args)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
@@ -258,7 +257,7 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        cmdline_args = [f"{self.template_path}/MultigridStudies.prm"]
+        cmdline_args = [f"MultigridStudies.prm"]
         evaluation_samples = 1
         for arg in args:
             # get expression list from the input arguments

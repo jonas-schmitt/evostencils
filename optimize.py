@@ -10,7 +10,7 @@ import sympy
 
 def main():
     cwd = f'{os.getcwd()}'
-    eval_software = "hypre"
+    eval_software = "hyteg"
     # Path to the ExaStencils compiler
     compiler_path = f'{cwd}/exastencils/Compiler/Compiler.jar'
     # Path to base folder
@@ -132,7 +132,7 @@ def main():
 
     mu_ = 256 # Population size
     lambda_ = 4 # Number of offspring
-    generations = 150  # Number of generations
+    generations = 100  # Number of generations
     population_initialization_factor = 8  # Multiply mu_ by this factor to set the initial population size
 
     # Number of generations after which a generalization is performed
