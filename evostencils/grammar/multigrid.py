@@ -345,6 +345,15 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         return smoothing(relaxation_factor_index, partitioning_, smoother.generate_symmetricsor, cycle)
     def WeightedJacobi(relaxation_factor_index, partitioning_, cycle):
         return smoothing(relaxation_factor_index, partitioning_, smoother.generate_weightedjacobi, cycle)
+    def GaussSeidel(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_gaussseidel, cycle)
+    def Uzawa(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_uzawa, cycle)
+    def SymmetricGaussSeidel(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_symmetricgaussseidel, cycle)
+    def Chebyshev(relaxation_factor_index, partitioning_, cycle):
+        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_chebyshev, cycle)
+    
     
     def correct_with_coarse_grid_solver(relaxation_factor_index, prolongation_operator, coarse_grid_solver,
                                         restriction_operator, cycle):
@@ -374,8 +383,11 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
         add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
     elif use_hyteg:
+        # add/remove smoothers for the optimization here.
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
         add_primitive(pset, WeightedJacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"weightedjacobi_{depth}")
+        add_primitive(pset, GaussSeidel, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"gauseeidel_{depth}")
+        add_primitive(pset, SymmetricGaussSeidel, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"symmetricgaussseidel_{depth}")     
     else:
         # start: Exclude for FAS
         if not FAS:
