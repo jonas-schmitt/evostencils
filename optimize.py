@@ -54,8 +54,15 @@ def main():
     # Use model based estimation instead of code generation and model_based_prediction
     model_based_estimation = False
 
-    # model_based_estimation = False
-    program_generator = ProgramGenerator(0,4 ,mpi_rank)
+    # problem specifications
+    flexmg_min_level = 5
+    flexmg_max_level = 9
+    cgs_level = 2
+    assert flexmg_min_level < flexmg_max_level
+    assert flexmg_min_level >= cgs_level
+    assert flexmg_max_level - flexmg_min_level < 5
+    problem_name = "2dpoisson"
+    program_generator = ProgramGenerator(flexmg_min_level,flexmg_max_level , mpi_rank, cgs_level)
 
    # Obtain extracted information from program generator
     dimension = 2#program_generator.dimension  # Dimensionality of the problem
@@ -78,7 +85,6 @@ def main():
     tmp = tuple([2] * dimension)
     coarsening_factors = [tmp for _ in range(len(fields))]
     finest_grid = [base.Grid(grid_size, step_size, max_level) for _ in range(len(fields))]
-    problem_name = "2dpoisson"#program_generator.problem_name
     convergence_evaluator = None
     performance_evaluator = None
     if model_based_estimation:
@@ -130,10 +136,10 @@ def main():
     # Option to use random search instead of crossover and mutation to create new individuals
     use_random_search = False
 
-    mu_ = 256 # Population size
+    mu_ = 4 # Population size
     lambda_ = 4 # Number of offspring
-    generations = 100  # Number of generations
-    population_initialization_factor = 8  # Multiply mu_ by this factor to set the initial population size
+    generations = 4  # Number of generations
+    population_initialization_factor = 1  # Multiply mu_ by this factor to set the initial population size
 
     # Number of generations after which a generalization is performed
     # This is achieved by incrementing min_level and max_level within the optimization
