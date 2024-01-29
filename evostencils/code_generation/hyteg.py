@@ -17,19 +17,24 @@ class Smoothers(Enum):
     SOR = 7
     WeightedJacobi = 12
     SymmtericSOR = 10 # implemented only for 3D
+    Chebyshev = 2
+    Uzawa = 11
+    GaussSeidel = 3
+    SymmetricGaussSeidel = 9
     CGS_GE = 9
     NoSmoothing = 0
 
 class ProgramGenerator:
-    def __init__(self,min_level, max_level, mpi_rank=0) -> None:
+    def __init__(self,min_level, max_level, mpi_rank=0,cgs_level=0) -> None:
         
         # INPUT
         self.min_level = min_level
+        self.cgs_level = cgs_level
         self.max_level = max_level
         self.mpi_rank = mpi_rank
 
         # HYPRE FILES
-        self.template_path = "/home/rzlin/hi60toga/Documents/code/hyteg-build/apps/MultigridStudies"#"../../../hyteg-build/apps/MultigridStudies"
+        self.template_path = f"{os.getcwd()}/hyteg-build/apps/MultigridStudies"
         self.problem = "MultigridStudies"
         # generate build path 
         self.build_path = f"{self.template_path}_{self.mpi_rank}/"
@@ -52,12 +57,6 @@ class ProgramGenerator:
         self.num_sweeps = [] # number of sweeps for each smoother.
         self.relaxation_weights = [] # sequence of relaxation factors for each smoother. 
         self.cgc_weights = [] # sequence of relaxations weights at intergrid transfer steps (meant for correction steps, weights in restriction steps is typically set to 1)
-        self.nx = 100
-        self.ny = 100
-        self.nz = 10
-        self.cx = 0.001
-        self.cy = 1
-        self.cz = 1
 
         #OUTPUT
         self.mgcycle= "" # the command line arguments for MG specification in hyteg.
@@ -127,8 +126,8 @@ class ProgramGenerator:
             assert state_lvl >= cur_lvl
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
-                    while cur_lvl > self.min_level:
-                        self.smoothers.append(Smoothers.GS_Forward)
+                    while cur_lvl > self.cgs_level:
+                        self.smoothers.append(Smoothers.GaussSeidel)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
                         self.intergrid_ops.append(InterGridOperations.Restriction)
@@ -141,7 +140,7 @@ class ProgramGenerator:
                         self.relaxation_weights.append(1)
                         self.intergrid_ops.append(InterGridOperations.Interpolation)
                         self.cgc_weights.append(1)
-                        self.smoothers.append(Smoothers.GS_Backward)
+                        self.smoothers.append(Smoothers.GaussSeidel)
                         self.num_sweeps.append(1)
                         cur_lvl +=1
                 else:
@@ -190,7 +189,7 @@ class ProgramGenerator:
         # sum of elements in intergrid_ops is zero, converting the enum to int
         assert sum([i.value for i in self.intergrid_ops]) == 0, "The sum of intergrid operations should be zero"
         # the grid hierarchy should be for self.max_level levels.
-        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level ==0, "The grid hierarchy should be for self.max_level levels"
+        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level -self.cgs_level ==0, "The grid hierarchy should be for self.max_level - self.min_levels"
         # length of intergrid_ops is one less than length of smoothers
         assert len(self.intergrid_ops) == len(self.smoothers) - 1, "The number of intergrid operations should be one less than the number of nodes in the mg cycle"
         # length of smoothing weights is equal to length of smoothers and num_sweeps
@@ -217,9 +216,6 @@ class ProgramGenerator:
         self.mgcycle.append("-smootherWeights")
         self.mgcycle.append(list_to_string(self.relaxation_weights))
 
-    def compile_code(self):
-        subprocess.run(['make','clean'],cwd=self.build_path)
-        subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
         output = subprocess.run([f"./{self.problem}"] + cmd_args, capture_output=True, text=True, cwd=self.build_path)
@@ -232,7 +228,6 @@ class ProgramGenerator:
         run_time = [1e100] * self.n_individuals
         n_iterations =[1e100] * self.n_individuals
         convergence_factor = [1e100] *  self.n_individuals
-        solve_phase = False
         i = 0 
         for line in output_lines:
             if "Convergence Factor" in line:
