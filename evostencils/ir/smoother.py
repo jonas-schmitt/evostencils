@@ -74,3 +74,19 @@ def generate_symmetricsor(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hyteg_smoothers.SymmtericSOR
     return op
+def generate_gaussseidel(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.GaussSeidel
+    return op
+def generate_symmetricgaussseidel(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.SymmetricGaussSeidel
+    return op
+def generate_chebyshev(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.Chebyshev
+    return op
+def generate_uzawa(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hyteg_smoothers.Uzawa
+    return op
