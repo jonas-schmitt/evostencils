@@ -113,6 +113,7 @@ class ProgramGenerator:
         cur_lvl = self.max_level # finest level
         first_state_lvl = self.list_states[0]['level']
         # restrict from the finest level until first_state_lvl is reached
+        n_cgs = 0
         while cur_lvl > first_state_lvl:
             self.smoothers.append(Smoothers.NoSmoothing)
             self.relaxation_weights.append(0)

@@ -574,6 +574,7 @@ class CoarseGridSolver(Entity):
         shape = operator.shape
         self._operator = operator
         self._expression = expression
+        self.additional_info = {}
         super().__init__(name, operator.grid, shape)
 
     @staticmethod
@@ -658,6 +659,7 @@ class Cycle(Expression):
         self.rhs = rhs
         self.correction = correction
         self.relaxation_factor = relaxation_factor
+        self.additional_info = {}
         self.partitioning = partitioning
         self.predecessor = predecessor
         self.global_id = None

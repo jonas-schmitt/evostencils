@@ -465,6 +465,16 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
     terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
     types = Types(0, FAS=FAS)
+
+    if use_hyteg:
+        pset = PrimitiveSetTyped("main", [], types.S_h)
+        cgs_tolerance = [1e-3, 1e-5, 1e-7]
+        cgs_level = [0, 1, 2]
+        for i in cgs_tolerance:
+            pset.addTerminal(i, types.CGSTolerance)
+        for i in cgs_level:
+            pset.addTerminal(i, types.CGSLevel)
+    else:
     pset = PrimitiveSetTyped("main", [], types.S_h)
     pset.addTerminal((approximation, rhs), types.S_guard_h, 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, terminals.no_partitioning.get_name())
