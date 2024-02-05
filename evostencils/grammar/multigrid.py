@@ -13,6 +13,10 @@ from functools import reduce
 
 use_hypre = False
 use_hyteg = True
+optimize_cgs = False
+optimize_cgc_scalingfactor = False
+cgs_tolerance = []
+cgs_level = []
 class OperatorInfo:
     def __init__(self, name, level, stencil, operator_type=base.Operator):
         self._name = name
@@ -228,6 +232,10 @@ class Types:
         self.P_2h = Type(gen_id("P"))
         self.CGS_2h = Type(gen_id("CGC"))
 
+        # Coarse-Grid Solver Types
+        self.CGSTolerance  = self._init_type("CGSTolerance", previous_types)
+        self.CGSLevel  = self._init_type("CGSLevel", previous_types)
+
         # General Types
         self.Partitioning = self._init_type("Partitioning", previous_types)
         self.RelaxationFactorIndex = self._init_type("RelaxationFactorIndex", previous_types)
@@ -260,7 +268,10 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         return cycle
 
     def update(relaxation_factor_index, partitioning_, cycle):
-        relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
+        if relaxation_factor_index == -1: # scaling factor for cgc is not optimized, fixed to 1.0
+            relaxation_factor = 1.0
+        else:
+            relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
         rhs = cycle.rhs
         cycle.relaxation_factor = relaxation_factor
         cycle.partitioning = partitioning_
@@ -299,65 +310,88 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         cycle = restrict(restriction_operator, cycle)
         return initiate_cycle(coarse_operator, coarse_approximation, cycle)
 
-    def update_with_coarse_grid_correction(relaxation_factor_index, prolongation_operator, state, restriction_operator=None):
+    def update_with_coarse_grid_correction(prolongation_operator, state, relaxation_factor_index=-1, restriction_operator=None):
         cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
         return update(relaxation_factor_index, terminals.no_partitioning, cycle)
-
-    def smoothing(relaxation_factor_index, partitioning_, generate_smoother, cycle):
+    
+    def smoothing(partitioning_, generate_smoother, cycle, relaxation_factor_index=-1):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
         smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
         return update(relaxation_factor_index, partitioning_, cycle)
 
     def decoupled_jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_decoupled_jacobi, cycle)
+        return smoothing(partitioning_, smoother.generate_decoupled_jacobi, cycle, relaxation_factor_index)
 
     def collective_jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_collective_jacobi, cycle)
+        return smoothing(partitioning_, smoother.generate_collective_jacobi, cycle, relaxation_factor_index)
 
     def collective_block_jacobi(relaxation_factor_index, block_shape, cycle):
         def generate_collective_block_jacobi_fixed(operator):
             return smoother.generate_collective_block_jacobi(operator, block_shape)
 
-        return smoothing(relaxation_factor_index, part.Single, generate_collective_block_jacobi_fixed, cycle)
+        return smoothing(part.Single, generate_collective_block_jacobi_fixed, cycle, relaxation_factor_index)
 
     def jacobi_picard(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_jacobi_picard, cycle)
+        return smoothing(partitioning_, smoother.generate_jacobi_picard, cycle, relaxation_factor_index)
 
     def jacobi_newton(relaxation_factor_index, partitioning_, n_newton_steps, cycle):
         def generate_jacobi_newton_fixed(operator):
             return smoother.generate_jacobi_newton(operator, n_newton_steps)
 
-        return smoothing(relaxation_factor_index, partitioning_, generate_jacobi_newton_fixed, cycle)
+        return smoothing(partitioning_, generate_jacobi_newton_fixed, cycle, relaxation_factor_index)
     
     # smoothers in hypre
     def jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_jacobi, cycle)
+        return smoothing(partitioning_, smoother.generate_jacobi, cycle, relaxation_factor_index)
     def GS_forward(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_GS_forward, cycle)
+        return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index)
     def GS_backward(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_GS_backward, cycle)
+        return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index)
     
     # smoothers in hyteg
     def SOR(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_sor, cycle)
+        return smoothing(partitioning_, smoother.generate_sor, cycle, relaxation_factor_index)
     def SymmtericSOR(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_symmetricsor, cycle)
+        return smoothing(partitioning_, smoother.generate_symmetricsor, cycle, relaxation_factor_index)
     def WeightedJacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_weightedjacobi, cycle)
-    def GaussSeidel(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_gaussseidel, cycle)
+        return smoothing(partitioning_, smoother.generate_weightedjacobi, cycle, relaxation_factor_index)
+    def GaussSeidel(partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_gaussseidel, cycle)
     def Uzawa(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_uzawa, cycle)
-    def SymmetricGaussSeidel(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_symmetricgaussseidel, cycle)
+        return smoothing(partitioning_, smoother.generate_uzawa, cycle, relaxation_factor_index)
+    def SymmetricGaussSeidel(partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_symmetricgaussseidel, cycle)
     def Chebyshev(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(relaxation_factor_index, partitioning_, smoother.generate_chebyshev, cycle)
+        return smoothing(partitioning_, smoother.generate_chebyshev, cycle, relaxation_factor_index)
     
-    
-    def correct_with_coarse_grid_solver(relaxation_factor_index, prolongation_operator, coarse_grid_solver,
-                                        restriction_operator, cycle):
+    def contains_coarse_grid_solver(expression):
+        expr_type = type(expression).__name__
+
+        if expr_type == "Cycle":
+            return contains_coarse_grid_solver(expression.approximation) or contains_coarse_grid_solver(expression.correction)
+        elif expr_type == "Multiplication":
+            op_type = type(expression.operand1).__name__
+            if op_type == "CoarseGridSolver":
+                return True
+            else:
+                return contains_coarse_grid_solver(expression.operand2)
+        elif "Residual" in expr_type:
+            return contains_coarse_grid_solver(expression.approximation) or contains_coarse_grid_solver(expression.rhs)
+        else:
+            return False
+
+    def correct_with_coarse_grid_solver(prolongation_operator, coarse_grid_solver,
+                                        restriction_operator, cycle, cgs_tolerance=None, cgs_level=None, relaxation_factor_index=-1):
         cycle = restrict(restriction_operator, cycle)
+        
+        # set the cgs_tolerance and cgs_level
+        if optimize_cgs and not contains_coarse_grid_solver(cycle):
+            if cgs_tolerance is not None:
+                coarse_grid_solver.additional_info['CGStol'] = cgs_tolerance
+            if cgs_level is not None:
+                coarse_grid_solver.additional_info['CGSlvl'] = cgs_level
+        
         if FAS:
             approximation_c = base.mul(coarse_grid_solver, cycle.correction)
             restricted_solution_FAS = base.mul(restriction_operator, cycle.approximation)
@@ -386,8 +420,8 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         # add/remove smoothers for the optimization here.
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
         add_primitive(pset, WeightedJacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"weightedjacobi_{depth}")
-        add_primitive(pset, GaussSeidel, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"gauseeidel_{depth}")
-        add_primitive(pset, SymmetricGaussSeidel, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"symmetricgaussseidel_{depth}")     
+        add_primitive(pset, GaussSeidel, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"gauseeidel_{depth}")
+        add_primitive(pset, SymmetricGaussSeidel, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"symmetricgaussseidel_{depth}")     
     else:
         # start: Exclude for FAS
         if not FAS:
@@ -403,22 +437,57 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
     if not coarsest:
         if FAS:
             pset.addPrimitive(update_with_coarse_grid_correction,
-                              [types.RelaxationFactorIndex, types.P_2h, types.S_2h, types.R_h],
+                              [types.P_2h, types.S_2h, types.RelaxationFactorIndex, types.R_h],
                               types.S_h,
                               f"update_with_coarse_grid_correction_{depth}")
             pset.addPrimitive(update_with_coarse_grid_correction,
-                              [types.RelaxationFactorIndex, types.P_2h, types.S_guard_2h, types.R_h],
+                              [types.P_2h, types.S_guard_2h, types.RelaxationFactorIndex, types.R_h],
                               types.S_guard_h,
                               f"update_with_coarse_grid_correction_{depth}")
 
+        elif not optimize_cgc_scalingfactor:
+            add_primitive(pset, update_with_coarse_grid_correction, [types.P_2h], [types.S_2h, types.S_guard_2h], [types.S_h, types.S_guard_h], f"update_with_coarse_grid_correction_{depth}")
         else:
-
-            add_primitive(pset, update_with_coarse_grid_correction, [types.RelaxationFactorIndex, types.P_2h], [types.S_2h, types.S_guard_2h], [types.S_h, types.S_guard_h], f"update_with_coarse_grid_correction_{depth}")
-
+            pset.addPrimitive(update_with_coarse_grid_correction,   
+                              [types.P_2h, types.S_2h, types.RelaxationFactorIndex, types.R_h],
+                              types.S_h,
+                              f"update_with_coarse_grid_correction_{depth}")
+            pset.addPrimitive(update_with_coarse_grid_correction,
+                              [types.P_2h, types.S_guard_2h, types.RelaxationFactorIndex, types.R_h],
+                              types.S_guard_h,
+                              f"update_with_coarse_grid_correction_{depth}")         
         add_primitive(pset, coarsening, [types.A_2h, types.x_2h, types.R_h], [types.C_h, types.C_guard_h], [types.C_2h, types.C_guard_2h], f"coarsening_{depth}")
 
     else:
-        add_primitive(pset, correct_with_coarse_grid_solver, [types.RelaxationFactorIndex, types.P_2h, types.CGS_2h, types.R_h], [types.C_h, types.C_guard_h], [types.S_h, types.S_h], f'correct_with_coarse_grid_solver_{depth}')
+        if optimize_cgs:   
+            for i in cgs_tolerance:
+                pset.addTerminal(i, types.CGSTolerance)
+            for i in cgs_level:
+                pset.addTerminal(i, types.CGSLevel)
+        else:
+            dummy_value = -1
+            pset.addTerminal(dummy_value, types.CGSTolerance)
+            pset.addTerminal(dummy_value, types.CGSLevel)
+
+        if optimize_cgc_scalingfactor:
+            pset.addPrimitive(correct_with_coarse_grid_solver, 
+                            [types.P_2h, types.CGS_2h, types.R_h, types.C_h, types.CGSTolerance, types.CGSLevel, types.RelaxationFactorIndex],
+                            types.S_h, 
+                            f'correct_with_coarse_grid_solver_{depth}')
+            pset.addPrimitive(correct_with_coarse_grid_solver, 
+                            [types.P_2h, types.CGS_2h, types.R_h, types.C_guard_h, types.CGSTolerance, types.CGSLevel, types.RelaxationFactorIndex],
+                            types.S_h, 
+                            f'correct_with_coarse_grid_solver_{depth}')
+        else:
+            pset.addPrimitive(correct_with_coarse_grid_solver, 
+                            [types.P_2h, types.CGS_2h, types.R_h, types.C_h, types.CGSTolerance, types.CGSLevel],
+                            types.S_h, 
+                            f'correct_with_coarse_grid_solver_{depth}')
+            pset.addPrimitive(correct_with_coarse_grid_solver, 
+                            [types.P_2h, types.CGS_2h, types.R_h, types.C_guard_h, types.CGSTolerance, types.CGSLevel],
+                            types.S_h, 
+                            f'correct_with_coarse_grid_solver_{depth}')
+
         pset.addTerminal(terminals.coarse_grid_solver, types.CGS_2h, f'CGS_{depth + 1}')
 
 
@@ -465,16 +534,6 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     relaxation_factor_interval = np.linspace(0.1, 1.9, relaxation_factor_samples)
     terminals = Terminals(approximation, operator, coarse_operator, restriction_operators, prolongation_operators, coarse_grid_solver, relaxation_factor_interval, partitionings)
     types = Types(0, FAS=FAS)
-
-    if use_hyteg:
-        pset = PrimitiveSetTyped("main", [], types.S_h)
-        cgs_tolerance = [1e-3, 1e-5, 1e-7]
-        cgs_level = [0, 1, 2]
-        for i in cgs_tolerance:
-            pset.addTerminal(i, types.CGSTolerance)
-        for i in cgs_level:
-            pset.addTerminal(i, types.CGSLevel)
-    else:
     pset = PrimitiveSetTyped("main", [], types.S_h)
     pset.addTerminal((approximation, rhs), types.S_guard_h, 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, terminals.no_partitioning.get_name())
