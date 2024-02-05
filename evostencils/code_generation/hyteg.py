@@ -21,7 +21,7 @@ class Smoothers(Enum):
     Uzawa = 11
     GaussSeidel = 3
     SymmetricGaussSeidel = 9
-    CGS_GE = 9
+    CGS_GE = 15
     NoSmoothing = 0
 
 class ProgramGenerator:
@@ -57,6 +57,7 @@ class ProgramGenerator:
         self.num_sweeps = [] # number of sweeps for each smoother.
         self.relaxation_weights = [] # sequence of relaxation factors for each smoother. 
         self.cgc_weights = [] # sequence of relaxations weights at intergrid transfer steps (meant for correction steps, weights in restriction steps is typically set to 1)
+        self.cgs_tolerance = None
 
         #OUTPUT
         self.mgcycle= "" # the command line arguments for MG specification in hyteg.
@@ -79,7 +80,7 @@ class ProgramGenerator:
         expr_type = type(expression).__name__
         cur_lvl = expression.grid[0].level
         list_states = []
-        cur_state = {'level':cur_lvl,'correction_type':None, 'component':None,'relaxation_factor':None}
+        cur_state = {'level':cur_lvl,'correction_type':None, 'component':None,'relaxation_factor':None,'additional_info':None}
         if expr_type == "Cycle" and expression not in self.cycle_objs:
             self.cycle_objs.append(expression)
             list_states = self.traverse_graph(expression.approximation) + self.traverse_graph(expression.correction)
@@ -101,6 +102,7 @@ class ProgramGenerator:
                 cur_state['correction_type'] = CorrectionTypes.Smoothing
                 cur_state['component'] = Smoothers.CGS_GE
                 cur_state['relaxation_factor'] = 1
+                cur_state['additional_info'] = expression.operand1.additional_info
                 list_states.append(cur_state)
             return list_states
         elif "Residual" in expr_type:
@@ -127,6 +129,9 @@ class ProgramGenerator:
             assert state_lvl >= cur_lvl
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
+                    if state['additional_info']:
+                        self.cgs_level = state['additional_info']['CGSlvl']
+                        self.cgs_tolerance = state['additional_info']['CGStol']
                     while cur_lvl > self.cgs_level:
                         self.smoothers.append(Smoothers.GaussSeidel)
                         self.num_sweeps.append(1)
@@ -190,7 +195,7 @@ class ProgramGenerator:
         # sum of elements in intergrid_ops is zero, converting the enum to int
         assert sum([i.value for i in self.intergrid_ops]) == 0, "The sum of intergrid operations should be zero"
         # the grid hierarchy should be for self.max_level levels.
-        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level -self.cgs_level ==0, "The grid hierarchy should be for self.max_level - self.min_levels"
+        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level -self.cgs_level ==0, "The grid hierarchy should be for self.max_level - self.cgs_levels"
         # length of intergrid_ops is one less than length of smoothers
         assert len(self.intergrid_ops) == len(self.smoothers) - 1, "The number of intergrid operations should be one less than the number of nodes in the mg cycle"
         # length of smoothing weights is equal to length of smoothers and num_sweeps
@@ -216,6 +221,12 @@ class ProgramGenerator:
         self.mgcycle.append(list_to_string(self.smoothers))
         self.mgcycle.append("-smootherWeights")
         self.mgcycle.append(list_to_string(self.relaxation_weights))
+        if not self.cgs_tolerance is None:
+            self.mgcycle.append("-coarseGridResidualTolerance")
+            self.mgcycle.append(str(self.cgs_tolerance))
+            self.mgcycle.append("-minLevel")   
+            self.mgcycle.append(str(self.cgs_level))
+
 
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
