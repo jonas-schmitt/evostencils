@@ -421,7 +421,9 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
         add_primitive(pset, WeightedJacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"weightedjacobi_{depth}")
         add_primitive(pset, GaussSeidel, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"gauseeidel_{depth}")
-        add_primitive(pset, SymmetricGaussSeidel, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"symmetricgaussseidel_{depth}")     
+        
+        # SymmetricGaussSeidel not valid for 2D problems, backward smoothing not supported in HyTeG
+        # add_primitive(pset, SymmetricGaussSeidel, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"symmetricgaussseidel_{depth}")     
     else:
         # start: Exclude for FAS
         if not FAS:
