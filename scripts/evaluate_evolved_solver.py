@@ -1,13 +1,21 @@
+import os,sys
+# Compute the path to the directory containing `evostencils`.
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+
+# Add this path to sys.path.
+sys.path.append(parent_dir)
+sys.path.append(os.getcwd())
+
 from matplotlib import patches
 from evostencils.optimization.program import Optimizer
-from evostencils.optimization.program import Optimizer
-from evostencils.code_generation.hypre import ProgramGenerator
+from evostencils.code_generation.hyteg import ProgramGenerator
 from evostencils.grammar import multigrid as initialization
 from evostencils.ir import base, system
-import os
 import sympy
+from mpi4py import MPI
 import subprocess,re
 import matplotlib.pyplot as plt
+from deap import tools, gp
 
 
 def evalaute(nx, ny, nz, max_level, min_level, grammar_string):
@@ -271,77 +279,102 @@ def parse_logoutput(logfile):
                     n_iterations.append(int(match.group()))
     return n_iterations
 
+
+def create_optimizer_pset(min_level, max_level):
+    # Set up MPI
+    comm = MPI.COMM_WORLD
+    mpi_rank = comm.Get_rank()
+
+    dimension = 2
+    finest_grid = 'u'
+    coarsening_factors = [2, 2]
+    equations = []
+    operators = []
+    fields = [sympy.Symbol('u')]
+    for i in range(min_level, max_level + 1):
+        equations.append(initialization.EquationInfo('solEq', i, f"( xxxxxxx@xxx * x@xxx ) == xxxxx@xxx"))
+        operators.append(initialization.OperatorInfo('RestrictionNode', i, None, base.Restriction))
+        operators.append(initialization.OperatorInfo('ProlongationNode', i, None, base.Prolongation))
+        operators.append(initialization.OperatorInfo('Laplace', i, None, base.Operator))
+    size = 2 ** max_level
+    grid_size = tuple([size] * dimension)
+    h = 1 / (2 ** max_level)
+    step_size = tuple([h] * dimension)
+    tmp = tuple([2] * dimension)
+    coarsening_factors = [tmp for _ in range(len(fields))]
+    finest_grid = [base.Grid(grid_size, step_size, max_level) for _ in range(len(fields))]
+    convergence_evaluator = None
+    performance_evaluator = None
+    checkpoint_directory_path = None
+    optimizer = Optimizer(dimension, finest_grid, coarsening_factors, min_level, max_level, equations, operators, fields,
+                            mpi_comm=comm, mpi_rank=mpi_rank, number_of_mpi_processes=1,
+                            program_generator=program_generator,
+                            convergence_evaluator=convergence_evaluator,
+                            performance_evaluator=performance_evaluator,
+                            checkpoint_directory_path=checkpoint_directory_path)
+    
+    pset, _ = \
+    initialization.generate_primitive_set(optimizer.approximation, optimizer.rhs, dimension,
+                                                    coarsening_factors, max_level, equations,
+                                                    operators, fields,
+                                                    maximum_local_system_size=8,
+                                                    depth=max_level - min_level)
+    return optimizer, pset
+
+def print_jobscript(save_path, build_path, tag, cmd_line_args):
+    with open(f"{save_path}/job_{tag}.sh", 'w', newline='\n') as f:
+        print("#!/bin/bash -l", file=f)
+        print(f"#SBATCH --nodes=1", file=f)
+        print(f"#SBATCH --time=00:30:00", file=f)
+        print(f"#SBATCH --cpu-freq=2200000-2200000", file=f)
+        print(f"#SBATCH --job-name=evostencils_{tag}", file=f)
+        print(f"#SBATCH --export=NONE", file=f)
+        print(f"#SBATCH --output=out_evo_{tag}", file=f)
+        print(f"unset SLURM_EXPORT_ENV", file=f)
+        print(f"cd {build_path}", file=f)
+
+
+        for cmd_line_arg in cmd_line_args:
+            cmd_line_arg = " ".join(cmd_line_arg)
+            print(f"./{cmd_line_arg}",file=f)
+
+
 if __name__ == "__main__":
-    min_level = [6,7]
-    max_level = [10,11]
-    scaling_type = "weak"
-    problem_name = "poisson"
-    amg_precond = False
-    viz_cycle_struct = False
-    print_jobs = False
-    plot_output = False
-    problem_folder = "test2_anisotropic"
-    cwd = os.getcwd()
-    experiment_folder = "data_4"
+    number_of_flexible_levels = 5
+    max_level_list = [4,5,6,7,8,9]
+    experiment_folder = "/home/hpc/iwia/iwia058h/evostencils/2dpoisson_allsmoothers"
+    number_of_experiments = 5
+    binary = "MultigridStudies"
+    build_path = "/home/hpc/iwia/iwia058h/hyteg-build_local/apps/MultigridStudies"
+    save_path = f"{experiment_folder}/scaling"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)    
+    hof_indices = [10,24,33,41,56]
+    cgs_level = 0
+    
+    '''
+    for max_level in max_level_list:
+        program_generator = ProgramGenerator(max_level - number_of_flexible_levels + 1, max_level, cgs_level)
+        optimizer, pset = create_optimizer_pset(max_level - number_of_flexible_levels + 1, max_level)
+        global_hof = tools.ParetoFront()
+        for j in range(number_of_experiments):
+            pop = optimizer.load_data_structure(f'{experiment_folder}/data_{j}/pop_0.p')
+            global_hof.update(pop)
 
-    if scaling_type is not None:
-        folder_path = f"{cwd}/{problem_folder}/{experiment_folder}/hof_0"
-        save_results_folder = f"{cwd}/{problem_folder}/{experiment_folder}/{scaling_type}_scaling"
-        if not os.path.exists(save_results_folder):
-            os.makedirs(save_results_folder)
-        # find all text files in folder
-        # files_list = os.listdir(folder_path)
-        files_list = ["individual_0.txt", "individual_1.txt", "individual_2.txt", "individual_20.txt", "individual_30.txt", "individual_40.txt"]
-        #files_list = ["individual_0.txt"]
-        #files_list = ["individual_0.txt", "individual_4.txt", "individual_8.txt", "individual_16.txt"]
-        #files_list = ["individual_0.txt", "individual_4.txt", "individual_8.txt", "individual_16.txt","individual_24.txt", "individual_32.txt", "individual_40.txt", "individual_48.txt"]
-        #files = [f for f in files_list if os.path.isfile(os.path.join(folder_path, f))]
-        # read string from files
-        for file in files_list:
-            amg_args = []
-            with open(f"{folder_path}/{file}", 'r') as f:
-                grammar_string = f.read()
-            tag = experiment_folder + "_" + file.split(".")[0]
-            for i in range(len(min_level)):
-                amg_args.append(getamgcycle(min_level[i], max_level[i], grammar_string))
-            print_jobscript(save_results_folder, tag, amg_args,problem=problem_name,precond=amg_precond,scaling=scaling_type)
-            subprocess.check_call(["sbatch", f"job_{tag}.sh"], cwd=save_results_folder)
+        cmd_line_args_list = [] 
+        for index in hof_indices:
+            cmd_line_args = [binary, f"{binary}.prm"]
+            individual = global_hof[index]  
+            expression, _  = gp.compile(individual, pset)
+            cmd_line_args += program_generator.generate_cycle_function(expression)
+            cmd_line_args_list.append(cmd_line_args)
 
-    if viz_cycle_struct:
-        folder_path = f"{cwd}/{problem_folder}/{experiment_folder}/hof_0"
-        files_list = os.listdir(folder_path)
-        files = [f for f in files_list if os.path.isfile(os.path.join(folder_path, f))]
-        save_results_folder = f"{cwd}/{problem_folder}/{experiment_folder}/solvers"
-        if not os.path.exists(save_results_folder):
-            os.makedirs(save_results_folder)
-        # read string from files
-        for file in files:
-            amg_args = []
-            with open(f"{folder_path}/{file}", 'r') as f:
-                grammar_string = f.read()
-            tag = experiment_folder + "_" + file.split(".")[0]
-            save_path = save_results_folder + "/" + tag + ".png"
-            viz_cycle(grammar_string,save_path)
-
-    if plot_output:
-        n_procs = [1,8,27,64,125,216]
-        # find all out_evo files in save_results_folder
-        files = [f for f in os.listdir(save_results_folder) if os.path.isfile(os.path.join(save_results_folder, f)) and "out_evo" in f]
-        # read string from files
-        for file in files:
-            n_iterations = parse_logoutput(f"{save_results_folder}/{file}")
-            file_no = file.split("_")[-1]
-            # use last len(n_procs) entries of n_iterations
-            n_iterations = n_iterations[-len(n_procs):]
-            plt.plot(n_procs, n_iterations, label=file_no)
-        # mark x label as number of processes
-        plt.xticks(n_procs)
-        # wrap with seaborn
-        import seaborn as sns
-        sns.set()
-        # set labels
-        plt.xlabel("Number of Processes")
-        plt.ylabel("Number of Iterations")
-        plt.legend()
-        #save plot as pdf   
-        plt.savefig(f"{save_results_folder}/weak_scaling_4nodes.pdf")
+        print_jobscript(save_path, build_path, f"maxLvl{max_level}", cmd_line_args_list)
+        subprocess.run(["sbatch", f"job_maxLvl{max_level}.sh"], cwd=save_path)
+    ''' 
+    
+    for max_level in max_level_list:
+        print_jobscript(save_path, f"maxLvl{max_level}", f"refsolvers_maxLvl{max_level}", [[binary, f"{binary}.prm", "-preSmoothingSteps", 1 ,"-postSmoothingSteps" ,1 ,"-maxLevel", max_level],
+                                                                                           [binary, f"{binary}.prm", "-preSmoothingSteps", 2 ,"-postSmoothingSteps" ,2 ,"-maxLevel", max_level],
+                                                                                           [binary, f"{binary}.prm", "-preSmoothingSteps", 3 ,"-postSmoothingSteps" ,3 ,"-maxLevel", max_level]])
+        subprocess.run(["sbatch", f"job_refsolvers_maxLvl{max_level}.sh"], cwd=save_path)
