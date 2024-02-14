@@ -10,6 +10,7 @@ import math
 import numpy as np
 import time
 import os
+import sympy
 # from mpi4py import MPI
 
 use_hypre=False
@@ -65,11 +66,39 @@ def load_checkpoint_from_file(filename):
 
 
 class Optimizer:
-    def __init__(self, dimension, finest_grid, coarsening_factor, min_level, max_level, equations, operators, fields,
-                 program_generator, convergence_evaluator=None, performance_evaluator=None,
+    def __init__(self, min_level, max_level,program_generator,
                  mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
                  epsilon=1e-12, infinity=1e100, checkpoint_directory_path='./'):
         assert program_generator is not None, "At least a program generator must be available"
+        
+        # ------------dummy inputs: deprecated and code needs refactoring--------------
+
+         # Obtain extracted information from program generator
+        dimension = 2#program_generator.dimension  # Dimensionality of the problem
+        finest_grid = 'u'#program_generator.finest_grid  # Representation of the finest grid
+        coarsening_factor = [2,2]#program_generator.coarsening_factor
+        min_level = program_generator.min_level  # Minimum discretization level
+        max_level = program_generator.max_level  # Maximum discretization level
+        equations = [] #program_generator.equations  # System of PDEs in SymPy
+        operators = [] #program_generator.operators  # Discretized differential operators
+        fields = [sympy.Symbol('u')] #program_generator.fields  # Variables that occur within system of PDEs
+        for i in range(min_level, max_level + 1):
+            equations.append(multigrid_initialization.EquationInfo('solEq', i, f"( Laplace@{i} * u@{i} ) == RHS_u@{i}"))
+            operators.append(multigrid_initialization.OperatorInfo('RestrictionNode', i, None, base.Restriction))
+            operators.append(multigrid_initialization.OperatorInfo('ProlongationNode', i, None, base.Prolongation))
+            operators.append(multigrid_initialization.OperatorInfo('Laplace', i, None, base.Operator))
+        size = 2 ** max_level
+        grid_size = tuple([size] * dimension)
+        h = 1 / (2 ** max_level)
+        step_size = tuple([h] * dimension)
+        tmp = tuple([2] * dimension)
+        coarsening_factor = [tmp for _ in range(len(fields))]
+        finest_grid = [base.Grid(grid_size, step_size, max_level) for _ in range(len(fields))]
+        convergence_evaluator = None
+        performance_evaluator = None
+        
+        # --------------------------------------------------------------------------------
+
         self._dimension = dimension
         self._finest_grid = finest_grid
         solution_entries = [base.Approximation(f.name, g) for f, g in zip(fields, finest_grid)]
