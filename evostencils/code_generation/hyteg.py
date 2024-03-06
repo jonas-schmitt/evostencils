@@ -314,7 +314,7 @@ class ProgramGenerator:
         self.list_states = self.traverse_graph(expression)
         self.set_mginputs()
         self.generate_cmdline_args()
-        return str(self.mgcycle)
+        return self.mgcycle
 
     # dummy functions to maintain compatibility in the optimisation pipeline
     def generate_storage(self, *args):
