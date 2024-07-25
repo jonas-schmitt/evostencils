@@ -68,7 +68,7 @@ def load_checkpoint_from_file(filename):
 class Optimizer:
     def __init__(self, min_level, max_level,program_generator,
                  mpi_comm=None, mpi_rank=0, number_of_mpi_processes=1,
-                 epsilon=1e-12, infinity=1e100, checkpoint_directory_path='./'):
+                 epsilon=1e-12, infinity=1e100, checkpoint_directory_path='./',checkpoint_frequency=1e9):
         assert program_generator is not None, "At least a program generator must be available"
         
         # ------------dummy inputs: deprecated and code needs refactoring--------------
@@ -117,6 +117,7 @@ class Optimizer:
         self._epsilon = epsilon
         self._infinity = infinity
         self._checkpoint_directory_path = checkpoint_directory_path
+        self._checkpoint_frequency = checkpoint_frequency
         self._init_creator()
         self._total_number_of_evaluations = 0
         self._failed_evaluations = 0
@@ -941,7 +942,7 @@ class Optimizer:
                                     crossover_probability, mutation_probability,
                                     min_level, max_level, solver_program, storages, best_expression, evaluation_samples, logbooks,
                                     model_based_estimation=model_based_estimation, pde_parameter_values=pde_parameter_values,
-                                    checkpoint_frequency=2, checkpoint=tmp, use_random_search=use_random_search)
+                                    checkpoint_frequency=self._checkpoint_frequency, checkpoint=tmp, use_random_search=use_random_search)
             if len(pop[0].fitness.values) == 2:
                 pop = sorted(pop, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
                 hof = sorted(hof, key=lambda ind: estimate_execution_time(ind.fitness.values[0], ind.fitness.values[1]))
