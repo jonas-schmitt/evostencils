@@ -651,7 +651,7 @@ class Residual(Expression):
 
 class Cycle(Expression):
     def __init__(self, approximation, rhs, correction=None, partitioning=part.Single,
-                 relaxation_factor=1.0, predecessor=None):
+                 relaxation_factor=1.0, relaxation_factor_outer=1.0, predecessor=None):
         # assert iterate.shape == correction.shape, "Shapes must match"
         # assert iterate.grid.size == correction.grid.size and iterate.grid.step_size == correction.grid.step_size, \
         #    "Grids must match"
@@ -659,6 +659,7 @@ class Cycle(Expression):
         self.rhs = rhs
         self.correction = correction
         self.relaxation_factor = relaxation_factor
+        self.relaxation_factor_outer = relaxation_factor_outer
         self.additional_info = {}
         self.partitioning = partitioning
         self.predecessor = predecessor
@@ -693,7 +694,7 @@ class Cycle(Expression):
         approximation = transform(self.approximation, *args)
         rhs = transform(self.rhs, *args)
         correction = transform(self.correction, *args)
-        return Cycle(approximation, rhs, correction, self.partitioning, self.relaxation_factor, self.predecessor)
+        return Cycle(approximation, rhs, correction, self.partitioning, self.relaxation_factor, self.relaxation_factor_outer, self.predecessor)
 
     def mutate(self, f: callable, *args):
         f(self.correction, *args)

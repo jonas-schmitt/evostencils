@@ -267,13 +267,19 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         cycle.correction = base.Multiplication(operator, cycle.correction)
         return cycle
 
-    def update(relaxation_factor_index, partitioning_, cycle):
-        if relaxation_factor_index == -1: # scaling factor for cgc is not optimized, fixed to 1.0
+    def update(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
+        if relaxation_factor_index == -1:
             relaxation_factor = 1.0
         else:
             relaxation_factor = terminals.relaxation_factor_interval[relaxation_factor_index]
+        if relaxation_factor_index_outer == -1: 
+            relaxation_factor_outer = 1.0   
+        else:
+            relaxation_factor_outer = terminals.relaxation_factor_interval[relaxation_factor_index_outer]
+        
         rhs = cycle.rhs
         cycle.relaxation_factor = relaxation_factor
+        cycle.relaxation_factor_outer = relaxation_factor_outer
         cycle.partitioning = partitioning_
         approximation = cycle
         return approximation, rhs
@@ -312,13 +318,13 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
 
     def update_with_coarse_grid_correction(prolongation_operator, state, relaxation_factor_index=-1, restriction_operator=None):
         cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
-        return update(relaxation_factor_index, terminals.no_partitioning, cycle)
+        return update(relaxation_factor_index, -1, terminals.no_partitioning, cycle)
     
-    def smoothing(partitioning_, generate_smoother, cycle, relaxation_factor_index=-1):
+    def smoothing(partitioning_, generate_smoother, cycle, relaxation_factor_index=-1, relaxation_factor_index_outer=-1):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
         smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
-        return update(relaxation_factor_index, partitioning_, cycle)
+        return update(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle)
 
     def decoupled_jacobi(relaxation_factor_index, partitioning_, cycle):
         return smoothing(partitioning_, smoother.generate_decoupled_jacobi, cycle, relaxation_factor_index)
@@ -342,12 +348,12 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         return smoothing(partitioning_, generate_jacobi_newton_fixed, cycle, relaxation_factor_index)
     
     # smoothers in hypre
-    def jacobi(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_jacobi, cycle, relaxation_factor_index)
-    def GS_forward(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index)
-    def GS_backward(relaxation_factor_index, partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index)
+    def jacobi(relaxation_factor_index, relaxation_factor_index_outer,  partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_jacobi, cycle, relaxation_factor_index, relaxation_factor_index_outer)
+    def GS_forward(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
+    def GS_backward(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
     
     # smoothers in hyteg
     def SOR(relaxation_factor_index, partitioning_, cycle):
@@ -400,7 +406,7 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
             cycle.correction = correction
         else:
             cycle = apply(prolongation_operator, apply(coarse_grid_solver, cycle))
-        return update(relaxation_factor_index, terminals.no_partitioning, cycle)
+        return update(relaxation_factor_index, -1, terminals.no_partitioning, cycle)
 
     def add_primitive(pset, f, fixed_types, input_types, output_types, name):
         for t1, t2 in zip(input_types, output_types):
@@ -413,9 +419,9 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"decoupled_jacobi_{depth}")
 
     if use_hypre:
-        add_primitive(pset, jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
-        add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
-        add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
+        add_primitive(pset, jacobi, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
+        add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex,  types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
+        add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
     elif use_hyteg:
         # add/remove smoothers for the optimization here.
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
