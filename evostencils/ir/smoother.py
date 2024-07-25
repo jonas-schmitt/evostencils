@@ -59,7 +59,18 @@ def generate_GS_backward(operator: system.Operator):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.GS_Backward
     return op
-
+def generate_l1jacobi(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hypre_smoothers.l1Jacobi
+    return op
+def generate_l1GS_forward(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hypre_smoothers.l1GS_Forward
+    return op
+def generate_l1GS_backward(operator: system.Operator):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hypre_smoothers.l1GS_Backward
+    return op
 
 # hyteg smoothers
 def generate_sor(operator: system.Operator):

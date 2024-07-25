@@ -354,6 +354,13 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
     def GS_backward(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
         return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
+    def l1jacobi(partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1jacobi, cycle)
+    def l1GS_forward(partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1GS_forward, cycle)
+    def l1GS_backward(partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1GS_backward, cycle)
+            
     
     # smoothers in hyteg
     def SOR(relaxation_factor_index, partitioning_, cycle):
@@ -422,6 +429,9 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, jacobi, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
         add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex,  types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
         add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
+        add_primitive(pset, l1jacobi, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1jacobi_{depth}")
+        add_primitive(pset, l1GS_forward, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_forward_{depth}")
+        add_primitive(pset, l1GS_backward, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_backward_{depth}")
     elif use_hyteg:
         # add/remove smoothers for the optimization here.
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
