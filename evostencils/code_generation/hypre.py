@@ -28,7 +28,7 @@ class ProgramGenerator:
         self.mpi_rank = mpi_rank
 
         # HYPRE FILES
-        self.template_path = "../../hypre/src/evo_test"
+        self.template_path = "./evo_test"
         self.problem = "ij"
         # generate build path 
         self.build_path = f"{self.template_path}_{self.mpi_rank}/"
@@ -49,11 +49,12 @@ class ProgramGenerator:
         self.intergrid_ops = [] # sequence of inter-grid operations in the multigrid solver -> describes the cycle structure. 
         self.smoothers = [] # sequence of different smoothers used across the AMG cycle.
         self.num_sweeps = [] # number of sweeps for each smoother.
-        self.relaxation_weights = [] # sequence of relaxation factors for each smoother. 
+        self.relaxation_weights = [] # sequence of inner relaxation factors for each smoother. 
+        self.relaxation_weights_outer = [] # sequence of outer relaxation factors for each smoother.
         self.cgc_weights = [] # sequence of relaxations weights at intergrid transfer steps (meant for correction steps, weights in restriction steps is typically set to 1)
         self.nx = 100
         self.ny = 100
-        self.nz = 10
+        self.nz = 100
         self.cx = 0.001
         self.cy = 1
         self.cz = 1
@@ -72,6 +73,7 @@ class ProgramGenerator:
         self.smoothers.clear()
         self.num_sweeps.clear()
         self.relaxation_weights.clear()
+        self.relaxation_weights_outer.clear()
         self.cgc_weights.clear()
         self.amgcycle = ""
 
@@ -79,7 +81,7 @@ class ProgramGenerator:
         expr_type = type(expression).__name__
         cur_lvl = expression.grid[0].level
         list_states = []
-        cur_state = {'level':cur_lvl,'correction_type':None, 'component':None,'relaxation_factor':None}
+        cur_state = {'level':cur_lvl,'correction_type':None, 'component':None,'relaxation_factor':None, 'relaxation_factor_outer':None}
         if expr_type == "Cycle" and expression not in self.cycle_objs:
             self.cycle_objs.append(expression)
             list_states = self.traverse_graph(expression.approximation) + self.traverse_graph(expression.correction)
@@ -92,6 +94,7 @@ class ProgramGenerator:
                 cur_state['correction_type']= CorrectionTypes.Smoothing
                 cur_state['component'] = smoothing_operator.smoother_type
             cur_state['relaxation_factor']=expression.relaxation_factor
+            cur_state['relaxation_factor_outer']=expression.relaxation_factor_outer
             list_states.append(cur_state)
             return list_states
         elif expr_type == "Multiplication":
@@ -101,6 +104,7 @@ class ProgramGenerator:
                 cur_state['correction_type'] = CorrectionTypes.Smoothing
                 cur_state['component'] = Smoothers.CGS_GE
                 cur_state['relaxation_factor'] = 1
+                cur_state['relaxation_factor_outer'] = 1
                 list_states.append(cur_state)
             return list_states
         elif "Residual" in expr_type:
@@ -116,6 +120,7 @@ class ProgramGenerator:
         while cur_lvl > first_state_lvl:
             self.smoothers.append(Smoothers.NoSmoothing)
             self.relaxation_weights.append(0)
+            self.relaxation_weights_outer.append(0)
             self.num_sweeps.append(0)
             self.intergrid_ops.append(InterGridOperations.Restriction)
             self.cgc_weights.append(1)
@@ -130,14 +135,17 @@ class ProgramGenerator:
                         self.smoothers.append(Smoothers.GS_Forward)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
+                        self.relaxation_weights_outer.append(1)
                         self.intergrid_ops.append(InterGridOperations.Restriction)
                         self.cgc_weights.append(1)
                         cur_lvl -=1
                     self.smoothers.append(Smoothers.CGS_GE)
                     self.num_sweeps.append(1)
                     self.relaxation_weights.append(1)
+                    self.relaxation_weights_outer.append(1)
                     while cur_lvl < state_lvl:
                         self.relaxation_weights.append(1)
+                        self.relaxation_weights_outer.append(1)
                         self.intergrid_ops.append(InterGridOperations.Interpolation)
                         self.cgc_weights.append(1)
                         self.smoothers.append(Smoothers.GS_Backward)
@@ -146,6 +154,7 @@ class ProgramGenerator:
                 else:
                     self.smoothers.append(state['component'])
                     self.relaxation_weights.append(state['relaxation_factor'])
+                    self.relaxation_weights_outer.append(state['relaxation_factor_outer'])
                     self.num_sweeps.append(1)
             elif state['correction_type']==CorrectionTypes.CoarseGridCorrection: # coarse grid correction
                 self.intergrid_ops.append(InterGridOperations.Interpolation)
@@ -159,21 +168,25 @@ class ProgramGenerator:
                         self.smoothers.append(Smoothers.NoSmoothing)
                         self.num_sweeps.append(0)
                         self.relaxation_weights.append(0)
+                        self.relaxation_weights_outer.append(0)
                     while cur_lvl > next_state_lvl: # restrict and go down the grid hierarchy until next_state_lvl is reached.
                         self.intergrid_ops.append(InterGridOperations.Restriction)
                         self.cgc_weights.append(1)
                         self.smoothers.append(Smoothers.NoSmoothing)
                         self.num_sweeps.append(0)
                         self.relaxation_weights.append(0)
+                        self.relaxation_weights_outer.append(0)
                         cur_lvl -=1
                     self.smoothers.pop()
                     self.num_sweeps.pop()
                     self.relaxation_weights.pop()
+                    self.relaxation_weights_outer.pop()
                 # if consecutive coarse grid corrections are performed 
                 elif next_state_lvl > cur_lvl and state['correction_type']==next_state_correction_type==CorrectionTypes.CoarseGridCorrection:
                     self.smoothers.append(Smoothers.NoSmoothing)
                     self.num_sweeps.append(0)
                     self.relaxation_weights.append(0)
+                    self.relaxation_weights_outer.append(0)
                 # if consecutive smoothing steps are performed at the same level. 
                 elif next_state_lvl == cur_lvl and state['correction_type']==next_state_correction_type==CorrectionTypes.Smoothing:
                     self.intergrid_ops.append(InterGridOperations.AltSmoothing)
@@ -183,6 +196,7 @@ class ProgramGenerator:
                     self.smoothers.append(Smoothers.NoSmoothing)
                     self.num_sweeps.append(0)
                     self.relaxation_weights.append(0)
+                    self.relaxation_weights_outer.append(0)
  
     def generate_cmdline_args(self):
         # assert checks
@@ -193,7 +207,7 @@ class ProgramGenerator:
         # length of intergrid_ops is one less than length of smoothers
         assert len(self.intergrid_ops) == len(self.smoothers) - 1, "The number of intergrid operations should be one less than the number of nodes in the amg cycle"
         # length of smoothing weights is equal to length of smoothers and num_sweeps
-        assert len(self.smoothers) == len(self.relaxation_weights) == len(self.num_sweeps), "The number of smoothing weights should be equal to the number of nodes in the amg cycle"
+        assert len(self.smoothers) == len(self.relaxation_weights) == len(self.relaxation_weights_outer) == len(self.num_sweeps), "The number of smoothing weights should be equal to the number of nodes in the amg cycle"
         # length of cgc weights is equal to length of intergrid_ops
         assert len(self.intergrid_ops) == len(self.cgc_weights), "The number of coarse grid correction weights should be equal to the number of intergrid operations in the amg cycle"
         # list to comma separated string
@@ -208,7 +222,7 @@ class ProgramGenerator:
             return string[:-1]
         
         # generate the AMG cycle string
-        self.amgcycle = f"{len(self.intergrid_ops) + 1}/{list_to_string(self.intergrid_ops)}/{list_to_string(self.smoothers)}/{list_to_string(self.num_sweeps)}/{list_to_string(self.relaxation_weights)}/{list_to_string(self.cgc_weights)}"
+        self.amgcycle = f"{len(self.intergrid_ops) + 1}/{list_to_string(self.intergrid_ops)}/{list_to_string(self.smoothers)}/{list_to_string(self.num_sweeps)}/{list_to_string(self.relaxation_weights_outer)}/{list_to_string(self.relaxation_weights)}/{list_to_string(self.cgc_weights)}"
 
     def compile_code(self):
         subprocess.run(['make','clean'],cwd=self.build_path)
