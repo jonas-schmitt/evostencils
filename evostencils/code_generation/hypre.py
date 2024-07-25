@@ -15,8 +15,11 @@ class CorrectionTypes(Enum):
 class Smoothers(Enum):
     CGS_GE = 9
     Jacobi = 0
-    GS_Forward = 13
-    GS_Backward = 14
+    GS_Forward = 3
+    GS_Backward = 4
+    l1Jacobi = 18
+    l1GS_Forward = 13
+    l1GS_Backward = 14
     NoSmoothing = -1
 
 class ProgramGenerator:
@@ -132,7 +135,7 @@ class ProgramGenerator:
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
                     while cur_lvl > 0:
-                        self.smoothers.append(Smoothers.GS_Forward)
+                        self.smoothers.append(Smoothers.l1GS_Forward)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
                         self.relaxation_weights_outer.append(1)
@@ -148,7 +151,7 @@ class ProgramGenerator:
                         self.relaxation_weights_outer.append(1)
                         self.intergrid_ops.append(InterGridOperations.Interpolation)
                         self.cgc_weights.append(1)
-                        self.smoothers.append(Smoothers.GS_Backward)
+                        self.smoothers.append(Smoothers.l1GS_Backward)
                         self.num_sweeps.append(1)
                         cur_lvl +=1
                 else:
