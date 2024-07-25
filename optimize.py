@@ -1,5 +1,6 @@
 from evostencils.optimization.program import Optimizer
-from evostencils.code_generation.hyteg import ProgramGenerator
+from evostencils.code_generation.hypre import ProgramGenerator as ProgramGeneratorHypre
+from evostencils.code_generation.hyteg import ProgramGenerator as ProgramGeneratorHyteg
 import evostencils.grammar.multigrid as mg_grammar
 import os
 import sys
@@ -8,7 +9,7 @@ from mpi4py import MPI
 
 def main():
     cwd = f'{os.getcwd()}'
-    eval_software = "hyteg"
+    eval_software = "hypre"
 
     # I. Set up MPI
     comm = MPI.COMM_WORLD
@@ -23,21 +24,26 @@ def main():
 
     # II. problem specifications
     problem_name = "2dpoisson"
-    flexmg_min_level = 0
-    flexmg_max_level = 4
+    flexmg_min_level = 6
+    flexmg_max_level = 10
     cgs_level = 0
     mg_grammar.optimize_cgs = False # optimises the tolerance and level of the coarse-grid solver
     if mg_grammar.optimize_cgs:
         mg_grammar.cgs_tolerance = [1e-3, 1e-5, 1e-7, 1e-9] # set the options for the tolerance
         mg_grammar.cgs_level = [0, 1, 2] # set the options for the level
-    mg_grammar.optimize_cgc_scalingfactor = False # optimises the weights / scaling factors for coarse-grid correction (set to False with hyteg)
+    mg_grammar.optimize_cgc_scalingfactor = True # optimises the weights / scaling factors for coarse-grid correction (set to False with hyteg)
     assert flexmg_min_level < flexmg_max_level
     assert flexmg_min_level >= cgs_level
     assert flexmg_max_level - flexmg_min_level < 5
     if eval_software == "hyteg":
         assert not mg_grammar.optimize_cgc_scalingfactor
-    program_generator = ProgramGenerator(flexmg_min_level,flexmg_max_level , mpi_rank, cgs_level)
-
+        program_generator = ProgramGeneratorHyteg(flexmg_min_level,flexmg_max_level , mpi_rank, cgs_level)
+        mg_grammar.use_hypre = False
+        mg_grammar.use_hyteg = True
+    elif eval_software == "hypre":
+        program_generator = ProgramGeneratorHypre(flexmg_min_level, flexmg_max_level, mpi_rank)
+        mg_grammar.use_hypre = True
+        mg_grammar.use_hyteg = False
 
     if mpi_rank == 0 and not os.path.exists(f'{cwd}/{problem_name}'):
         # Create directory for checkpoints and output data
