@@ -245,7 +245,7 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        mpiarg = ["srun","-ntasks-per-socket=8","-n","8"]
+        mpiarg = ["srun","-n","8"]
         output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
         # check if the code ran successfully
         if output.returncode != 0:
