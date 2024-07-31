@@ -239,6 +239,7 @@ class Types:
         # General Types
         self.Partitioning = self._init_type("Partitioning", previous_types)
         self.RelaxationFactorIndex = self._init_type("RelaxationFactorIndex", previous_types)
+        self.RelaxOrder = self._init_type("RelaxOrder", previous_types)
         self.BlockShape = self._init_type("BlockShape", previous_types)
         if FAS:
             self.NewtonSteps = self._init_type("NewtonSteps", previous_types)
@@ -320,9 +321,12 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         cycle = coarse_grid_correction(prolongation_operator, state, restriction_operator)
         return update(relaxation_factor_index, -1, terminals.no_partitioning, cycle)
     
-    def smoothing(partitioning_, generate_smoother, cycle, relaxation_factor_index=-1, relaxation_factor_index_outer=-1):
+    def smoothing(partitioning_, generate_smoother, cycle, relaxation_factor_index=-1, relaxation_factor_index_outer=-1, relax_order=-1):
         assert isinstance(cycle.correction, base.Residual), 'Invalid production: expected residual'
-        smoothing_operator = generate_smoother(cycle.correction.operator)
+        if relax_order != -1:
+            smoothing_operator = generate_smoother(cycle.correction.operator, relax_order)
+        else:
+            smoothing_operator = generate_smoother(cycle.correction.operator)
         cycle = apply(base.Inverse(smoothing_operator), cycle)
         return update(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle)
 
@@ -348,18 +352,18 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         return smoothing(partitioning_, generate_jacobi_newton_fixed, cycle, relaxation_factor_index)
     
     # smoothers in hypre
-    def jacobi(relaxation_factor_index, relaxation_factor_index_outer,  partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_jacobi, cycle, relaxation_factor_index, relaxation_factor_index_outer)
-    def GS_forward(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
-    def GS_backward(relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index, relaxation_factor_index_outer)
-    def l1jacobi(partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_l1jacobi, cycle)
-    def l1GS_forward(partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_l1GS_forward, cycle)
-    def l1GS_backward(partitioning_, cycle):
-        return smoothing(partitioning_, smoother.generate_l1GS_backward, cycle)
+    def jacobi(relax_order, relaxation_factor_index, relaxation_factor_index_outer,  partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_jacobi, cycle, relaxation_factor_index, relaxation_factor_index_outer, relax_order)
+    def GS_forward(relax_order, relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_GS_forward, cycle, relaxation_factor_index, relaxation_factor_index_outer, relax_order)
+    def GS_backward(relax_order, relaxation_factor_index, relaxation_factor_index_outer, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_GS_backward, cycle, relaxation_factor_index, relaxation_factor_index_outer, relax_order)
+    def l1jacobi(relax_order, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1jacobi, cycle, relax_order=relax_order)
+    def l1GS_forward(relax_order, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1GS_forward, cycle, relax_order=relax_order)
+    def l1GS_backward(relax_order, partitioning_, cycle):
+        return smoothing(partitioning_, smoother.generate_l1GS_backward, cycle, relax_order=relax_order)
             
     
     # smoothers in hyteg
@@ -426,12 +430,12 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, decoupled_jacobi, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"decoupled_jacobi_{depth}")
 
     if use_hypre:
-        add_primitive(pset, jacobi, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
-        add_primitive(pset, GS_forward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex,  types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
-        add_primitive(pset, GS_backward, [types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
-        add_primitive(pset, l1jacobi, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1jacobi_{depth}")
-        add_primitive(pset, l1GS_forward, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_forward_{depth}")
-        add_primitive(pset, l1GS_backward, [types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_backward_{depth}")
+        add_primitive(pset, jacobi, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
+        add_primitive(pset, GS_forward, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex,  types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
+        add_primitive(pset, GS_backward, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
+        add_primitive(pset, l1jacobi, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1jacobi_{depth}")
+        add_primitive(pset, l1GS_forward, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_forward_{depth}")
+        add_primitive(pset, l1GS_backward, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_backward_{depth}")
     elif use_hyteg:
         # add/remove smoothers for the optimization here.
         add_primitive(pset, SOR, [types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"sor_{depth}")
@@ -555,6 +559,8 @@ def generate_primitive_set(approximation, rhs, dimension, coarsening_factors, ma
     pset = PrimitiveSetTyped("main", [], types.S_h)
     pset.addTerminal((approximation, rhs), types.S_guard_h, 'u_and_f')
     pset.addTerminal(terminals.no_partitioning, types.Partitioning, terminals.no_partitioning.get_name())
+    pset.addTerminal(0, types.RelaxOrder)
+    pset.addTerminal(1, types.RelaxOrder)
     # Start: Exclude for FAS
     if enable_partitioning:
         for p in terminals.partitionings:

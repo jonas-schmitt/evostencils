@@ -47,29 +47,35 @@ def generate_jacobi_newton(operator: system.Operator, n_newton_steps: int):
     return base.Addition(system.ElementwiseDiagonal(operator), system.Jacobian(operator, n_newton_steps))
 
 # hypre smoothers
-def generate_jacobi(operator: system.Operator):
+def generate_jacobi(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.Jacobi
+    op.relax_order = relax_order
     return op
-def generate_GS_forward(operator: system.Operator):
+def generate_GS_forward(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.GS_Forward
+    op.relax_order = relax_order
     return op
-def generate_GS_backward(operator: system.Operator):
+def generate_GS_backward(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.GS_Backward
+    op.relax_order = relax_order
     return op
-def generate_l1jacobi(operator: system.Operator):
+def generate_l1jacobi(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.l1Jacobi
+    op.relax_order = relax_order
     return op
-def generate_l1GS_forward(operator: system.Operator):
+def generate_l1GS_forward(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.l1GS_Forward
+    op.relax_order = relax_order
     return op
-def generate_l1GS_backward(operator: system.Operator):
+def generate_l1GS_backward(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.l1GS_Backward
+    op.relax_order = relax_order
     return op
 
 # hyteg smoothers

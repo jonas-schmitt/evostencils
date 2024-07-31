@@ -8,6 +8,7 @@ class System(base.Expression):
         self._entries = entries
         self._shape = shape
         self.smoother_type=None
+        self.relax_order = None
         super().__init__()
 
     @property
