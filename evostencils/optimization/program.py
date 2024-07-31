@@ -850,7 +850,7 @@ class Optimizer:
                                   node_replacement_probability=0.1, optimization_method=None, use_random_search=False,
                                   levels_per_run=None, evaluation_samples=3, continue_from_checkpoint=False,
                                   maximum_local_system_size=8, model_based_estimation=False, pde_parameter_values=None,
-                                  verbose=False):
+                                  verbose=False, get_pset=False):
         self._maximum_local_system_size = maximum_local_system_size
         levels = self.max_level - self.min_level
         if levels_per_run is None:
@@ -937,6 +937,8 @@ class Optimizer:
                     return math.log(self.epsilon) / math.log(convergence_factor) * execution_time
                 else:
                     return convergence_factor * math.sqrt(self.infinity) * execution_time
+            if get_pset:
+                return pset
             pop, log, hof, evaluation_min_level, evaluation_max_level,fitnesses = \
                 optimization_method(pset, initial_population_size, generations, generalization_interval, mu_, lambda_,
                                     crossover_probability, mutation_probability,
