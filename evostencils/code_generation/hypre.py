@@ -1,9 +1,9 @@
-import subprocess,re
+import subprocess,re,traceback
 from statistics import mean
 import os
 import shutil
 import numpy as np
-
+import random
 from enum import Enum
 class InterGridOperations(Enum):
     Restriction = -1
@@ -139,7 +139,7 @@ class ProgramGenerator:
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
                     while cur_lvl > 0:
-                        self.smoothers.append(Smoothers.l1GS_Forward)
+                        self.smoothers.append(Smoothers.GS_Forward)
                         self.relax_order.append(0)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
@@ -157,7 +157,7 @@ class ProgramGenerator:
                         self.relaxation_weights_outer.append(1)
                         self.intergrid_ops.append(InterGridOperations.Interpolation)
                         self.cgc_weights.append(1)
-                        self.smoothers.append(Smoothers.l1GS_Backward)
+                        self.smoothers.append(Smoothers.GS_Forward)
                         self.relax_order.append(0)
                         self.num_sweeps.append(1)
                         cur_lvl +=1
@@ -245,13 +245,22 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        mpiarg = ["srun","-n","8"]
-        output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-        # check if the code ran successfully
-        if output.returncode != 0:
+        mpiarg = ["mpirun","-np","8"]
+        try:
             output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-            print("error")
+        
+        # check if the code ran successfully
+        #if output.returncode != 0:
+         #   output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+          #  print("error")
+           # print(output.args)
+            #print("Standard Error:", output.stderr)
+        
+        except Exception as e:
+            print("An error occurred:")
             print(output.args)
+            print("Standard Error:", output.stderr)
+            traceback.print_exc()
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
         run_time = [1e100] * self.n_individuals
@@ -286,8 +295,10 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
-        evaluation_samples = 1
+        rhs_newton_itr = 2#random.choice([3])# choose the rhs randomly
+
+       #cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
+        cmdline_args = ["-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8","-amgusrinputs","1"]  
         for arg in args:
             # get expression list from the input arguments
             if type(arg).__name__ == 'list':
@@ -296,7 +307,7 @@ class ProgramGenerator:
                         expression_list.append(cycle)
             elif type(arg).__name__ == 'Cycle':
                 expression_list.append(arg)
-
+        evaluation_samples = 1
         if 'evaluation_samples' in kwargs:
             evaluation_samples = kwargs['evaluation_samples']
         
