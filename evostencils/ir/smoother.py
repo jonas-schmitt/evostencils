@@ -62,6 +62,11 @@ def generate_GS_backward(operator: system.Operator, relax_order: int):
     op.smoother_type = hypre_smoothers.GS_Backward
     op.relax_order = relax_order
     return op
+def generate_GS_symmetric(operator: system.Operator, relax_order: int):
+    op = system.ElementwiseDiagonal(operator)
+    op.smoother_type = hypre_smoothers.GS_Sym
+    op.relax_order = relax_order
+    return op
 def generate_l1jacobi(operator: system.Operator, relax_order: int):
     op = system.ElementwiseDiagonal(operator)
     op.smoother_type = hypre_smoothers.l1Jacobi
