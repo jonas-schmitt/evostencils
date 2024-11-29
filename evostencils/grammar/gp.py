@@ -43,7 +43,7 @@ def generate(pset, min_height, max_height, condition, return_type=None, subtree=
     return expression
 
 
-def genGrow(pset, min_height, max_height, type_=None, size_limit=150):
+def genGrow(pset, min_height, max_height, type_=None, size_limit=1000):
     def condition(height, depth):
         return depth < height
     result = generate(pset, min_height, max_height, condition, type_)
