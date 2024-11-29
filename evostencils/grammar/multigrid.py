@@ -435,7 +435,7 @@ def add_level(pset, terminals: Terminals, types: Types, depth, coarsest=False, F
         add_primitive(pset, jacobi, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"jacobi_{depth}")
         add_primitive(pset, GS_forward, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex,  types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_forward_{depth}")
         add_primitive(pset, GS_backward, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_backward_{depth}")
-        add_primitive(pset, GS_symmetric, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_symmetric_{depth}")
+        #add_primitive(pset, GS_symmetric, [types.RelaxOrder, types.RelaxationFactorIndex, types.RelaxationFactorIndex, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"GS_symmetric_{depth}")
         add_primitive(pset, l1jacobi, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1jacobi_{depth}")
         add_primitive(pset, l1GS_forward, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_forward_{depth}")
         add_primitive(pset, l1GS_backward, [types.RelaxOrder, types.Partitioning], [types.C_h, types.C_guard_h], [types.S_h, types.S_guard_h], f"l1GS_backward_{depth}")

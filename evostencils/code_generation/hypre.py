@@ -140,7 +140,7 @@ class ProgramGenerator:
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
                     while cur_lvl > 0:
-                        self.smoothers.append(Smoothers.GS_Sym)
+                        self.smoothers.append(Smoothers.l1GS_Forward)
                         self.relax_order.append(0)
                         self.num_sweeps.append(1)
                         self.relaxation_weights.append(1)
@@ -158,7 +158,7 @@ class ProgramGenerator:
                         self.relaxation_weights_outer.append(1)
                         self.intergrid_ops.append(InterGridOperations.Interpolation)
                         self.cgc_weights.append(1)
-                        self.smoothers.append(Smoothers.GS_Sym)
+                        self.smoothers.append(Smoothers.l1GS_Backward)
                         self.relax_order.append(0)
                         self.num_sweeps.append(1)
                         cur_lvl +=1
@@ -246,10 +246,10 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        mpiarg = ["mpirun","-np","8"]
+        mpiarg = ["likwid-mpirun","-np","8"]#,"-nperdomain","S:8"]
         try:
             output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-        
+           # output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
         # check if the code ran successfully
         #if output.returncode != 0:
          #   output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
@@ -296,10 +296,10 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        rhs_newton_itr = 2#random.choice([3])# choose the rhs randomly
+        rhs_newton_itr = 3#random.choice([3])# choose the rhs randomly
 
        #cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
-        cmdline_args = ["-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8","-amgusrinputs","1"]  
+        cmdline_args = ["-P","4","2","1","-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8","-amgusrinputs","1"]  
         for arg in args:
             # get expression list from the input arguments
             if type(arg).__name__ == 'list':
