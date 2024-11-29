@@ -23,9 +23,10 @@ def main():
         print(f"Running {nprocs} MPI {tmp}")
 
     # II. problem specifications
-    problem_name = "3dpoisson_withrelaxorder"
-    flexmg_min_level = 5
-    flexmg_max_level = 9
+    problem_name = "FE2T_4t_3i_8procs"
+    
+    flexmg_min_level =8 
+    flexmg_max_level =12 
     cgs_level = 0
     mg_grammar.optimize_cgs = False # optimises the tolerance and level of the coarse-grid solver
     if mg_grammar.optimize_cgs:
@@ -58,12 +59,12 @@ def main():
 
     # IV. optimization parameters
     optimization_method = optimizer.NSGAII
-    mu_ = 256 # Population size
+    mu_ = 16#256 # Population size
     lambda_ = 4 # Number of offspring
-    generations = 100  # Number of generations
-    population_initialization_factor = 8  # Multiply mu_ by this factor to set the initial population size
-    generalization_interval = 150
-    crossover_probability = 0.7
+    generations = 3#100  # Number of generations
+    population_initialization_factor =1#64  # Multiply mu_ by this factor to set the initial population size
+    generalization_interval = 250
+    crossover_probability = 0.9
     mutation_probability = 1.0 - crossover_probability
     node_replacement_probability = 0.1  # Probability to perform mutation by altering a single node in the tree
     evaluation_samples = 1  # Number of evaluation samples
