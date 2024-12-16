@@ -15,6 +15,7 @@ def main():
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
     mpi_rank = comm.Get_rank()
+    hostname = MPI.Get_processor_name().split('.')[0]
     if nprocs > 1:
         tmp = "processes"
     else:
@@ -23,7 +24,7 @@ def main():
         print(f"Running {nprocs} MPI {tmp}")
 
     # II. problem specifications
-    problem_name = "FE2T_4t_3i_8procs"
+    problem_name = "FE2T_4t_1i_8procs"
     
     flexmg_min_level =8 
     flexmg_max_level =12 
@@ -42,7 +43,7 @@ def main():
         mg_grammar.use_hypre = False
         mg_grammar.use_hyteg = True
     elif eval_software == "hypre":
-        program_generator = ProgramGeneratorHypre(flexmg_min_level, flexmg_max_level, mpi_rank)
+        program_generator = ProgramGeneratorHypre(flexmg_min_level, flexmg_max_level, hostname, mpi_rank)
         mg_grammar.use_hypre = True
         mg_grammar.use_hyteg = False
 
@@ -59,10 +60,10 @@ def main():
 
     # IV. optimization parameters
     optimization_method = optimizer.NSGAII
-    mu_ = 16#256 # Population size
+    mu_ = 256 # Population size
     lambda_ = 4 # Number of offspring
-    generations = 3#100  # Number of generations
-    population_initialization_factor =1#64  # Multiply mu_ by this factor to set the initial population size
+    generations = 100  # Number of generations
+    population_initialization_factor =64  # Multiply mu_ by this factor to set the initial population size
     generalization_interval = 250
     crossover_probability = 0.9
     mutation_probability = 1.0 - crossover_probability

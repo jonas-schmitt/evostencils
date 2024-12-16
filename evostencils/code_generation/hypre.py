@@ -24,7 +24,7 @@ class Smoothers(Enum):
     NoSmoothing = -1
 
 class ProgramGenerator:
-    def __init__(self,min_level, max_level, mpi_rank=0) -> None:
+    def __init__(self,min_level, max_level, hostname, mpi_rank=0) -> None:
         
         # INPUT
         self.min_level = min_level
@@ -48,6 +48,12 @@ class ProgramGenerator:
         self.list_states = []
         self.cycle_objs = []
         self.n_individuals = 0
+
+        # if rank is even, pin to socket 0, else pin to socket 1
+        if self.mpi_rank % 2 == 0:
+            self.mpi_pinning_arg = ['-host',f'{hostname}','-genv','I_MPI_PIN_PROCESSOR_LIST=0,1,2,3,4,5,6,7']
+        else:
+            self.mpi_pinning_arg = ['-host',f'{hostname}','-genv','I_MPI_PIN_PROCESSOR_LIST=36,37,38,39,40,41,42,43']
 
         # AMG PARAMETERS
         self.intergrid_ops = [] # sequence of inter-grid operations in the multigrid solver -> describes the cycle structure. 
@@ -246,7 +252,7 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        mpiarg = ["likwid-mpirun","-np","8"]#,"-nperdomain","S:8"]
+        mpiarg = ["mpirun","-np","8"] + self.mpi_pinning_arg
         try:
             output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
            # output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
@@ -296,7 +302,7 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        rhs_newton_itr = 3#random.choice([3])# choose the rhs randomly
+        rhs_newton_itr = 1#random.choice([3])# choose the rhs randomly
 
        #cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
         cmdline_args = ["-P","4","2","1","-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8","-amgusrinputs","1"]  
