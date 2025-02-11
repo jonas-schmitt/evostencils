@@ -15,6 +15,7 @@ def main():
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
     mpi_rank = comm.Get_rank()
+    hostname = MPI.Get_processor_name().split('.')[0]
     if nprocs > 1:
         tmp = "processes"
     else:
@@ -22,10 +23,15 @@ def main():
     if mpi_rank == 0:
         print(f"Running {nprocs} MPI {tmp}")
 
+    #rank = MPI.COMM_WORLD.Get_rank()
+    #size = MPI.COMM_WORLD.Get_size()
+    node_name = MPI.Get_processor_name()
+    #print(f"Process {mpi_rank+1} of {nprocs}: MPI Library Version: {MPI.Get_library_version()},node name: {node_name}")
+
     # II. problem specifications
-    problem_name = "3dpoisson_withrelaxorder"
-    flexmg_min_level = 5
-    flexmg_max_level = 9
+    problem_name = "ares_1MDOFs"
+    flexmg_min_level = 3
+    flexmg_max_level =7 
     cgs_level = 0
     mg_grammar.optimize_cgs = False # optimises the tolerance and level of the coarse-grid solver
     if mg_grammar.optimize_cgs:
@@ -41,7 +47,7 @@ def main():
         mg_grammar.use_hypre = False
         mg_grammar.use_hyteg = True
     elif eval_software == "hypre":
-        program_generator = ProgramGeneratorHypre(flexmg_min_level, flexmg_max_level, mpi_rank)
+        program_generator = ProgramGeneratorHypre(flexmg_min_level, flexmg_max_level, hostname, mpi_rank)
         mg_grammar.use_hypre = True
         mg_grammar.use_hyteg = False
 
@@ -59,7 +65,7 @@ def main():
     # IV. optimization parameters
     optimization_method = optimizer.NSGAII
     mu_ = 256 # Population size
-    lambda_ = 4 # Number of offspring
+    lambda_ = 4  # Number of offspring
     generations = 100  # Number of generations
     population_initialization_factor = 8  # Multiply mu_ by this factor to set the initial population size
     generalization_interval = 150

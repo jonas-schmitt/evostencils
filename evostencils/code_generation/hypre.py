@@ -23,7 +23,7 @@ class Smoothers(Enum):
     NoSmoothing = -1
 
 class ProgramGenerator:
-    def __init__(self,min_level, max_level, mpi_rank=0) -> None:
+    def __init__(self,min_level, max_level, hostname, mpi_rank=0) -> None:
         
         # INPUT
         self.min_level = min_level
@@ -47,6 +47,12 @@ class ProgramGenerator:
         self.list_states = []
         self.cycle_objs = []
         self.n_individuals = 0
+
+        # if rank is even, pin to socket 0, else pin to socket 1
+        if self.mpi_rank % 2 == 0:
+            self.mpi_pinning_arg = ['--host',f'{hostname}:8','--cpu-list','0:1-8']
+        else:
+            self.mpi_pinning_arg = ['--host',f'{hostname}:8','--cpu-list','1:1-8']
 
         # AMG PARAMETERS
         self.intergrid_ops = [] # sequence of inter-grid operations in the multigrid solver -> describes the cycle structure. 
@@ -245,13 +251,19 @@ class ProgramGenerator:
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
         # run the code and pass the command line arguments from the input list
-        mpiarg = ["srun","-n","8"]
-        output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+        #mpiarg = ["mpirun","--report-bindings","--bind-to","core","-np","8"]
+       # mpiarg = ['srun', '-n', '8']
+        mpiarg = ["mpirun","-np","8","--oversubscribe"] + self.mpi_pinning_arg
+        #try:
+        output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True,env=os.environ)
+        #except subprocess.CalledProcessError as e:
+        #    print(e)
         # check if the code ran successfully
+       
         if output.returncode != 0:
-            output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
+           # output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
             print("error")
-            print(output.args)
+            print(output)
         # parse the output to extract wall clock time, number of iterations, convergence factor. 
         output_lines = output.stdout.split('\n')
         run_time = [1e100] * self.n_individuals
@@ -286,7 +298,8 @@ class ProgramGenerator:
         time_solution_list = []
         convergence_factor_list = []
         n_iterations_list = []
-        cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
+        #cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
+        cmdline_args = ["-P","2","2","2", "-x0rand","-solver","1","-fromfile","/p/lustre1/parthasa/05.11.24/8ranks_124999/Ares_Matrix_num_1.UMatrix","-pout","0","-amgusrinputs","1"]
         evaluation_samples = 1
         for arg in args:
             # get expression list from the input arguments
