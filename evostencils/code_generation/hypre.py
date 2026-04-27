@@ -9,6 +9,7 @@ class InterGridOperations(Enum):
     Restriction = -1
     Interpolation = 1
     AltSmoothing = 0
+    Terminate = -2
 class CorrectionTypes(Enum):
     Smoothing = 1
     CoarseGridCorrection = 0
@@ -47,8 +48,6 @@ class ProgramGenerator:
         # TEMP OBJECTS
         self.list_states = []
         self.cycle_objs = []
-        self.n_individuals = 0
-
         # if rank is even, pin to socket 0, else pin to socket 1
         if self.mpi_rank % 2 == 0:
             self.mpi_pinning_arg = ['-host',f'{hostname}','-genv','I_MPI_PIN_PROCESSOR_LIST=0,1,2,3,4,5,6,7']
@@ -71,7 +70,8 @@ class ProgramGenerator:
         self.cz = 1
 
         #OUTPUT
-        self.amgcycle= "" # the command line arguments for AMG specification in hypre.
+        self.amgcycle= "" # string representation of the AMG cycle
+        self.amgcycle_args = [] # list of -flexamg_* flags for the ij binary
 
     @property
     def uses_FAS(self):
@@ -88,6 +88,7 @@ class ProgramGenerator:
         self.relaxation_weights_outer.clear()
         self.cgc_weights.clear()
         self.amgcycle = ""
+        self.amgcycle_args = []
 
     def traverse_graph(self, expression): 
         expr_type = type(expression).__name__
@@ -145,29 +146,11 @@ class ProgramGenerator:
             assert state_lvl >= cur_lvl
             if state['correction_type']==CorrectionTypes.Smoothing: # smoothing correction
                 if state['component'] == Smoothers.CGS_GE:
-                    while cur_lvl > 0:
-                        self.smoothers.append(Smoothers.l1GS_Forward)
-                        self.relax_order.append(0)
-                        self.num_sweeps.append(1)
-                        self.relaxation_weights.append(1)
-                        self.relaxation_weights_outer.append(1)
-                        self.intergrid_ops.append(InterGridOperations.Restriction)
-                        self.cgc_weights.append(1)
-                        cur_lvl -=1
                     self.smoothers.append(Smoothers.CGS_GE)
                     self.relax_order.append(0)
                     self.num_sweeps.append(1)
                     self.relaxation_weights.append(1)
                     self.relaxation_weights_outer.append(1)
-                    while cur_lvl < state_lvl:
-                        self.relaxation_weights.append(1)
-                        self.relaxation_weights_outer.append(1)
-                        self.intergrid_ops.append(InterGridOperations.Interpolation)
-                        self.cgc_weights.append(1)
-                        self.smoothers.append(Smoothers.l1GS_Backward)
-                        self.relax_order.append(0)
-                        self.num_sweeps.append(1)
-                        cur_lvl +=1
                 else:
                     self.smoothers.append(state['component'])
                     self.relax_order.append(state['relax_order'])
@@ -220,128 +203,110 @@ class ProgramGenerator:
                     self.num_sweeps.append(0)
                     self.relaxation_weights.append(0)
                     self.relaxation_weights_outer.append(0)
+
+        # add termination state at the end of the cycle
+        self.intergrid_ops.append(InterGridOperations.Terminate)
+        # add 0 to cgc_weights so that length of cgc_weights is equal to length of intergrid_ops
+        self.cgc_weights.append(0)
  
     def generate_cmdline_args(self):
         # assert checks
         # sum of elements in intergrid_ops is zero, converting the enum to int
         assert sum([i.value for i in self.intergrid_ops]) == 0, "The sum of intergrid operations should be zero"
         # the grid hierarchy should be for self.max_level levels.
-        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level ==0, "The grid hierarchy should be for self.max_level levels"
+        assert min([sum([i.value for i in self.intergrid_ops[:j+1]]) for j in range(len(self.intergrid_ops))]) + self.max_level - self.min_level ==0, "The grid hierarchy should be for self.max_level levels"
         # length of intergrid_ops is one less than length of smoothers
-        assert len(self.intergrid_ops) == len(self.smoothers) - 1, "The number of intergrid operations should be one less than the number of nodes in the amg cycle"
+        assert len(self.intergrid_ops) == len(self.smoothers), "The number of intergrid operations should be equal to the number of nodes in the amg cycle"
         # length of smoothing weights is equal to length of smoothers and num_sweeps
         assert len(self.smoothers) == len(self.relax_order) == len(self.relaxation_weights) == len(self.relaxation_weights_outer) == len(self.num_sweeps), "The number of smoothing weights should be equal to the number of nodes in the amg cycle"
         # length of cgc weights is equal to length of intergrid_ops
         assert len(self.intergrid_ops) == len(self.cgc_weights), "The number of coarse grid correction weights should be equal to the number of intergrid operations in the amg cycle"
-        # list to comma separated string
-        def list_to_string(list):
-            string = ""
-            for item in list:
-                # check if item is an enum
-                if type(item).__name__ == 'Smoothers' or type(item).__name__ == 'InterGridOperations':
-                    string += str(item.value) + ","
-                else:
-                    string += str(item) + ","
-            return string[:-1]
-        
-        # generate the AMG cycle string
-        self.amgcycle = f"{len(self.intergrid_ops) + 1}/{list_to_string(self.intergrid_ops)}/{list_to_string(self.smoothers)}/{list_to_string(self.num_sweeps)}/{list_to_string(self.relax_order)}/{list_to_string(self.relaxation_weights_outer)}/{list_to_string(self.relaxation_weights)}/{list_to_string(self.cgc_weights)}"
+        def to_str(lst):
+            return ','.join(str(v.value if hasattr(v, 'value') else v) for v in lst)
+
+        # cycle_struct: intergrid op after each smoother node, -2 as terminator on the last
+        cycle_struct = [op.value for op in self.intergrid_ops] + [-2]
+        cgc_scaling  = list(self.cgc_weights) + [0.0]
+
+        self.amgcycle_args = [
+            '-flexamg_cycle_struct', to_str(cycle_struct),
+            '-flexamg_relax_types',  to_str(self.smoothers),
+            '-flexamg_relax_orders', to_str(self.relax_order),
+            '-flexamg_cgc_scaling',  to_str(cgc_scaling),
+            '-flexamg_relax_weights', to_str(self.relaxation_weights),
+            '-flexamg_outer_weights', to_str(self.relaxation_weights_outer),
+        ]
+        self.amgcycle = ' '.join(self.amgcycle_args)
 
     def compile_code(self):
         subprocess.run(['make','clean'],cwd=self.build_path)
         subprocess.run(['make',self.problem],cwd=self.build_path)
     def execute_code(self, cmd_args=[]):
-        # run the code and pass the command line arguments from the input list
         mpiarg = ["mpirun","-np","8"] + self.mpi_pinning_arg
         try:
             output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-           # output = subprocess.run([self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-        # check if the code ran successfully
-        #if output.returncode != 0:
-         #   output = subprocess.run(mpiarg + [self.build_path + self.problem] + cmd_args, capture_output=True, text=True)
-          #  print("error")
-           # print(output.args)
-            #print("Standard Error:", output.stderr)
-        
-        except Exception as e:
+        except Exception:
             print("An error occurred:")
-            print(output.args)
-            print("Standard Error:", output.stderr)
             traceback.print_exc()
-        # parse the output to extract wall clock time, number of iterations, convergence factor. 
+            return 1e100, 1e100, 1e100
         output_lines = output.stdout.split('\n')
-        run_time = [1e100] * self.n_individuals
-        n_iterations =[1e100] * self.n_individuals
-        convergence_factor = [1e100] *  self.n_individuals
+        run_time = 1e100
+        n_iterations = 1e100
+        convergence_factor = 1e100
         solve_phase = False
-        i = 0 
         for line in output_lines:
             if "Solve phase times" in line:
-                solve_phase=True
+                solve_phase = True
             if "Convergence Factor" in line:
                 match = re.search(r'\d+\.\d+', line)
                 if match:
-                    convergence_factor[i] = float(match.group())
-                i +=1 
+                    convergence_factor = float(match.group())
             elif "wall clock time" in line and solve_phase:
                 match = re.search(r'\d+\.\d+', line)
                 if match:
-                    run_time[i]=float(match.group())*1000 # convert to milliseconds
-                solve_phase=False
+                    run_time = float(match.group()) * 1000
+                solve_phase = False
             elif "Iterations" in line:
                 match = re.search(r'\d+', line)
                 if match:
-                    n_iterations[i] = int(match.group())
-        
-        # if convergence factor is greater than 1, set n_iterations to 1e100
-
-        n_iterations = [1e100 if cf > 1 else ni for cf, ni in zip(convergence_factor, n_iterations)]
+                    n_iterations = int(match.group())
+        if convergence_factor > 1:
+            n_iterations = 1e100
         return run_time, convergence_factor, n_iterations
     def generate_and_evaluate(self, *args, **kwargs):
         expression_list = []
-        time_solution_list = []
-        convergence_factor_list = []
-        n_iterations_list = []
-        rhs_newton_itr = 1#random.choice([3])# choose the rhs randomly
-
-       #cmdline_args = ["-P","2","2","2","-rhszero", "-x0rand","-pout","0","-n",str(self.nx),str(self.ny),str(self.nz),"-c",str(self.cx),str(self.cy),str(self.cz),"-amgusrinputs","1"]
-        cmdline_args = ["-P","4","2","1","-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8","-amgusrinputs","1"]  
+        rhs_newton_itr = 1
+        base_cmdline_args = ["-P","4","2","1","-fromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_A_8procs04_02_01_004_00{rhs_newton_itr}","-rhsfromfile",f"/home/vault/iwia/iwia058h/8_procs_89100_dofs/ij_b_8procs04_02_01_004_00{rhs_newton_itr}","-pout","0","-solver","3","-th","0.8","-rlx_down","6","-rlx_up","6","-k","100","-mg_max_iter","500","-precon_cycles","1","-falgout","-mxrs","0.9","-tol","1e-4","-atol","1e-8"]
         for arg in args:
-            # get expression list from the input arguments
             if type(arg).__name__ == 'list':
                 for cycle in arg:
                     if type(cycle).__name__ == 'Cycle':
                         expression_list.append(cycle)
             elif type(arg).__name__ == 'Cycle':
                 expression_list.append(arg)
-        evaluation_samples = 1
-        if 'evaluation_samples' in kwargs:
-            evaluation_samples = kwargs['evaluation_samples']
-        
-        self.n_individuals = len(expression_list)
-        cmdline_args[-1]=str(self.n_individuals)
+        evaluation_samples = kwargs.get('evaluation_samples', 1)
+
+        time_results = []
+        convergence_results = []
+        iteration_results = []
         for expression in expression_list:
             self.reset()
             self.list_states = self.traverse_graph(expression)
-    
-            # fill in the AMG parameter list based on the sequence of AMG states visited in the GP tree.
             self.set_amginputs()
-            
-            # generate cmd line arguments to set amg inputs
             self.generate_cmdline_args()
-            cmdline_args.append(self.amgcycle)
+            ind_times, ind_cf, ind_ni = [], [], []
+            for _ in range(evaluation_samples):
+                rt, cf, ni = self.execute_code(base_cmdline_args + self.amgcycle_args)
+                ind_times.append(rt)
+                ind_cf.append(cf)
+                ind_ni.append(ni)
+            time_results.append(mean(ind_times))
+            convergence_results.append(mean(ind_cf))
+            iteration_results.append(mean(ind_ni))
 
-        # run the code and pass the command line arguments from the list
-        for _ in range(evaluation_samples):
-            run_time, convergence, n_iterations = self.execute_code(cmdline_args)
-            time_solution_list.append(run_time)
-            convergence_factor_list.append(convergence)
-            n_iterations_list.append(n_iterations)
-
-        array_mean_time = np.atleast_1d(np.mean(time_solution_list,axis=0))
-        array_mean_convergence = np.atleast_1d(np.mean(convergence_factor_list,axis=0))
-        array_mean_iterations = np.atleast_1d(np.mean(n_iterations_list,axis=0))
-        
+        array_mean_time = np.atleast_1d(np.array(time_results))
+        array_mean_convergence = np.atleast_1d(np.array(convergence_results))
+        array_mean_iterations = np.atleast_1d(np.array(iteration_results))
         assert (array_mean_time.shape == array_mean_convergence.shape == array_mean_iterations.shape), "The shape of the output arrays with solver metrics (runtime, convergence, n_iterations) should be the same"
         return array_mean_time, array_mean_convergence, array_mean_iterations
     
